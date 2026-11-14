@@ -367,6 +367,14 @@ answers their client tools on the phone. Nothing sits in between: no backend, no
 - **Validate before handing over an APK:** `./gradlew testDebugUnitTest lintDebug assembleRelease`, review the
   screenshots in `android/build/screens/`, check the APK (`apksigner verify`, `aapt2 dump badging`), and run one real
   conversation on the emulator.
+- **APKs from a cloud session:** the owner's phone takes only APKs signed with his Mac's debug key (cert SHA-256
+  `28d4b3…`). The build signs with `REN_DEBUG_KEYSTORE` (that keystore, base64) when it is set, and bakes
+  `REN_GEMINI_TOKEN`, `REN_BRAVE_SEARCH_KEY`, `REN_BRAVE_ANSWERS_KEY` and `REN_ANSWERING_NUMBER` when
+  `ren.local.properties` is absent; `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` reach the web build from the
+  environment. All seven are the owner's cloud environment variables, which he enters himself. A container has no
+  Android SDK: install the command-line tools from dl.google.com, then `sdkmanager "platforms;android-36"
+  "build-tools;36.0.0"`, and point `android/local.properties` at it (`sdk.dir=`). Check the APK's signer with
+  `apksigner verify --print-certs` before handing it over.
 
 ## Repository map
 
