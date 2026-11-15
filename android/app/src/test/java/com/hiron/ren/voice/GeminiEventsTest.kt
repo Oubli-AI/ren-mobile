@@ -40,6 +40,20 @@ class GeminiEventsTest {
     }
 
     @Test
+    fun theJournalNeverShowsInTheChat() {
+        val state = replay(
+            """{"message": {"role": "assistant", "content": [{"toolUse": {"toolUseId": "j1", "name": "journal", "input": {"entry": "Likes dolphins."}}}]}}""",
+            """{"message": {"role": "user", "content": [{"toolResult": {"toolUseId": "j1", "status": "success", "content": [{"text": "Noted."}]}}]}}""",
+            """{"data": "Got it."}""",
+            """{"message": {"role": "assistant", "content": [{"text": "Got it."}]}}""",
+            """{"type": "bidi_tool_use_blocks", "tool_uses": [{"toolUseId": "j2", "name": "journal", "input": {}}]}""",
+            """{"stop_reason": "end_turn", "interrupts": []}""",
+        )
+        assertEquals("Got it.", (state.messages.single().parts.single() as Reply).text)
+        assertEquals(Activity.Done, state.activity)
+    }
+
+    @Test
     fun reasoningStreamsIntoTheTurnsChainOfThoughtAndEndsWhenTheModelActs() {
         val events = listOf(
             """{"reasoning": "**Checking** the battery. "}""" to 1_000L,

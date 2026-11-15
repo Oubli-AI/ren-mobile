@@ -312,7 +312,7 @@ answers their client tools on the phone. Nothing sits in between: no backend, no
     owner tests it).
   - Text (`/gemini/text`): the Strands harness, `create_harness(model="google/<text model>", effort=…)` for Gemini, with
     every built-in on (shell, read, write, edit, web_fetch, Google Search, programmatic_tool_caller, subagent, todos,
-    memory, sessions) plus python_repl, http_request, notebook, sleep, stop, handoff_to_user, swarm, graph and
+    sessions) plus python_repl, http_request, notebook, sleep, stop, handoff_to_user, swarm, graph and
     mcp_router. Gemini's default text model is gemini-4-argon.
   - Voice (`/gemini/voice`): `BidiAgent` with `GoogleGeminiLiveModel` on gemini-3.8-live, voice Algieba, the same
     vended tools except swarm and graph (subagent and web_fetch run on the text model) and the bidi docs'
@@ -326,6 +326,17 @@ answers their client tools on the phone. Nothing sits in between: no backend, no
     agents' own prompts, read when a conversation opens and filled like ElevenLabs' dynamic variables. The chat is
     built from Strands' events (`voice/GeminiEvents.kt`). `start_background_task`, `call_as_emrys`, Google Calendar
     and the ElevenLabs webhook tools have no Gemini counterpart yet.
+  - Memory (2026-11-15) is ren desktop's own, from the image's copy of ren (`agent/api/core/dreaming.py` at ren's
+    `10ceb73`), in place of the harness's built-in memory. Both agents search the user's second brain (`search_memory`,
+    by meaning, on Mistral's `mistral-embed`) and keep a journal (`journal`) in the folder `phone`, in ren's `local`
+    storage under `/config/emrys-gemini/storage`, per `user_id`. The text agent's turns are journaled and what it
+    remembers is injected before each turn, as the SDK does both, with no model call; the voice agent has the two
+    tools. Once the user has journaled nothing for 300 s (ren's `RON_MEMORY_IDLE_SECONDS`) the dream files every
+    journal into the brain as one version and removes what it filed, on NIM MiniMax M3.1 Flash, then Mistral GLM 5.3
+    Flash, NIM DeepSeek v4.1 Flash and Mistral Medium (ren's `DREAM_MODELS`, built by `providers.py`; the keys are
+    `NVIDIA_NIM_API_KEY` and `MISTRAL_API_KEY` in `gemini.env`). Both prompts end with ren's `JOURNAL_DIRECTIVE`, and
+    the chat leaves `journal` calls out (`GeminiEvents`). Checked on the image's packages with scripted models and
+    counted-word embeddings (a journaled turn, a dream, a search of what it filed); not run live.
 - **Phone MCP server** (`mcp/`, Settings › Remote tools): served on Ren's hub; see "The phone on the hub" above.
 - **Release builds** keep the SDK's private fields (`android/app/proguard-rules.pro`). The SDK reads the voice
   conversation token into a private field with Gson, and its own keep rules cover only public members. Without the
@@ -464,6 +475,10 @@ cd deploy/vm/hub && uvx --python 3.12 --with fastmcp==3.4.0 --with mcp==1.26.0 -
 9. **Telnyx** (PR #13): checked by mypy and offline (the model, its window from the catalogue, the catalogue's filter);
    not run live. It needs `TELNYX_API_KEY` in the VM's `gemini.env` and the `gemini` image rebuilt, then one typed
    conversation from Settings › Agents › Telnyx with a tool call.
+10. **Memory:** the `gemini` image is pinned to ren's dreaming commit (`10ceb73`, the branch `claude/dreaming-memory`),
+    which has to be on GitHub before the image builds; then one live conversation and one dream. The VM's `ren` image
+    (`deploy/vm/ren`, ren's backend for ren's pages, at `b112adf`) gets the same memory when its pin moves there, and
+    needs `MISTRAL_API_KEY` in its env for the brain's search and the dream's Mistral models.
 
 ## Before launch (checklist)
 1. **Release signing:** the APK is signed with the debug key (`android/app/build.gradle.kts`). Create a release
