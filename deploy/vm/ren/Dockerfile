@@ -1,11 +1,11 @@
 # ren desktop's backend for the phone, as ren desktop runs it (its deploy/systemd/ron-api.service runs
-# `python agent/api/main.py`): ren's own code (github.com/ImRonAI/TheBrowser) at one commit, unmodified, with its pinned
+# `python agent/api/main.py`): ren's own code (github.com/Oubli-AI/ren, was ImRonAI/TheBrowser) at one commit, unmodified, with its pinned
 # Strands source and requirements. compose.yaml sets what ren's deploy/ron.env.example leaves to the host.
 FROM python:3.14-slim-bookworm
-ARG REN_COMMIT=868d09770e13c96f28e0325540d52547bcf4c1ef
+ARG REN_COMMIT=0f6fa57b1b3896f19cb873aa713833baba42a351
 RUN apt-get update && apt-get install -y --no-install-recommends git build-essential socat && rm -rf /var/lib/apt/lists/*
 WORKDIR /opt/ren
-RUN git clone --filter=blob:none --no-checkout https://github.com/ImRonAI/TheBrowser.git . \
+RUN git clone --filter=blob:none --no-checkout https://github.com/Oubli-AI/ren.git . \
     && git sparse-checkout set agent deploy \
     && git checkout --detach "$REN_COMMIT"
 # The second install is ren's own pin for the MCP packages, then electron-playwright-mcp as ren installs it
