@@ -11,11 +11,12 @@ import { useEffect, useId, useMemo, useRef, useState, type ComponentType, type K
 import { RenIcon } from '@/components/brand'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { DocumentIcon, DocumentTextIcon, GlobeAltIcon, ChatBubbleLeftRightIcon, FolderIcon, ClipboardDocumentListIcon, CalendarDaysIcon, ArrowUpTrayIcon, ChevronLeftIcon, ChevronRightIcon, MagnifyingGlassIcon, XMarkIcon, CheckIcon, LinkIcon, ArrowPathIcon } from '@heroicons/react/24/outline'
+import { DocumentIcon, DocumentTextIcon, GlobeAltIcon, ChatBubbleLeftRightIcon, FolderIcon, ClipboardDocumentListIcon, CalendarDaysIcon, ArrowUpTrayIcon, ChevronLeftIcon, ChevronRightIcon, MagnifyingGlassIcon, XMarkIcon, CheckIcon, LinkIcon, ArrowPathIcon, BookmarkIcon } from '@heroicons/react/24/outline'
 import { cn } from '@/utils/cn'
 import { API_BASE_URL } from '@/lib/api-base'
 import { createContextClient, formatBytes } from '@/lib/context-api'
 import { savedContextItem, searchContexts, type CategoryId, type ContextCategory, type ContextItem, type ContextType } from '@/lib/chat-context'
+import { useContextAgentStore } from '@/stores/contextAgentStore'
 import { useContextSources } from './useContextSources'
 
 export type { ContextItem } from '@/lib/chat-context'
@@ -34,6 +35,7 @@ const TYPE_ICON: Record<ContextType, Icon> = {
   file: DocumentIcon,
 }
 const CATEGORY_ICON: Record<CategoryId, Icon> = {
+  context: BookmarkIcon,
   tabs: GlobeAltIcon,
   conversations: ChatBubbleLeftRightIcon,
   issues: ClipboardDocumentListIcon,
@@ -43,8 +45,14 @@ const CATEGORY_ICON: Record<CategoryId, Icon> = {
   documents: DocumentTextIcon,
 }
 const CATEGORY_TYPES: Record<CategoryId, ContextType[]> = {
-  tabs: ['tab'], conversations: ['conversation'], issues: ['issue', 'task'], projects: ['project'],
-  dates: ['event'], interests: ['interest'], documents: ['document', 'file'],
+  context: ['file'],
+  tabs: ['tab'],
+  conversations: ['conversation'],
+  issues: ['issue', 'task'],
+  projects: ['project'],
+  dates: ['event'],
+  interests: ['interest'],
+  documents: ['document'],
 }
 const MAX_ROWS = 100
 
@@ -53,10 +61,11 @@ export const contextIcon = (type: ContextType): Icon => TYPE_ICON[type] ?? Docum
 const META_TONE: Record<string, string> = {
   Active: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
   Overdue: 'bg-rose-500/10 text-rose-600 dark:text-rose-400',
-  Today: 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
+  Today: 'bg-sky-500/10 text-sky-700 dark:text-sky-300',
   Now: 'bg-accent/10 text-accent dark:text-accent-light',
   Critical: 'bg-rose-500/10 text-rose-600 dark:text-rose-400',
-  High: 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
+  High: 'bg-blurple-500/10 text-volt dark:bg-blurple-400/15',
+  Ask: 'bg-blurple-500/10 text-volt dark:bg-blurple-400/15',
 }
 
 /** One selectable row: favicon, status dot or type icon, name, description, meta badge and a check when chosen. */
@@ -113,9 +122,11 @@ interface ContextPickerProps {
   width?: number
   /** The dropdown's right edge never passes this x (px); defaults to 8px inside the window. */
   boundsRight?: number
+  /** Height cap of the scrolling list in px (default 320). */
+  maxListHeight?: number
 }
 
-export function ContextPicker({ selectedContexts, onContextsChange, className, anchor = 'top', disabled = false, width = 336, boundsRight }: ContextPickerProps) {
+export function ContextPicker({ selectedContexts, onContextsChange, className, anchor = 'top', disabled = false, width = 336, boundsRight, maxListHeight = 320 }: ContextPickerProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [activeCategory, setActiveCategory] = useState<CategoryId | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
@@ -129,6 +140,8 @@ export function ContextPicker({ selectedContexts, onContextsChange, className, a
   const dialogRef = useRef<HTMLDivElement>(null)
   const listId = useId()
   const [coords, setCoords] = useState({ bottom: 0, left: 0 })
+  // The list never makes the menu run past the window: header, search and footer take ~150px.
+  const [listCap, setListCap] = useState(maxListHeight)
 
   const handleOpen = () => {
     if (disabled) return
@@ -137,6 +150,8 @@ export function ContextPicker({ selectedContexts, onContextsChange, className, a
       const right = boundsRight ?? window.innerWidth - 8
       const left = Math.max(8, Math.min(rect.left, right - width))
       setCoords(anchor === 'bottom' ? { bottom: -(rect.bottom + 8), left } : { bottom: window.innerHeight - rect.top + 8, left })
+      const room = anchor === 'bottom' ? window.innerHeight - rect.bottom - 16 : rect.top - 16
+      setListCap(Math.max(120, Math.min(maxListHeight, room - 150)))
     }
     setIsOpen(true)
   }
@@ -201,6 +216,7 @@ export function ContextPicker({ selectedContexts, onContextsChange, className, a
       onContextsChange([...selectedContexts, savedContextItem(saved)])
       setUpload({ busy: false })
       reload()
+      void useContextAgentStore.getState().refreshItems()
     } catch (error) {
       setUpload({ busy: false, error: `Upload failed: ${error instanceof Error ? error.message : String(error)}` })
     } finally {
@@ -264,6 +280,7 @@ export function ContextPicker({ selectedContexts, onContextsChange, className, a
                 ref={dialogRef}
                 role="dialog"
                 aria-label="Add context"
+                data-panel-overlay=""
                 initial={{ opacity: 0, y: 8, scale: 0.96 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 8, scale: 0.96 }}
@@ -307,7 +324,7 @@ export function ContextPicker({ selectedContexts, onContextsChange, className, a
                       aria-activedescendant={optionCount ? `${listId}-${activeIndex}` : undefined}
                       value={searchQuery}
                       onChange={(event) => setSearchQuery(event.target.value)}
-                      placeholder={category ? `Search ${category.name.toLowerCase()}…` : 'Search chats, issues, tabs, dates…'}
+                      placeholder={category ? `Search ${category.name.toLowerCase()}…` : 'Search context, chats, issues, tabs, dates…'}
                       aria-label={category ? `Search ${category.name}` : 'Search all context'}
                       className="flex-1 bg-transparent text-body-sm text-ink dark:text-ink-inverse placeholder:text-ink-muted/50 outline-none"
                       autoFocus
@@ -317,7 +334,7 @@ export function ContextPicker({ selectedContexts, onContextsChange, className, a
                   </div>
                 </div>
 
-                <div ref={listRef} role="listbox" aria-multiselectable className="max-h-80 overflow-y-auto scrollbar-thin px-1 py-1">
+                <div ref={listRef} role="listbox" aria-multiselectable style={{ maxHeight: listCap }} className="overflow-y-auto scrollbar-thin px-1 py-1">
                   {rootRows ? categories.map((candidate, index) => {
                     const CategoryIcon = CATEGORY_ICON[candidate.id]
                     const count = selectedIn(candidate)
@@ -342,7 +359,7 @@ export function ContextPicker({ selectedContexts, onContextsChange, className, a
                       </button>
                     )
                   }) : <>
-                    {category?.id === 'documents' && !searchQuery && <>
+                    {(category?.id === 'context' || category?.id === 'documents') && !searchQuery && <>
                       <button type="button" disabled={upload.busy} onClick={() => fileRef.current?.click()}
                         className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left hover:bg-surface-100 dark:hover:bg-surface-700 disabled:opacity-60 border-b border-surface-100 dark:border-surface-700 mb-1">
                         <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-accent/10 dark:bg-accent-light/10">
@@ -392,16 +409,16 @@ export function ContextMentionList({ query, results, activeIndex, loading, onPic
   selectedIds: Set<string>
 }) {
   const listRef = useRef<HTMLDivElement>(null)
-  const listId = useId()
+  const mentionListId = useId()
   useEffect(() => { listRef.current?.querySelector('[data-active]')?.scrollIntoView({ block: 'nearest' }) }, [activeIndex])
   return (
     <div ref={listRef} role="listbox" aria-label="Mention context"
       className="absolute bottom-full left-0 right-0 mb-2 max-h-72 overflow-y-auto scrollbar-thin rounded-xl border border-surface-200 bg-surface-0 p-1 shadow-[0_18px_48px_-18px_rgb(26_25_23/0.28)] dark:border-surface-700 dark:bg-surface-850">
       <p className="px-3 pt-1.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-muted dark:text-ink-inverse-muted">
-        {query ? `Context matching “${query}”` : 'Mention a chat, issue, tab, date or interest'}
+        {query ? `Context matching “${query}”` : 'Mention context, chats, issues, tabs, dates or interests'}
       </p>
       {results.map(({ category, item }, index) => (
-        <ContextRow key={item.id} id={`${listId}-${index}`} item={item} label={category.name} active={index === activeIndex} selected={selectedIds.has(item.id)}
+        <ContextRow key={item.id} id={`${mentionListId}-${index}`} item={item} label={category.name} active={index === activeIndex} selected={selectedIds.has(item.id)}
           onPick={() => onPick(item)} onHover={() => onHover(index)} />
       ))}
       {!results.length && <Note>{loading ? 'Loading…' : query ? `Nothing matches “${query}”. Esc or Enter keeps it as text.` : 'Nothing to mention yet.'}</Note>}

@@ -2,7 +2,7 @@
  * Renderer side of `POST /discover/feed` (agent/api/core/brave_search.py). Pure functions
  * only, so `node --experimental-strip-types` can test them; no DOM, no React.
  */
-import type { Story } from './articles.ts'
+import { youtubeVideoId, type Story, type StoryDiscussion, type StoryVideo } from './articles.ts'
 import type { FeedRequestBody } from './discover-profile.ts'
 
 export type ItemKind = 'article' | 'video' | 'image' | 'place' | 'discussion' | 'web' | 'rich'
@@ -24,10 +24,20 @@ export interface DiscoverItem {
   favicon: string | null
   published: string | null
   age: string | null
-  video?: { duration?: string | null; creator?: string | null; publisher?: string | null; views?: number | null } | null
+  video?: { duration?: string | null; creator?: string | null; publisher?: string | null; views?: number | string | null; original_thumbnail?: string | null } | null
   image?: { url?: string | null; width?: number | null; height?: number | null; thumbnail_width?: number | null; thumbnail_height?: number | null; confidence?: string | null } | null
   place?: Record<string, unknown> | null
+  discussion?: { forum?: string | null; answers?: number | null; score?: string | number | null; question?: string | null; top_comment?: string | null } | null
   rich?: RichAnswer | null
+  /** Brave's `extra_snippets`, `article`, `faq`/`qa`, `is_live`/`breaking`, `thumbnail.original` (see core/brave_search.py). */
+  snippets?: string[] | null
+  author?: string | null
+  paywalled?: boolean | null
+  language?: string | null
+  live?: boolean | null
+  breaking?: boolean | null
+  original_thumbnail?: string | null
+  answers?: { question: string; answer: string }[] | null
 }
 export interface FeedSectionError { code: string; message: string; status?: number | null; retry_after?: number | null }
 export interface FeedSection {
@@ -92,7 +102,7 @@ export function stripMarkup(text: string): string {
 }
 
 export function sectionLabel(section: Pick<FeedSection, 'kind' | 'q'>): string {
-  const q = (section.q || '').trim()
+  const q = (section.q || '').trim().replace(/\s+site:youtube\.com$/i, '').trim()
   if (section.kind === 'videos') return q ? `${q} · Video` : 'Video'
   if (section.kind === 'places') return q ? `Near you · ${q}` : 'Near you'
   return q || section.kind
@@ -100,10 +110,38 @@ export function sectionLabel(section: Pick<FeedSection, 'kind' | 'q'>): string {
 
 const STORY_KINDS = new Set<ItemKind>(['article', 'web', 'video', 'discussion'])
 
+const text = (value: unknown): string | undefined => typeof value === 'string' && value.trim() !== '' ? value : (typeof value === 'number' && Number.isFinite(value) ? String(value) : undefined)
+
+function videoOf(item: DiscoverItem): StoryVideo | undefined {
+  if (!item.video) return undefined
+  const video: StoryVideo = {}
+  const duration = text(item.video.duration), creator = text(item.video.creator), publisher = text(item.video.publisher), views = text(item.video.views)
+  if (duration) video.duration = duration
+  if (creator) video.creator = creator
+  if (publisher) video.publisher = publisher
+  if (views) video.views = views
+  return Object.keys(video).length ? video : undefined
+}
+
+function discussionOf(item: DiscoverItem): StoryDiscussion | undefined {
+  const data = item.discussion
+  if (!data) return undefined
+  const discussion: StoryDiscussion = {}
+  const forum = text(data.forum), score = text(data.score), question = text(data.question), topComment = text(data.top_comment)
+  if (forum) discussion.forum = forum
+  if (typeof data.answers === 'number' && Number.isFinite(data.answers)) discussion.answers = data.answers
+  if (score) discussion.score = score
+  if (question) discussion.question = stripMarkup(question)
+  if (topComment) discussion.topComment = stripMarkup(topComment)
+  return Object.keys(discussion).length ? discussion : undefined
+}
+
 export function itemToStory(item: DiscoverItem, topic: string): Story | null {
   if (!STORY_KINDS.has(item.kind) || !item.title || !/^https?:\/\//i.test(item.url)) return null
   let hostname = ''
   try { hostname = new URL(item.url).hostname } catch { hostname = item.source || '' }
+  const hero = item.original_thumbnail || item.video?.original_thumbnail || ''
+  const video = videoOf(item), discussion = discussionOf(item)
   return { title: stripMarkup(item.title), url: item.url, description: stripMarkup(item.description || ''), age: item.age || '', topic,
     hostname,
     thumbnail: item.thumbnail || '',
@@ -111,10 +149,23 @@ export function itemToStory(item: DiscoverItem, topic: string): Story | null {
     favicon: item.favicon || '',
     published: item.published || '',
     kind: item.kind === 'video' ? 'video' : item.kind === 'discussion' ? 'discussion' : item.kind === 'web' ? 'web' : 'article',
+    // Only what Brave sent: the reader renders what exists, and absent keys keep stories comparable.
+    ...(item.snippets?.length ? { snippets: item.snippets.map(stripMarkup).filter(Boolean) } : {}),
+    ...(item.author ? { author: item.author } : {}),
+    ...(item.paywalled ? { paywalled: true } : {}),
+    ...(item.live ? { live: true } : {}),
+    ...(item.breaking ? { breaking: true } : {}),
+    ...(item.language ? { language: item.language } : {}),
+    ...(/^https:\/\//i.test(hero) ? { heroImage: hero } : {}),
+    ...(item.answers?.length ? { answers: item.answers } : {}),
+    ...(video ? { video } : {}),
+    ...(discussion ? { discussion } : {}),
   }
 }
 
-/** Story groups for the cinematic grid: one group per successful non-rich section, deduplicated by URL. */
+/** Story groups for the cinematic grid: one group per successful non-rich section, deduplicated by URL.
+ * Hard-paywalled stories and non-YouTube videos are filtered out so every card opens cleanly in-platform.
+ */
 export function sectionsToStoryGroups(sections: FeedSection[]): Story[][] {
   const seen = new Set<string>()
   const groups: Story[][] = []
@@ -125,6 +176,14 @@ export function sectionsToStoryGroups(sections: FeedSection[]): Story[][] {
     for (const item of section.items) {
       const story = itemToStory(item, topic)
       if (!story || seen.has(story.url)) continue
+      if (story.paywalled) continue
+      const ytId = youtubeVideoId(story.url)
+      if (section.kind === 'videos' || story.kind === 'video') {
+        if (!ytId) continue
+        story.kind = 'video'
+      } else if (ytId) {
+        story.kind = 'video'
+      }
       seen.add(story.url)
       group.push(story)
     }
