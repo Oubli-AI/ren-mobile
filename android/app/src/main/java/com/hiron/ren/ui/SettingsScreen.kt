@@ -45,6 +45,7 @@ import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.PhoneInTalk
+import androidx.compose.material.icons.outlined.QueryStats
 import androidx.compose.material.icons.outlined.RecordVoiceOver
 import androidx.compose.material.icons.outlined.TouchApp
 import androidx.compose.material.icons.outlined.WarningAmber
@@ -82,6 +83,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.hiron.ren.BuildConfig
 import com.hiron.ren.core.RenRuntime
+import com.hiron.ren.device.AppUsage
 import com.hiron.ren.core.PermAction
 import com.hiron.ren.core.PermissionGroups
 import com.hiron.ren.device.CallForwarding
@@ -109,7 +111,7 @@ private val RowInset = 18.dp
  * cards whose rows carry Inter labels, grey details, slim switches and hairline dividers.
  */
 @Composable
-fun SettingsScreen(runtime: RenRuntime) {
+fun SettingsScreen(runtime: RenRuntime, onOpen: (String) -> Unit = {}) {
     val p = LocalPalette.current
     val context = LocalContext.current
     var refresh by remember { mutableIntStateOf(0) }
@@ -123,17 +125,19 @@ fun SettingsScreen(runtime: RenRuntime) {
             .padding(top = 28.dp, bottom = 48.dp),
         verticalArrangement = Arrangement.spacedBy(40.dp),
     ) {
-        Section(1, "Agents") { Agents(runtime, refresh) }
+        Section(1, "ren account") { Account(runtime, onOpen) }
 
-        Section(2, "Permissions") { AgentPermissions(runtime, refresh) }
+        Section(2, "Agents") { Agents(runtime, refresh) }
 
-        Section(3, "Call answering") { CallAnswering(runtime, refresh) }
+        Section(3, "Permissions") { AgentPermissions(runtime, refresh) }
 
-        Section(4, "What Ren can use") { Permissions(context, refresh) { refresh++ } }
+        Section(4, "Call answering") { CallAnswering(runtime, refresh) }
 
-        Section(5, "Remote tools") { RemoteTools(runtime, refresh) }
+        Section(5, "What Ren can use") { Permissions(context, refresh) { refresh++ } }
 
-        Section(6, "About") { About() }
+        Section(6, "Remote tools") { RemoteTools(runtime, refresh) }
+
+        Section(7, "About") { About() }
     }
 }
 
@@ -243,6 +247,36 @@ private fun RemoteTools(runtime: RenRuntime, refresh: Int) {
     }
     InfoStrip("While this is on, Ren's agents and ren desktop can use this phone's tools and its browser through the hub, and Ren can use ren desktop's.")
 }
+
+/**
+ * The ren account, the same one as ren desktop's: signing in and ren's interview happen on Discover (ren desktop's own
+ * pages), and once both are done the Context widget appears over the browser.
+ */
+@Composable
+private fun Account(runtime: RenRuntime, onOpen: (String) -> Unit) {
+    val account by runtime.contextWidget.account.collectAsStateWithLifecycle()
+    RenCard(padding = PaddingValues(0.dp)) {
+        if (account.signedIn) {
+            Readout("Signed in", account.email, Modifier.padding(horizontal = RowInset, vertical = 14.dp))
+            RowRule()
+            Readout("Context widget", if (account.surveyComplete) "On" else "After the interview", Modifier.padding(horizontal = RowInset, vertical = 14.dp))
+        } else {
+            Readout("Signed in", "No", Modifier.padding(horizontal = RowInset, vertical = 14.dp))
+        }
+        RowRule()
+        Row(Modifier.padding(horizontal = RowInset, vertical = 18.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            when {
+                !account.signedIn -> Keycap("Sign in to ren", { onOpen(SIGN_IN) }, tone = KeyTone.Accent)
+                !account.surveyComplete -> Keycap("Start the interview", { onOpen(INTERVIEW) }, tone = KeyTone.Accent)
+            }
+            if (account.signedIn) Keycap("Sign out", { runtime.contextWidget.signOut() })
+        }
+    }
+    InfoStrip("Your ren account is the one you use in ren desktop. Signed in, Ren's Context Agent learns from the pages you open here, the apps you use and what Ren does on your phone, alongside what it learns on your computer.")
+}
+
+private const val SIGN_IN = "ren://discover#signin"
+private const val INTERVIEW = "ren://discover#onboarding"
 
 /** The colophon: the Ren wordmark, which build it is, who made it and where to get help. */
 @Composable
@@ -423,6 +457,10 @@ private fun Permissions(context: Context, refresh: Int, onChanged: () -> Unit) {
         val browser = remember(refresh) { context.holdsBrowserRole() }
         PermissionRow(Access(Icons.Outlined.Language, "Default browser", "Open links from every app in Ren"), browser) {
             context.browserRoleIntent()?.let { role.launch(it) }
+        }
+        val usage = remember(refresh) { AppUsage(context).allowed() }
+        PermissionRow(Access(Icons.Outlined.QueryStats, "App usage", "Which apps you use, for your ren context"), usage) {
+            context.startActivity(Intent(AndroidSettings.ACTION_USAGE_ACCESS_SETTINGS))
         }
         val screening = remember(refresh) { roles?.isRoleHeld(RoleManager.ROLE_CALL_SCREENING) == true }
         PermissionRow(Access(Icons.Outlined.PhoneInTalk, "Call screening", "See who's calling"), screening) {

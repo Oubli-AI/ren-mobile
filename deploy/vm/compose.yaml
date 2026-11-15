@@ -115,19 +115,20 @@ services:
   # Projects, Documents, Calendar, Vibe and Build, at https://rivet.ron-ai.dev/.
   ren:
     build: ./ren
-    image: ren-api:b112adf
+    image: ren-api:2df3daa
     restart: unless-stopped
     env_file:
       # The Brave keys and NIM's key.
       - search.env
-      # SUPABASE_URL and SUPABASE_ANON_KEY (ren's publishable key), for Projects signed in to a ren account.
+      # SUPABASE_URL and SUPABASE_ANON_KEY (ren's publishable key), for Projects signed in to a ren account;
+      # SUPABASE_SERVICE_ROLE_KEY for stored and scheduled agents; HF_TOKEN for the storage bucket.
       - ren.env
     environment:
       # The app's bundled pages (androidx.webkit's WebViewAssetLoader) are the one origin that calls it.
       CORS_ORIGINS: https://appassets.androidplatform.net
-      # Sessions, run journals and memory on the volume (ren's `local` storage).
-      PANEL_STORAGE: local
-      PANEL_STORAGE_DIR: /home/ren/data/storage
+      # Sessions, run journals and memory in ren desktop's own bucket, so the phone and the desktop share one account.
+      PANEL_STORAGE: huggingface
+      HF_BUCKET_ID: IAMRonHIT/RonBrowserRebuildBucket
       # Search sessions and the guest Projects database (projects.sqlite3).
       SESSION_STORAGE_DIR: /home/ren/data
       NIM_MODEL: minimaxai/minimax-m3.1-flash

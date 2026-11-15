@@ -1,0 +1,22 @@
+/*
+ * The phone's frame for ren desktop's Context widget. The app sizes this page's view to what is showing (the orb, the
+ * orb with a run's notice, or the open panel), so the page stays transparent around them, and the panel, a 520 by 560
+ * card at the desktop window's corner, fills the view instead.
+ */
+html,
+body,
+#root {
+  background: transparent;
+}
+[data-testid="context-panel"] {
+  inset: 0 !important;
+  width: auto !important;
+  height: auto !important;
+}
+/* An interest's discovery card, 600 wide at the desktop window's top right, fills the phone's width instead. */
+.w-\[600px\][role="dialog"] {
+  top: 12px !important;
+  right: 12px !important;
+  left: 12px !important;
+  width: auto !important;
+}

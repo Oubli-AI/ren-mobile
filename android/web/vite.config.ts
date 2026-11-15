@@ -27,6 +27,7 @@ export default defineConfig({
         search: path.resolve(__dirname, "src/search/index.html"),
         destinations: path.resolve(__dirname, "src/destinations/index.html"),
         panel: path.resolve(__dirname, "src/panel/index.html"),
+        context: path.resolve(__dirname, "src/context/index.html"),
       },
     },
   },
