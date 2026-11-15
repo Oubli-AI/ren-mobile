@@ -14,7 +14,7 @@ const entries = [
   "src/components/chrome/UrlBar.tsx", "src/context/AgentUiContext.tsx", "src/lib/api-base.ts", "src/lib/project-documents.ts",
   "src/lib/search-api.ts", "src/lib/sign-in.ts", "src/stores/authStore.ts", "src/stores/favoritesStore.ts",
   "src/stores/navigationStore.ts", "src/stores/tabStore.ts", "src/stores/onboardingStore.ts", "src/stores/contextAgentStore.ts",
-  "src/stores/interestsStore.ts", "src/utils/cn.ts", "src/index.css", "src/vite-env.d.ts", "src/pages/types/electron.ts",
+  "src/stores/interestsStore.ts", "src/stores/accountProfileStore.ts", "src/utils/cn.ts", "src/index.css", "src/vite-env.d.ts", "src/pages/types/electron.ts",
 ]
 const extensions = ["", ".ts", ".tsx", ".d.ts", "/index.ts", "/index.tsx"]
 

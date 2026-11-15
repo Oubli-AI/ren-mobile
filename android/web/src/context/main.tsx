@@ -4,8 +4,8 @@
  * pages the user visits, here the phone's browser (`visit`), and from the phone itself: the apps the user used and
  * what Ren did there (`phone`, the Context Agent's [phone] turn).
  *
- * It shows only for a signed-in ren account that finished the interview, the same account and the same context as ren
- * desktop's. The page tells the app what to make room for (`layout`): nothing, the orb, the orb with a finished
+ * It shows only for a signed-in ren account that finished the interview, on either device: the same account, context,
+ * interview and interest graph as ren desktop's. The page tells the app what to make room for (`layout`): nothing, the orb, the orb with a finished
  * run's notice, or the open panel.
  */
 import { onApp, reportAccount, tell } from "../host"
@@ -21,6 +21,7 @@ import { useAuthStore } from "@/stores/authStore"
 import { useContextAgentStore } from "@/stores/contextAgentStore"
 import { useInterestsStore } from "@/stores/interestsStore"
 import { useOnboardingStore } from "@/stores/onboardingStore"
+import { useAccountProfileReady, useAccountProfileSync } from "@/stores/accountProfileStore"
 
 const dark = window.matchMedia("(prefers-color-scheme: dark)")
 const applyTheme = () => document.documentElement.classList.toggle("dark", dark.matches)
@@ -42,7 +43,10 @@ function Widget() {
   const surveyComplete = useOnboardingStore((state) => state.isComplete)
   const expanded = useInterestsStore((state) => state.isExpanded)
   const notice = useContextAgentStore((state) => runNotifications(state.runs).length > 0)
-  const ready = signedIn && surveyComplete
+  // The interview and interest graph follow the account, so an interview taken on the desktop counts here.
+  useAccountProfileSync()
+  const profileReady = useAccountProfileReady()
+  const ready = signedIn && surveyComplete && profileReady
   const layout = !ready ? "none" : expanded ? "panel" : notice ? "notice" : "orb"
   useEffect(() => tell("layout", { layout }), [layout])
   if (!ready) return null

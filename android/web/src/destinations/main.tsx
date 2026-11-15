@@ -4,7 +4,8 @@
  * ren desktop's App.tsx draws it, by HomePage on that tab or, for Research, Documents and the pages Execute opens, by
  * the page its tab's address names (MainContent in App.tsx), with the sign-in page behind `#signin` and the interests
  * interview behind `#onboarding` or, as App.tsx does, for a signed-in account that hasn't finished it. The app hears
- * which account is signed in (`reportAccount`), for the Context widget.
+ * which account is signed in (`reportAccount`), for the Context widget; the interview and interest graph follow that
+ * account (`useAccountProfileSync`), so one taken on the desktop counts here.
  *
  * On the desktop these live among ren's tabs. Here they are one tab of the phone's browser, so ren's tab store holds
  * just this page, and what they ask of it becomes the browser's: a story opens in this tab (the article itself, where
@@ -33,6 +34,7 @@ import { useAuthStore } from "@/stores/authStore"
 import { useFavoritesStore } from "@/stores/favoritesStore"
 import { useNavigationStore } from "@/stores/navigationStore"
 import { useOnboardingStore } from "@/stores/onboardingStore"
+import { useAccountProfileReady, useAccountProfileSync } from "@/stores/accountProfileStore"
 import { useTabStore } from "@/stores/tabStore"
 import { cn } from "@/utils/cn"
 
@@ -126,6 +128,9 @@ function Page() {
   const [hash, setHash] = useState(window.location.hash)
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
   const surveyComplete = useOnboardingStore((state) => state.isComplete)
+  // As App.tsx does: the interview and interest graph follow the account, and the interview waits for them.
+  useAccountProfileSync()
+  const profileReady = useAccountProfileReady()
   useEffect(() => {
     const update = () => setHash(window.location.hash)
     window.addEventListener("hashchange", update)
@@ -144,6 +149,7 @@ function Page() {
       </AuthPageLayout>
     )
   }
+  if (!profileReady) return null
   if ((isAuthenticated && !surveyComplete) || hash === "#onboarding") return <OnboardingPage />
   // ren desktop's BrowserLayout gives its pages the agent UI's context (Build's composer uses it).
   return (

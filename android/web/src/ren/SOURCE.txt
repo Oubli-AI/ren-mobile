@@ -1,6 +1,6 @@
-ren desktop's pages and components, unmodified: github.com/ImRonAI/TheBrowser at 2df3daa (branch
-claude/ren-mobile-context, pull 6: main at dbb7d5f, with deep research, plus the phone's [phone] turn for the Context
-Agent and the fixes of pull 5).
+ren desktop's pages and components, unmodified: github.com/Oubli-AI/ren (was ImRonAI/TheBrowser) at 0f6fa57 (branch
+claude/ren-account-sync, pull 8: main at 41f674f, with deep research's formation graph and the phone's [phone] turn,
+plus the interview and interest graph kept on the account, /context/profile).
 
   pages/SearchResultsPage.tsx                               ren's search results
   pages/HomePage.tsx, OnboardingPage.tsx, SignInPage.tsx    Discover and the destinations, the interview, sign-in
@@ -12,7 +12,8 @@ Agent and the fixes of pull 5).
   components/ai-elements/*, chrome/UrlBar.tsx,
   context/AgentUiContext.tsx                                the agent panel's conversation components
   the stores and libs the phone's mounts use                stores/ (auth, favorites, navigation, tab, onboarding,
-                                                            contextAgent, interests), lib/ (api-base, search-api,
+                                                            contextAgent, interests, accountProfile), lib/
+                                                            (api-base, search-api,
                                                             project-documents, sign-in), utils/cn.ts
   index.css, vite-env.d.ts, pages/types/electron.ts
   data/*.json (Discover's bundled stories)                  ../data (src/data, with its own SHA256SUMS)
