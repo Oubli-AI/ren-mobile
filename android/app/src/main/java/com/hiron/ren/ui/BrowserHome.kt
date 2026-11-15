@@ -14,7 +14,6 @@ import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,8 +22,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -37,10 +37,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Biotech
 import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Explore
+import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.MusicNote
 import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material.icons.outlined.Search
@@ -81,6 +83,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.hiron.ren.browser.Destination
@@ -138,7 +141,7 @@ internal fun BrowserHome(runtime: RenRuntime, onGo: (String) -> Unit) {
     }
 }
 
-/** Search (this page) and ren desktop's destinations side by side, as its sidebar lists them; the row scrolls. */
+/** Home (this page) and ren desktop's destinations side by side, as its sidebar lists them; the row scrolls. */
 @Composable
 private fun Environments(onGo: (String) -> Unit) {
     val p = LocalPalette.current
@@ -147,7 +150,7 @@ private fun Environments(onGo: (String) -> Unit) {
         Modifier.horizontalScroll(rememberScrollState()).clip(shape).background(p.tile).padding(4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        DestinationTab(Icons.Outlined.Search, "Search", current = true, onClick = {})
+        DestinationTab(Icons.Outlined.Home, "Home", current = true, onClick = {})
         Destination.entries.forEach { destination ->
             val tag = if (destination == Destination.Discover) Modifier.testTag(HOME_DISCOVER_TAG) else Modifier
             DestinationTab(destination.icon, destination.name, current = false, onClick = { onGo(destination.address) }, modifier = tag)
@@ -155,10 +158,11 @@ private fun Environments(onGo: (String) -> Unit) {
     }
 }
 
-/** The icon ren desktop's sidebar draws for a destination (lucide's Compass, Columns3, FileText, Calendar, Music2, Hammer). */
+/** The icon ren desktop's sidebar draws for a destination (lucide's Compass, Microscope, Columns3, FileText, Calendar, Music2, Hammer). */
 private val Destination.icon: ImageVector
     get() = when (this) {
         Destination.Discover -> Icons.Outlined.Explore
+        Destination.Research -> Icons.Outlined.Biotech
         Destination.Execute -> Icons.Outlined.ViewWeek
         Destination.Documents -> Icons.Outlined.Description
         Destination.Calendar -> Icons.Outlined.CalendarToday
@@ -241,46 +245,43 @@ private fun SearchBox(onGo: (String) -> Unit) {
 }
 
 /**
- * The favorite links, the way ren desktop's Discover draws them (`FavoriteLinks.tsx`): a micro label on a hairline,
- * then each link as a badge with its site's icon, and Add. Holding a badge offers to remove it.
+ * The favorite links as ren desktop's home page draws them (`FavoriteLinks.tsx`, its `dial` variant): each link a
+ * favicon tile with its title underneath, then Add, here in one row that scrolls sideways. Holding a tile offers to
+ * remove it.
  */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun FavoriteLinks(list: List<Favorite>, favorites: Favorites, onGo: (String) -> Unit) {
-    val p = LocalPalette.current
     var adding by rememberSaveable { mutableStateOf(false) }
-    Column(Modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("FAVORITES", style = Type.tele.copy(fontSize = 11.sp, letterSpacing = 0.08.sp * 11), color = p.ink2)
-            Rule(Modifier.weight(1f))
+    LazyRow(
+        Modifier.fillMaxWidth().semantics { contentDescription = "Favorite links" },
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+    ) {
+        items(list, key = { it.id }) { favorite ->
+            FavoriteTile(favorite, onOpen = { onGo(favorite.url) }, onRemove = { favorites.remove(favorite.id) })
         }
-        Spacer(Modifier.height(14.dp))
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            list.forEach { favorite -> FavoriteBadge(favorite, onOpen = { onGo(favorite.url) }, onRemove = { favorites.remove(favorite.id) }) }
-            AddBadge(onClick = { adding = true })
-        }
+        item(key = "add") { AddTile(onClick = { adding = true }) }
     }
     if (adding) AddFavorite(favorites, onDone = { adding = false })
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun FavoriteBadge(favorite: Favorite, onOpen: () -> Unit, onRemove: () -> Unit) {
+private fun FavoriteTile(favorite: Favorite, onOpen: () -> Unit, onRemove: () -> Unit) {
     val p = LocalPalette.current
-    val shape = RoundedCornerShape(Radius.card)
     var menu by remember { mutableStateOf(false) }
     Box {
-        Row(
-            Modifier.height(40.dp).clip(shape).background(p.card).border(1.dp, p.line, shape)
+        Column(
+            Modifier.width(72.dp).clip(RoundedCornerShape(Radius.card))
                 .combinedClickable(role = Role.Button, onLongClickLabel = "Remove ${favorite.title}", onLongClick = { menu = true }, onClick = onOpen)
-                .padding(start = 6.dp, end = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                .padding(4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Box(Modifier.size(28.dp).clip(RoundedCornerShape(8.dp)).background(p.tile), contentAlignment = Alignment.Center) {
-                SiteIcon(favorite.url)
+            val shape = RoundedCornerShape(Radius.card)
+            Box(Modifier.size(48.dp).clip(shape).background(p.card).border(1.dp, p.line, shape), contentAlignment = Alignment.Center) {
+                SiteIcon(favorite.url, 20.dp)
             }
-            Text(favorite.title, style = Type.labelLg, color = p.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 144.dp))
+            Text(favorite.title, style = Type.labelMd, color = p.ink2, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
             DropdownMenuItem(text = { Text("Remove from favorites") }, onClick = {
@@ -293,32 +294,36 @@ private fun FavoriteBadge(favorite: Favorite, onOpen: () -> Unit, onRemove: () -
 
 /** The site's icon from Google's favicon service, as ren desktop shows it; a globe while it loads or when it can't. */
 @Composable
-private fun SiteIcon(url: String) {
+private fun SiteIcon(url: String, size: Dp) {
     val p = LocalPalette.current
     val images = LocalImages.current
-    val px = with(LocalDensity.current) { 16.dp.roundToPx() }
+    val px = with(LocalDensity.current) { size.roundToPx() }
     val icon = produceState<ImageBitmap?>(null, url, images) {
         value = Favorites.icon(url)?.let { images?.bitmap(it, px * 2) }
     }.value
-    if (icon != null) Image(icon, contentDescription = null, modifier = Modifier.size(16.dp))
-    else Icon(Icons.Outlined.Public, contentDescription = null, tint = p.muted, modifier = Modifier.size(16.dp))
+    if (icon != null) Image(icon, contentDescription = null, modifier = Modifier.size(size))
+    else Icon(Icons.Outlined.Public, contentDescription = null, tint = p.muted, modifier = Modifier.size(size))
 }
 
 @Composable
-private fun AddBadge(onClick: () -> Unit) {
+private fun AddTile(onClick: () -> Unit) {
     val p = LocalPalette.current
     val radius = with(LocalDensity.current) { Radius.card.toPx() }
-    Row(
-        Modifier.height(40.dp).clip(RoundedCornerShape(Radius.card))
-            .drawBehind {
-                drawRoundRect(p.lineHi, cornerRadius = CornerRadius(radius), style = Stroke(1.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 3.dp.toPx()))))
-            }
-            .clickable(role = Role.Button, onClick = onClick).padding(horizontal = 14.dp).testTag(HOME_ADD_FAVORITE_TAG),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    Column(
+        Modifier.width(72.dp).clip(RoundedCornerShape(Radius.card)).clickable(role = Role.Button, onClick = onClick)
+            .padding(4.dp).testTag(HOME_ADD_FAVORITE_TAG),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Icon(Icons.Outlined.Add, contentDescription = null, tint = p.ink2, modifier = Modifier.size(16.dp))
-        Text("Add", style = Type.labelLg, color = p.ink2)
+        Box(
+            Modifier.size(48.dp).drawBehind {
+                drawRoundRect(p.lineHi, cornerRadius = CornerRadius(radius), style = Stroke(1.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 3.dp.toPx()))))
+            },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Outlined.Add, contentDescription = null, tint = p.muted, modifier = Modifier.size(16.dp))
+        }
+        Text("Add", style = Type.labelMd, color = p.muted)
     }
 }
 

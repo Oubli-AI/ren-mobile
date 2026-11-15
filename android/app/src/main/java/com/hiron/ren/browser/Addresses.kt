@@ -18,9 +18,13 @@ enum class SearchLevel(val wire: String, val label: String) {
     }
 }
 
-/** ren desktop's destinations, as its sidebar lists them (`DESTINATIONS` in `Sidebar.tsx`); each is Ren's page at [address]. */
+/**
+ * ren desktop's destinations after Home, as its sidebar lists them (`DESTINATIONS` in `navigation/destinations.ts`);
+ * each is Ren's page at [address].
+ */
 enum class Destination {
     Discover,
+    Research,
     Execute,
     Documents,
     Calendar,
