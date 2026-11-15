@@ -41,6 +41,18 @@ rivet.ron-ai.dev {
 			reverse_proxy ren:8765
 		}
 		@token header X-Ren-Token {$EMRYS_GEMINI_TOKEN}
+		# Deep research is loopback-only in ren desktop; with the token it goes through the container's own loopback.
+		@research {
+			header X-Ren-Token {$EMRYS_GEMINI_TOKEN}
+			path /deep-research /deep-research/*
+		}
+		handle @research {
+			reverse_proxy ren:8766 {
+				flush_interval -1
+				# uvicorn trusts forwarding headers from 127.0.0.1, so the phone's address must not come along.
+				header_up -X-Forwarded-For
+			}
+		}
 		handle @token {
 			reverse_proxy ren:8765 {
 				flush_interval -1
