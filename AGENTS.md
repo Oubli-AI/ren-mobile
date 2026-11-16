@@ -108,7 +108,7 @@ What the overhaul added, on the branch `claude/project-thread-tnj6xo` (PR #14) a
   token from the `RenHost` web message listener, which answers only the app's bundled origin
   (`https://appassets.androidplatform.net`). The backend is ren desktop's own backend on the VM, run as ren
   runs it (`python agent/api/main.py`; `deploy/vm/ren`, image built from `Oubli-AI/ren` at `0f6fa57`, the pages' commit (scheduled specialist runs are left to ren desktop: `RON_AGENT_SCHEDULES=0`, which also stops the VM resuming runs), with electron-playwright-mcp (no remote: the VM's `ren/electron-playwright-mcp/` is a copy of its `pyproject.toml`, `README.md` and `src/electron_playwright_mcp` from the owner's checkout at `4612a9b`) and Playwright's Chromium for deep research's PDF (its Slidev deck needs Node and isn't made), keys in
-  `search.env`, Supabase's, `HF_TOKEN` and `PERPLEXITY_API_KEY` (its tool-repair fixer runs on Perplexity) in `ren.env`; its storage is ren desktop's Hugging Face bucket, see "Context
+  `search.env`, Supabase's, `HF_TOKEN`, `PERPLEXITY_API_KEY` (its tool-repair fixer runs on Perplexity) and ren desktop's own providers (`RON_CHAT_PROVIDERS`, `TELNYX_API_KEY`, `GEMINI_API_KEY`, `MISTRAL_API_KEY`, `XAI_API_KEY`, 2026-11-16) in `ren.env`, so Deep Research picks ren desktop's default, Telnyx `moonshotai/Kimi-K3.1-Pro` (with only NIM it ran on `minimaxai/minimax-m3.1-flash`, which went silent mid-reply and failed the run); its storage is ren desktop's Hugging Face bucket, see "Context
   widget"), at `https://rivet.ron-ai.dev/` behind the same token (Caddy sends every
   path the other services don't take to it, except ren's A2A endpoint). "Add search to Ren context" and "Search deeper" need ren desktop's context
   store and Electron, so the first fails on the phone and the second is not shown.
@@ -481,7 +481,7 @@ cd deploy/vm/hub && uvx --python 3.12 --with fastmcp==3.4.0 --with mcp==1.26.0 -
    (`emrys-gemini:1.64.0`, `ren-api:0f6fa57`) and start once their env files are in `/opt/emrys`: `gemini.env`
    (`GOOGLE_API_KEY`, `NVIDIA_NIM_API_KEY`, `MISTRAL_API_KEY`, `TELNYX_API_KEY`, `XAI_API_KEY`; without `TELNYX_MCP_AUTHORIZATION` oubliai-telnyx
    doesn't load there), `search.env` (`BRAVE_SEARCH_API_KEY`, `BRAVE_ANSWERS_API_KEY`, `NVIDIA_NIM_API_KEY`) and
-   `ren.env` (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `HF_TOKEN`, `PERPLEXITY_API_KEY`).
+   `ren.env` (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `HF_TOKEN`, `PERPLEXITY_API_KEY`, `RON_CHAT_PROVIDERS` and ren desktop's provider keys).
    `EMRYS_GEMINI_TOKEN` is in `computer.env`, and the app's `geminiToken` (in `android/ren.local.properties`) is the
    same token. Live results are under "The Strands agents live" above; Gemini needs a billed key and NIM another
    model than its default. Next:
