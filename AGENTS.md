@@ -475,8 +475,8 @@ cd deploy/vm/hub && uvx --python 3.12 --with fastmcp==3.4.0 --with mcp==1.26.0 -
 9. **Telnyx** (PR #13): checked by mypy and offline (the model, its window from the catalogue, the catalogue's filter);
    not run live. It needs `TELNYX_API_KEY` in the VM's `gemini.env` and the `gemini` image rebuilt, then one typed
    conversation from Settings › Agents › Telnyx with a tool call.
-10. **Memory:** the `gemini` image is pinned to ren's dreaming commit (`10ceb73`, the branch `claude/dreaming-memory`),
-    which has to be on GitHub before the image builds; then one live conversation and one dream. The VM's `ren` image
+10. **Memory:** the `gemini` image is pinned to ren's dreaming commit (`10ceb73`, on ren's `main` since 2026-11-16);
+    it needs the image rebuilt on the VM, then one live conversation and one dream. The VM's `ren` image
     (`deploy/vm/ren`, ren's backend for ren's pages, at `b112adf`) gets the same memory when its pin moves there, and
     needs `MISTRAL_API_KEY` in its env for the brain's search and the dream's Mistral models.
 
