@@ -1,0 +1,15 @@
+{
+  "live-restore": true,
+  "log-opts": {
+    "max-size": "20m",
+    "max-file": "3"
+  },
+  "builder": {
+    "gc": {
+      "enabled": true,
+      "defaultReservedSpace": "2GB",
+      "defaultMaxUsedSpace": "8GB",
+      "defaultMinFreeSpace": "10GB"
+    }
+  }
+}
