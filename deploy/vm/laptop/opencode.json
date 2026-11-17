@@ -34,9 +34,9 @@
     "linear": { "type": "remote", "url": "https://mcp.linear.app/mcp" },
     "ren-memory": {
       "type": "remote",
-      "url": "http://ren:8765/opencode/mcp/",
+      "url": "http://ren:8765/memory/mcp/",
       "oauth": false,
-      "headers": { "X-Ren-User": "{env:REN_USER_ID}" }
+      "headers": { "X-Ren-Agent": "opencode", "X-Ren-User": "{env:REN_USER_ID}" }
     }
   }
 }
