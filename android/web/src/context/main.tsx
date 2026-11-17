@@ -16,6 +16,7 @@ import { StrictMode, useEffect } from "react"
 import { createRoot } from "react-dom/client"
 import { ContextBridge } from "@/components/interests/ContextBridge"
 import { InterestsWidget } from "@/components/interests/InterestsWidget"
+import { AgentUiProvider } from "@/context/AgentUiContext"
 import { runNotifications } from "@/lib/context-api"
 import { useAuthStore } from "@/stores/authStore"
 import { useContextAgentStore } from "@/stores/contextAgentStore"
@@ -50,11 +51,12 @@ function Widget() {
   const layout = !ready ? "none" : expanded ? "panel" : notice ? "notice" : "orb"
   useEffect(() => tell("layout", { layout }), [layout])
   if (!ready) return null
+  // ren desktop's BrowserLayout gives the widget the agent UI's context: a finished run's Review opens the panel.
   return (
-    <>
+    <AgentUiProvider>
       <ContextBridge />
       <InterestsWidget />
-    </>
+    </AgentUiProvider>
   )
 }
 
