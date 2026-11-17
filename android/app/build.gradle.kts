@@ -24,13 +24,6 @@ android {
         val local = Properties().apply {
             rootProject.file("ren.local.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
         }
-        fun baked(key: String) = "\"" + local.getProperty(key, "").replace("\\", "\\\\").replace("\"", "\\\"") + "\""
-        buildConfigField("String", "DEFAULT_ANSWERING_NUMBER", baked("answeringNumber"))
-        buildConfigField("String", "DEFAULT_BRAVE_SEARCH_KEY", baked("braveSearchKey"))
-        buildConfigField("String", "DEFAULT_BRAVE_ANSWERS_KEY", baked("braveAnswersKey"))
-        buildConfigField("String", "DEFAULT_GEMINI_TOKEN", baked("geminiToken"))
-        // The agents' seven Brave search tools (client tools and on the hub), off unless `braveSearchTools=true`.
-        buildConfigField("boolean", "BRAVE_SEARCH_TOOLS", (local.getProperty("braveSearchTools") == "true").toString())
         fun baked(key: String, variable: String): String {
             val value = local.getProperty(key) ?: System.getenv(variable).orEmpty()
             return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
@@ -39,6 +32,8 @@ android {
         buildConfigField("String", "DEFAULT_BRAVE_SEARCH_KEY", baked("braveSearchKey", "REN_BRAVE_SEARCH_KEY"))
         buildConfigField("String", "DEFAULT_BRAVE_ANSWERS_KEY", baked("braveAnswersKey", "REN_BRAVE_ANSWERS_KEY"))
         buildConfigField("String", "DEFAULT_GEMINI_TOKEN", baked("geminiToken", "REN_GEMINI_TOKEN"))
+        // The agents' seven Brave search tools (client tools and on the hub), off unless `braveSearchTools=true`.
+        buildConfigField("boolean", "BRAVE_SEARCH_TOOLS", (local.getProperty("braveSearchTools") == "true").toString())
     }
 
     signingConfigs {
