@@ -38,22 +38,43 @@ What the overhaul added, on the branch `claude/project-thread-tnj6xo` (PR #14) a
   a header) over the browser.
 - **Favorites** (2026-11-13, `browser/Favorites.kt`): one list, kept by the app (`Settings.favorites`), starting with
   ren desktop's `DEFAULT_FAVORITES` and added and normalized as its `favoritesStore.ts` does. Home shows them under
-  the search box (long-press removes, Add opens a dialog); Discover shows the same list through ren's own store, which
+  the search box in one row that scrolls sideways (2026-11-15; long-press removes, Add opens a dialog); Discover shows the same list through ren's own store, which
   the page reads from and writes back to the app over `RenHost` (`{"type":"favorites"}`). An addition on either side
   shows on the other.
-- **ren desktop's destinations** (2026-11-14, `ren://discover`, `ren://execute`, `ren://documents`,
+- **ren desktop's destinations** (2026-11-14, `ren://discover`, `ren://research` (2026-11-15), `ren://execute`, `ren://documents`,
   `ren://calendar`, `ren://vibe`, `ren://build`): ren desktop's `HomePage.tsx` on the tab the address names, with
   `OnboardingPage` for Personalize, `SignInPage` behind `#signin`, and the Projects and Documents pages App.tsx's
   `MainContent` draws for the addresses its tab store opens (`ron://projects`, `ron://project/<key>`,
-  `ron://documents`), all unmodified in `src/ren`. `src/destinations/` mounts them under a switcher (Search and the six
-  destinations, as ren desktop's sidebar lists them); Home's switcher scrolls to the same six. A story opens in the
+  `ron://documents`), all unmodified in `src/ren`, and `DeepResearchPage` for Research. `src/destinations/` mounts
+  them under a switcher (ren desktop's `navigation/destinations.ts`: Home and the seven destinations); Home's switcher
+  scrolls to the same seven. A story opens in the
   same tab (the mount follows ren's tab store, where Electron would open `ron://read`), and Back returns. Projects work
   as ren's guest workspace (`X-Ron-Workspace`, kept in SQLite on the VM) or signed in with Supabase (email and
   password; ren's social sign-in says it runs in the desktop app). The build needs `VITE_SUPABASE_URL` and
-  `VITE_SUPABASE_ANON_KEY` in `android/web/.env.local` (gitignored; the values are ren desktop's `.env`). Seven of
-  ren's files come from ren desktop's fixes on top of `b112adf` (`ImRonAI/TheBrowser` PR #5, see `src/ren/SOURCE.txt`): ren desktop's nine `tsc` errors are fixed there, so
-  the pages type-check with none. Build's live preview (an iframe) and ren's voice and teaching WebSockets can't
+  `VITE_SUPABASE_ANON_KEY` in `android/web/.env.local` (gitignored; the values are ren desktop's `.env`).
+  The pages are ren desktop at `0f6fa57` (`Oubli-AI/ren`, which was `ImRonAI/TheBrowser`, PR #8: main with deep
+  research's formation graph and the Context Agent's `[phone]` turn, plus the account profile; see `src/ren/SOURCE.txt`, and `node scripts/sync-ren.mjs <checkout> .` copies
+  them again), so the pages type-check with no errors. Build's live preview (an iframe) and ren's voice and teaching WebSockets can't
   carry the workspace token, so the VM refuses them.
+- **Context widget** (2026-11-15, `browser/ContextWidget.kt`, `device/AppUsage.kt`, `src/context/`): ren desktop's
+  Context widget (`InterestsWidget`) and what feeds its Context Agent (`ContextBridge`), unmodified, on a bundled page
+  in one WebView the app keeps for as long as it runs, laid over the browser under the agent panel. The page tells the
+  app what it shows (`layout`: none, the orb, the orb with a finished run's notice, or the open panel) and the view
+  takes only that much of the screen; Back closes the panel. It shows only for a ren account that is signed in and
+  finished ren's interview (the pages report `{"type":"account"}` over `RenHost`; Settings › ren account shows it,
+  opens `ren://discover#signin` or `#onboarding`, and signs out). As on the desktop it hears the pages the browser
+  loads (`observeVisit`, `[browsing]`), and at most every three minutes, when the app comes to the front, what the
+  user did on the phone: the apps they used, from usage access (Settings › What Ren can use › App usage,
+  `PACKAGE_USAGE_STATS`), and what Ren did (the activity log's `device`, `approval` and `call` lines), as the Context
+  Agent's `[phone]` turn (`reportPhone`, ren desktop PR #6). The record starts at sign-in. The account is ren
+  desktop's: the same Supabase sign-in, and the VM's backend on ren desktop's storage (`PANEL_STORAGE: huggingface`,
+  `HF_BUCKET_ID` `IAMRonHIT/RonBrowserRebuildBucket`). A user can start on either device (owner, 2026-11-15): the
+  interview and the interest graph follow the account (ren desktop PR #8, `/context/profile` and
+  `useAccountProfileSync`, mounted by the destinations and context pages as App.tsx mounts it), so an interview
+  finished on the desktop isn't asked again on the phone, and the other way round; the interview waits until the
+  account's copy has loaded. On the emulator
+  (2026-11-15) the signed-out app showed no widget, Settings said "Signed in: No" from the widget page's report, and
+  Sign in opened ren's sign-in page; signing in needs the owner's account, so the widget itself was not seen there.
 - **Default browser** (2026-11-13): `MainActivity` takes `VIEW` `http`/`https` links (BROWSABLE, DEFAULT) and
   `APP_BROWSER`, so Android offers Ren for the browser role; a link from another app opens in a new tab in front.
   Onboarding's step 4 and Settings › What Ren can use › Default browser ask for the role
@@ -79,15 +100,16 @@ What the overhaul added, on the branch `claude/project-thread-tnj6xo` (PR #14) a
   `ScreenAccessSheet` (restricted settings on Android 13+, Notification access, App operator). The agents' hints point
   to Settings › What Ren can use; Settings › Permissions holds the agents' approval switches, not Android's.
 - **Search**: `ren://search?q=…&level=…` is ren desktop's own results page. `android/web/src/ren/` holds
-  `src/pages/SearchResultsPage.tsx` and everything it imports from ren desktop at `b112adf`, unmodified (hashes in
+  `src/pages/SearchResultsPage.tsx` and everything it imports from ren desktop at `0f6fa57`, unmodified (hashes in
   `SHA256SUMS`, `npm run check:ren`), with ren desktop's Tailwind config and `index.css`. `src/search/` mounts it:
   the query and level come from the address, Dark follows the phone, a result opens in a new tab (`window.open`, which
   the browser turns into a tab), and `host.ts` adds the workspace token to the page's requests (as `X-Ren-Token`,
   since ren's Projects requests carry Supabase's bearer in `Authorization`). The page gets the
   token from the `RenHost` web message listener, which answers only the app's bundled origin
   (`https://appassets.androidplatform.net`). The backend is ren desktop's own backend on the VM, run as ren
-  runs it (`python agent/api/main.py`; `deploy/vm/ren`, image built from `ImRonAI/TheBrowser` at `b112adf`, keys in
-  `search.env` and Supabase's in `ren.env`), at `https://rivet.ron-ai.dev/` behind the same token (Caddy sends every
+  runs it (`python agent/api/main.py`; `deploy/vm/ren`, image built from `Oubli-AI/ren` at `0f6fa57`, the pages' commit (scheduled specialist runs are left to ren desktop: `RON_AGENT_SCHEDULES=0`, which also stops the VM resuming runs), with electron-playwright-mcp (no remote: the VM's `ren/electron-playwright-mcp/` is a copy of its `pyproject.toml`, `README.md` and `src/electron_playwright_mcp` from the owner's checkout at `4612a9b`) and Playwright's Chromium for deep research's PDF (its Slidev deck needs Node and isn't made), keys in
+  `search.env`, Supabase's, `HF_TOKEN`, `PERPLEXITY_API_KEY` (its tool-repair fixer runs on Perplexity) and ren desktop's own providers (`RON_CHAT_PROVIDERS`, `TELNYX_API_KEY`, `GEMINI_API_KEY`, `MISTRAL_API_KEY`, `XAI_API_KEY`, 2026-11-16) in `ren.env`, so Deep Research picks ren desktop's default, Telnyx `moonshotai/Kimi-K3.1-Pro` (with only NIM it ran on `minimaxai/minimax-m3.1-flash`, which went silent mid-reply and failed the run); its storage is ren desktop's Hugging Face bucket, see "Context
+  widget"), at `https://rivet.ron-ai.dev/` behind the same token (Caddy sends every
   path the other services don't take to it, except ren's A2A endpoint). "Add search to Ren context" and "Search deeper" need ren desktop's context
   store and Electron, so the first fails on the phone and the second is not shown.
 - **Ren's hub** (`deploy/vm/hub/app.py`, FastMCP 3.4.0 and mcp 1.26.0, the versions ren desktop pins; the `hub`
@@ -456,10 +478,10 @@ cd deploy/vm/hub && uvx --python 3.12 --with fastmcp==3.4.0 --with mcp==1.26.0 -
    simplified Settings), CloudFS, and triggers and webhooks.
 7. **The Strands agents** (plan https://claude.ai/artifact/Ri9R22DZiVUhd2x2oW6CeL): they run on the Gemini API (AI
    Studio, owner, 2026-11-06), NIM, Mistral, Telnyx and xAI. The `gemini` and `search` images are built on the VM
-   (`emrys-gemini:1.64.0`, `ren-api:b112adf`) and start once their env files are in `/opt/emrys`: `gemini.env`
+   (`emrys-gemini:1.64.0`, `ren-api:0f6fa57`) and start once their env files are in `/opt/emrys`: `gemini.env`
    (`GOOGLE_API_KEY`, `NVIDIA_NIM_API_KEY`, `MISTRAL_API_KEY`, `TELNYX_API_KEY`, `XAI_API_KEY`; without `TELNYX_MCP_AUTHORIZATION` oubliai-telnyx
    doesn't load there), `search.env` (`BRAVE_SEARCH_API_KEY`, `BRAVE_ANSWERS_API_KEY`, `NVIDIA_NIM_API_KEY`) and
-   `ren.env` (`SUPABASE_URL`, `SUPABASE_ANON_KEY`).
+   `ren.env` (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `HF_TOKEN`, `PERPLEXITY_API_KEY`, `RON_CHAT_PROVIDERS` and ren desktop's provider keys).
    `EMRYS_GEMINI_TOKEN` is in `computer.env`, and the app's `geminiToken` (in `android/ren.local.properties`) is the
    same token. Live results are under "The Strands agents live" above; Gemini needs a billed key and NIM another
    model than its default. Next:

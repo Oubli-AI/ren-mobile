@@ -13,8 +13,18 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import android.view.ViewGroup
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.key
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import com.hiron.ren.browser.ContextLayout
 import androidx.compose.ui.platform.testTag
 import com.hiron.ren.ui.BrowserScreen
 import com.hiron.ren.ui.Motion
@@ -99,6 +109,7 @@ class MainActivity : FragmentActivity() {
         super.onStart()
         ren.visible = true
         ren.browser.visible(true)
+        ren.contextWidget.resumed()
         HubService.start(this)
     }
 
@@ -189,6 +200,7 @@ private fun RenAppUi(runtime: RenRuntime, listenRequests: Int, focusRequests: In
     Box(Modifier.fillMaxSize()) {
         if (onboarded) {
             BrowserScreen(runtime, waiting = state.approvals.size, onAskRen = { panel = true }, onOpen = { page = it })
+            ContextOverlay(runtime)
             // While Ren drives the browser in this turn, the panel takes the lower half, so the page it works on stays in view.
             val browsing = state.messages.lastOrNull()?.takeIf { !it.fromUser }?.parts.orEmpty().any { it is ToolStep && it.name.startsWith(BROWSER_TOOLS) }
             val height by animateFloatAsState(if (browsing) BROWSING_HEIGHT else 1f, tween(Motion.BASE, easing = Motion.Standard), label = "panel height")
@@ -200,13 +212,20 @@ private fun RenAppUi(runtime: RenRuntime, listenRequests: Int, focusRequests: In
             ) {
                 AgentPanel(runtime, state, listen, { reviewing = true }, focusRequests, onClose = { panel = false })
             }
-            page?.let { shown -> SubPage(shown, runtime, state, onClose = { page = null }) }
+            page?.let { shown ->
+                SubPage(shown, runtime, state, onClose = { page = null }, onOpen = { url ->
+                    runtime.browser.open(url)
+                    page = null
+                })
+            }
         } else {
             Onboarding(runtime, onFinish = finish)
         }
     }
     BackHandler(onboarded && page != null) { page = null }
     BackHandler(onboarded && page == null && panel) { panel = false }
+    val contextLayout by runtime.contextWidget.layout.collectAsStateWithLifecycle()
+    BackHandler(onboarded && page == null && !panel && contextLayout == ContextLayout.Panel) { runtime.contextWidget.close() }
     if (onboarded && reviewing && state.approvals.isNotEmpty()) {
         ApprovalSheet(state.approvals.first(), onAnswer = runtime::answer, onDismiss = { reviewing = false })
     }
@@ -232,16 +251,48 @@ private fun AgentPanel(runtime: RenRuntime, state: RenState, listen: () -> Unit,
     }
 }
 
+/**
+ * ren desktop's Context widget over the browser, under the agent panel: its view takes only what the page shows (the
+ * orb at the corner above the bottom bar, the orb with a finished run's notice, or the open panel over the whole
+ * screen), and stays in place at no size while there is nothing to show, so its Context Agent keeps hearing the phone.
+ */
+@Composable
+private fun ContextOverlay(runtime: RenRuntime) {
+    val layout by runtime.contextWidget.layout.collectAsStateWithLifecycle()
+    val view = runtime.contextWidget.view() ?: return
+    val size = when (layout) {
+        ContextLayout.None -> Modifier.size(0.dp)
+        ContextLayout.Orb -> Modifier.navigationBarsPadding().padding(bottom = BOTTOM_BAR).size(ORB)
+        ContextLayout.Notice -> Modifier.navigationBarsPadding().padding(bottom = BOTTOM_BAR).width(NOTICE_WIDTH).height(NOTICE_HEIGHT)
+        ContextLayout.Panel -> Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()
+    }
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomEnd) {
+        key(view) {
+            AndroidView({ view.also { (it.parent as? ViewGroup)?.removeView(it) } }, size)
+        }
+    }
+}
+
+/** The browser's bottom bar: its 56 dp row and the hairline over it. */
+private val BOTTOM_BAR = 57.dp
+
+/** ren desktop's orb: 52 px, 20 px in from the corner. */
+private val ORB = 76.dp
+
+/** ren desktop's run notice: 300 px wide, 84 px above the corner, over the orb. */
+private val NOTICE_WIDTH = 330.dp
+private val NOTICE_HEIGHT = 280.dp
+
 /** Activity or Settings over the browser, under a header that closes back to it. */
 @Composable
-private fun SubPage(page: Page, runtime: RenRuntime, state: RenState, onClose: () -> Unit) {
+private fun SubPage(page: Page, runtime: RenRuntime, state: RenState, onClose: () -> Unit, onOpen: (String) -> Unit) {
     val p = LocalPalette.current
     Column(Modifier.fillMaxSize().background(p.bg).imePadding()) {
         HudHeader(state, if (page == Page.Activity) "Activity" else "Settings", onClose = onClose)
         Box(Modifier.weight(1f).fillMaxWidth()) {
             when (page) {
                 Page.Activity -> ActivityScreen(runtime, state)
-                Page.Settings -> SettingsScreen(runtime)
+                Page.Settings -> SettingsScreen(runtime, onOpen)
             }
         }
         Spacer(Modifier.navigationBarsPadding())

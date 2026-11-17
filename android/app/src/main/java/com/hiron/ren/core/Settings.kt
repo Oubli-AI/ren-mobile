@@ -46,6 +46,11 @@ class Settings(context: Context) {
         get() = prefs.getString("favorites", null)
         set(value) = prefs.edit().putString("favorites", value).apply()
 
+    /** When the phone's activity last went to ren's Context Agent (epoch ms); 0 until the account is ready for it. */
+    var phoneReportedAt: Long
+        get() = prefs.getLong("phone_reported_at", 0L)
+        set(value) = prefs.edit().putLong("phone_reported_at", value).apply()
+
     /** How hard a search from the address bar works. */
     var searchLevel: SearchLevel
         get() = SearchLevel.of(prefs.getString("search_level", null)) ?: SearchLevel.Default
