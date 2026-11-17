@@ -3,7 +3,7 @@ claude/ren-account-sync, pull 8: main at 41f674f, with deep research's formation
 plus the interview and interest graph kept on the account, /context/profile), with Deep Research's pages and libs from
 bf91e1c (branch claude/vm-deep-research, with pull 14: Deep Research built as the Strands SDK documents it), and the
 issue cards, the editor's blocks, document-ron.ts and ron-draft.ts from 5909d6a (branch claude/issue-glass-embed-tabs,
-pull 18: frosted glass issue cards and Embed tabs).
+pull 18: frosted glass issue cards and Embed tabs), and lib/deep-research-api.ts from e1de3a0 (main, pull 23: the agents' scoped roles).
 
   pages/SearchResultsPage.tsx                               ren's search results
   pages/HomePage.tsx, OnboardingPage.tsx, SignInPage.tsx    Discover and the destinations, the interview, sign-in
