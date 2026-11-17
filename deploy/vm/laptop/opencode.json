@@ -31,6 +31,12 @@
       "command": ["npx", "-y", "@playwright/mcp@0.0.83", "--headless", "--browser", "chromium", "--isolated"]
     },
     "vercel": { "type": "remote", "url": "https://mcp.vercel.com" },
-    "linear": { "type": "remote", "url": "https://mcp.linear.app/mcp" }
+    "linear": { "type": "remote", "url": "https://mcp.linear.app/mcp" },
+    "ren-memory": {
+      "type": "remote",
+      "url": "http://ren:8765/opencode/mcp/",
+      "oauth": false,
+      "headers": { "X-Ren-User": "{env:REN_USER_ID}" }
+    }
   }
 }

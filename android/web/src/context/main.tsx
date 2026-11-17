@@ -6,7 +6,7 @@
  *
  * It shows only for a signed-in ren account that finished the interview, on either device: the same account, context,
  * interview and interest graph as ren desktop's. The page tells the app what to make room for (`layout`): nothing, the orb, the orb with a finished
- * run's notice, or the open panel.
+ * run's or a dream's notice, or the open panel, which the dream's review checklist takes too.
  */
 import { onApp, reportAccount, tell } from "../host"
 import "../page.css"
@@ -35,7 +35,10 @@ onApp((event) => {
   const store = useContextAgentStore.getState()
   if (event.type === "visit") store.observeVisit(event.url, event.title)
   else if (event.type === "phone") void store.reportPhone(event.activity)
-  else if (event.type === "close") useInterestsStore.getState().setExpanded(false)
+  else if (event.type === "close") {
+    useInterestsStore.getState().setExpanded(false)
+    store.setReviewingDream(false)
+  }
   else void useAuthStore.getState().logout()
 })
 
@@ -43,12 +46,13 @@ function Widget() {
   const signedIn = useAuthStore((state) => state.isAuthenticated && state.user !== null)
   const surveyComplete = useOnboardingStore((state) => state.isComplete)
   const expanded = useInterestsStore((state) => state.isExpanded)
-  const notice = useContextAgentStore((state) => runNotifications(state.runs).length > 0)
+  const notice = useContextAgentStore((state) => runNotifications(state.runs).length > 0 || state.dream !== null)
+  const reviewing = useContextAgentStore((state) => state.dream !== null && state.reviewingDream)
   // The interview and interest graph follow the account, so an interview taken on the desktop counts here.
   useAccountProfileSync()
   const profileReady = useAccountProfileReady()
   const ready = signedIn && surveyComplete && profileReady
-  const layout = !ready ? "none" : expanded ? "panel" : notice ? "notice" : "orb"
+  const layout = !ready ? "none" : expanded || reviewing ? "panel" : notice ? "notice" : "orb"
   useEffect(() => tell("layout", { layout }), [layout])
   if (!ready) return null
   // ren desktop's BrowserLayout gives the widget the agent UI's context: a finished run's Review opens the panel.
