@@ -145,6 +145,11 @@ What the overhaul added, on the branch `claude/project-thread-tnj6xo` (PR #14) a
 - **The Strands agents on the hub** (`deploy/vm/gemini/app.py`): the server `ren-hub` (`http://hub:8300/mcp`,
   unprefixed) replaces the phone's Tailscale address, so Gemini, NIM and Mistral reach the phone and ren desktop
   whichever is attached.
+- **Issue cards and Embed tabs** (2026-11-17, ren `Oubli-AI/ren` PR #18, copied unmodified into `src/ren`): issue
+  cards are frosted glass with the status as a blurple tone, and the "/" menu's Embed tabs puts web pages, maps, Figma,
+  Loom, Vimeo, Drive, YouTube, video, audio, PDFs and workflows in one block with a tab each, in issue descriptions and
+  documents. Agents read and write it as one ```` ```embeds ```` fence with a `[Kind: title](url)` line per tab (a
+  workflow tab is a nested `workflow` fence).
 - **Web tools in place of Brave** (2026-11-17, ren `Oubli-AI/ren` PR #11): Brave's agent tools are off, not deleted.
   On the VM ren's `brave_tools()` is empty unless `RON_BRAVE_TOOLS=1`, and every Strands agent (text on every provider,
   Gemini Live) and ren's Deep Research get ren's `web_tools()` instead: strands_tools' Tavily (`TAVILY_API_KEY`), Exa

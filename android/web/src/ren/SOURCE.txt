@@ -1,7 +1,9 @@
 ren desktop's pages and components, unmodified: github.com/Oubli-AI/ren (was ImRonAI/TheBrowser) at 0f6fa57 (branch
 claude/ren-account-sync, pull 8: main at 41f674f, with deep research's formation graph and the phone's [phone] turn,
 plus the interview and interest graph kept on the account, /context/profile), with Deep Research's pages and libs from
-bf91e1c (branch claude/vm-deep-research, with pull 14: Deep Research built as the Strands SDK documents it).
+bf91e1c (branch claude/vm-deep-research, with pull 14: Deep Research built as the Strands SDK documents it), and the
+issue cards, the editor's blocks, document-ron.ts and ron-draft.ts from 5909d6a (branch claude/issue-glass-embed-tabs,
+pull 18: frosted glass issue cards and Embed tabs).
 
   pages/SearchResultsPage.tsx                               ren's search results
   pages/HomePage.tsx, OnboardingPage.tsx, SignInPage.tsx    Discover and the destinations, the interview, sign-in
