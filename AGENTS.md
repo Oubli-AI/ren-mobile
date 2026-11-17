@@ -175,6 +175,18 @@ What the overhaul added, on the branch `claude/project-thread-tnj6xo` (PR #14) a
   the hub) are served only when `braveSearchTools=true` in `android/ren.local.properties`
   (`BuildConfig.BRAVE_SEARCH_TOOLS`). The ElevenLabs agents get no new tools (their configuration is the owner's), and
   the search page in the browser still searches Brave.
+- **Docker's disk on the VM** (2026-11-17, `deploy/vm/host/`): the VM's 49 GB disk filled twice (11-16 and 11-17, the
+  second time killing a Deep Research run) when an image build ran beside the old images. The daemon uses the
+  containerd image store, so images are in `/var/lib/containerd`, not `/var/lib/docker`. The `daemon.json` set on
+  11-14 had only `defaultKeepStorage`, which Moby maps to BuildKit's `reservedSpace`: a floor the GC keeps, with no
+  ceiling, so the build cache was never trimmed. The host files are installed as `/etc/docker/daemon.json` (build cache
+  between 2 GB and 8 GB and at least 10 GB of disk left free, `live-restore` so a daemon restart leaves the containers
+  running, container logs rotated at 3 × 20 MB), `/etc/systemd/system/docker-prune.{service,timer}` (every hour, every
+  image no container uses and older than two hours goes, so each deploy's previous image is gone within the hour) and
+  `/etc/systemd/journald.conf.d/size.conf` (the journal kept to 300 MB). `emrys-brain:14bcf2b` stays because the
+  created, never-started container `emrys-brain-kept` holds it; a rollback image older than two hours does not stay,
+  so rebuild the old commit instead. `builder.gc` and `log-opts` need `systemctl restart docker`, the rest
+  `systemctl reload docker`.
 - **ElevenLabs is out of credits (2026-11-12):** a typed question on the emulator opened a session with the text
   agent (tools registered, both MCP servers connected), and ElevenLabs closed it 8 s later with WebSocket code 1002,
   "This request exceeds your quota limit." The SDK reports any close but 1000 as `DisconnectionDetails.Error`, and the
@@ -447,7 +459,8 @@ android/   Kotlin/Compose app (minSdk 29, targetSdk 36): the browser, the agent 
              src/cato (Cato, unmodified), src/robot (ren's robot), src/ren (ren desktop's search page and agent panel
              components, unmodified), src/search (the phone's mount of the page), src/panel (the agent panel's chat)
 deploy/vm/ the workspace VM: compose.yaml, Caddyfile, computer/ (Desktop Commander over HTTP), gemini/ (the Strands
-           agents), hub/ (Ren's hub), ren/ (ren desktop's backend), laptop/ (OpenCode config, workspace AGENTS.md)
+           agents), hub/ (Ren's hub), ren/ (ren desktop's backend), laptop/ (OpenCode config, workspace AGENTS.md),
+           host/ (the VM's Docker daemon, image prune timer and journald size)
 docs/      design/ (REN_DESIGN.md: Ink & Volt on the phone; ren-logotype.json)
 .github/   CI: android.yml (tests, lint, release build)
 ```
