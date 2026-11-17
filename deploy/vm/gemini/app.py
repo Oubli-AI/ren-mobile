@@ -18,6 +18,11 @@ subagent tool and `web_fetch` run their children on the text model, since the Li
 
 The instructions are the ElevenLabs agents' own prompts, read when the conversation opens and filled in the way
 ElevenLabs fills its dynamic variables.
+
+Memory is ren desktop's own (`agent/api/core/dreaming.py` in the image's copy of ren): both agents search the user's
+second brain and keep a journal in the folder `phone`, and the dream files the journal into the brain once the user
+has been idle. The text agent's turns are journaled and what it remembers is injected before each turn, as the SDK
+does both; the voice agent, a `BidiAgent`, has the two tools.
 """
 
 import asyncio
@@ -36,8 +41,10 @@ from strands.bidi.types.agent import BidiAgentInput
 from strands.bidi.types.events import BidiOutputEvent
 from strands.bidi.types.media import AudioDelta
 from strands.interrupt import Interrupt
+from strands.memory import MemoryManager
 from strands.models import Model
 from strands.models.gemini import GeminiModel
+from strands.models.routing import ModelRouter, RoutingCandidate
 from strands.multiagent.spec import Fixed
 from strands.tools.mcp import MCPClient, MCPServerConfig
 from strands.types.agent import AgentInput
@@ -64,11 +71,12 @@ from strands_harness import BuiltinToolsConfig, Effort, create_harness
 from strands_harness.models import EFFORT_LEVELS
 from strands_harness.tools.programmatic_tool_caller import programmatic_tool_caller
 
+from agent.api.core import dreaming
 from agent.api.core.brave_tools import brave_tools
 from agent.api.core.xai_model import XAIStatePruner
 
 from live_model import RenGeminiLiveModel
-from providers import ProviderName, build_model, list_provider_models, provider_default_model, reasoning_efforts
+from providers import ProviderName, build_model, list_provider_models, provider_api_key, provider_default_model, reasoning_efforts
 
 VOICE_AGENT = "agent_2901m620nzwrev2r7ekqpydcxe25"
 TEXT_AGENT = "agent_9601m623qa72ffs9cyy3ezc0p6tb"
@@ -86,6 +94,8 @@ PERMISSIONS = (
     "perm_create_music",
 )
 HOME = "/config/emrys-gemini"
+# The phone's Strands agents' folder in the user's second brain and journal.
+MEMORY_FOLDER = "phone"
 # Every agent here searches the web with ren desktop's Brave tools (`brave_tools()`: brave_answer, brave_web_search,
 # brave_news_search, brave_image_search, brave_video_search, brave_local_search, brave_rich_answer), whatever its model.
 # The harness's built-ins for Gemini. Its native web search is Google Search grounding, which a Gemini API key on the
@@ -106,6 +116,17 @@ SERVERS: dict[str, MCPServerConfig] = {
 
 elevenlabs = AsyncElevenLabs(api_key=os.environ["ELEVENLABS_API_KEY"])
 app = FastAPI()
+
+
+def dream_model() -> ModelRouter:
+    """The dream's models in ren's order, built as this service builds NIM and Mistral."""
+    return ModelRouter(
+        [RoutingCandidate(build_model(provider, model), name=f"{provider}:{model}") for provider, model in dreaming.DREAM_MODELS if provider_api_key(provider)]
+    )
+
+
+# ren builds the dream's models with its panel, which this image doesn't carry.
+dreaming.dream_model = dream_model
 
 
 async def instructions(agent_id: str, values: Mapping[str, str]) -> str:
@@ -186,13 +207,13 @@ async def efforts(provider: ProviderName, model: str) -> dict[str, list[str]]:
 
 @app.websocket("/gemini/voice")
 async def voice(
-    websocket: WebSocket, provider: ProviderName = "gemini", model: str | None = None, effort: str = "auto"
+    websocket: WebSocket, user_id: str, provider: ProviderName = "gemini", model: str | None = None, effort: str = "auto"
 ) -> None:
     await websocket.accept()
     helper = text_model(provider, model or provider_default_model(provider), effort)
     agent = BidiAgent(
         model=RenGeminiLiveModel(model_id=VOICE_MODEL, voice=VOICE),
-        system_prompt=await instructions(VOICE_AGENT, variables(websocket, text_only=False)),
+        system_prompt=await instructions(VOICE_AGENT, variables(websocket, text_only=False)) + dreaming.JOURNAL_DIRECTIVE,
         tools=[
             *MCPClient.load_servers(SERVERS, continue_on_error=True),
             programmatic_tool_caller,
@@ -210,6 +231,7 @@ async def voice(
             make_subagent(model=Fixed(helper)),
             make_mcp_router(servers=SERVERS),
             *brave_tools(),
+            *MemoryManager(stores=dreaming.agent_memory(user_id, MEMORY_FOLDER), injection=False).tools,
             end_conversation,
         ],
     )
@@ -221,19 +243,19 @@ async def voice(
 
 @app.websocket("/gemini/text")
 async def text(
-    websocket: WebSocket, conversation: str, provider: ProviderName = "gemini", model: str | None = None, effort: str = "auto"
+    websocket: WebSocket, conversation: str, user_id: str, provider: ProviderName = "gemini", model: str | None = None, effort: str = "auto"
 ) -> None:
     await websocket.accept()
     chosen = model or provider_default_model(provider)
     agent = create_harness(
         model=f"google/{chosen}" if provider == "gemini" else text_model(provider, chosen, effort),
         effort=harness_effort(effort) if provider == "gemini" else "auto",
-        instructions=await instructions(TEXT_AGENT, variables(websocket, text_only=True)),
+        instructions=await instructions(TEXT_AGENT, variables(websocket, text_only=True)) + dreaming.JOURNAL_DIRECTIVE,
         tools=[python_repl, http_request, notebook, sleep, stop, handoff_to_user, swarm, graph, make_mcp_router(servers=SERVERS), *brave_tools()],
         builtin_tools=GEMINI_BUILTINS if provider == "gemini" else None,
         mcp_servers=SERVERS,
         session={"id": conversation, "dir": f"{HOME}/sessions"},
-        memory={"dir": f"{HOME}/memory"},
+        memory=MemoryManager(stores=dreaming.agent_memory(user_id, MEMORY_FOLDER)),
     )
     if isinstance(agent.model, GeminiModel):
         # Gemini thinks either way but sends its thoughts only when asked to, which the harness doesn't ask.
