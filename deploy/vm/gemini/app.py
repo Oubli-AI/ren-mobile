@@ -28,7 +28,8 @@ does both; the voice agent, a `BidiAgent`, has the two tools.
 import asyncio
 import os
 import re
-from collections.abc import Mapping
+from collections.abc import AsyncIterator, Mapping
+from contextlib import asynccontextmanager
 
 import uvicorn
 from elevenlabs import AsyncElevenLabs
@@ -117,7 +118,16 @@ SERVERS: dict[str, MCPServerConfig] = {
 }
 
 elevenlabs = AsyncElevenLabs(api_key=os.environ["ELEVENLABS_API_KEY"])
-app = FastAPI()
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    """Restart the dream countdowns a restart cut, as ren's own API does at startup."""
+    await dreaming.resume_dreams()
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 
 def dream_model() -> ModelRouter:

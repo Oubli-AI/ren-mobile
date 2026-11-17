@@ -1,7 +1,7 @@
 /*
  * The phone's frame for ren desktop's Context widget. The app sizes this page's view to what is showing (the orb, the
- * orb with a run's notice, or the open panel), so the page stays transparent around them, and the panel, a 520 by 560
- * card at the desktop window's corner, fills the view instead.
+ * orb with a run's or a dream's notice, or the open panel), so the page stays transparent around them, and the panel, a 520
+ * by 560 card at the desktop window's corner, fills the view instead, as does the dream's review checklist.
  */
 html,
 body,
@@ -19,4 +19,12 @@ body,
   right: 12px !important;
   left: 12px !important;
   width: auto !important;
+}
+/* The dream's review checklist, a card over the orb on the desktop, fills the view the app gives it. */
+[data-testid="dream-notice"][data-reviewing="true"] {
+  inset: 12px !important;
+  width: auto !important;
+}
+[data-testid="dream-notice"][data-reviewing="true"] [data-testid="dream-topics"] {
+  max-height: none !important;
 }
