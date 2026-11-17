@@ -1,34 +1,35 @@
-Ren's search results page, its home page (Discover and the environments) and its agent panel's components from ren
-desktop, unmodified: github.com/ImRonAI/TheBrowser at b112adf.
+ren desktop's pages and components, unmodified: github.com/Oubli-AI/ren (was ImRonAI/TheBrowser) at 0f6fa57 (branch
+claude/ren-account-sync, pull 8: main at 41f674f, with deep research's formation graph and the phone's [phone] turn,
+plus the interview and interest graph kept on the account, /context/profile).
 
-  pages/SearchResultsPage.tsx and everything it imports     src/ (the same paths, without the src/ prefix)
-  pages/HomePage.tsx, pages/OnboardingPage.tsx and theirs   src/
-  pages/SignInPage.tsx, DocumentsPage.tsx, ProjectsIndexPage.tsx,
-  ProjectHomePage.tsx, layouts/AuthPageLayout.tsx and theirs src/
-  the agent panel's components (below) and their imports    src/
-  index.css, vite-env.d.ts, pages/types/electron.ts         src/
+  pages/SearchResultsPage.tsx                               ren's search results
+  pages/HomePage.tsx, OnboardingPage.tsx, SignInPage.tsx    Discover and the destinations, the interview, sign-in
+  pages/DeepResearchPage.tsx                                Research
+  pages/DocumentsPage.tsx, ProjectsIndexPage.tsx,
+  ProjectHomePage.tsx, layouts/AuthPageLayout.tsx           Projects and Documents
+  components/interests/InterestsWidget.tsx, ContextBridge   the Context widget and what feeds its Context Agent
+  components/navigation/destinations.ts                     the destinations, as ren desktop's sidebar lists them
+  components/ai-elements/*, chrome/UrlBar.tsx,
+  context/AgentUiContext.tsx                                the agent panel's conversation components
+  the stores and libs the phone's mounts use                stores/ (auth, favorites, navigation, tab, onboarding,
+                                                            contextAgent, interests, accountProfile), lib/
+                                                            (api-base, search-api,
+                                                            project-documents, sign-in), utils/cn.ts
+  index.css, vite-env.d.ts, pages/types/electron.ts
   data/*.json (Discover's bundled stories)                  ../data (src/data, with its own SHA256SUMS)
   tailwind.config.ts                                        the repository root
 
-These files are never edited here (SHA256SUMS holds their hashes; `npm run check:ren` verifies them). The file list is
-the import closure of src/pages/SearchResultsPage.tsx, src/pages/HomePage.tsx, src/pages/OnboardingPage.tsx, the pages
-App.tsx's MainContent draws for Projects and Documents, its sign-in page and of the
-components ren desktop's agent panel (src/components/agent-panel/AgentPanel.tsx) draws a conversation with:
-ai-elements/conversation, message, response, chain-of-thought, tool and shimmer:
+and everything those import, under the same paths without the src/ prefix. These files are never edited here
+(SHA256SUMS holds their hashes; `npm run check:ren` verifies them). `node scripts/sync-ren.mjs <ren desktop checkout> .`
+copies the import closure of those entries, type imports included, and writes SHA256SUMS. ren desktop's `@catalyst`
+alias is in vite.config.ts and tsconfig.ren.json.
 
-  esbuild src/pages/SearchResultsPage.tsx --bundle --packages=external --metafile=meta.json --outfile=/dev/null
-
-plus the files those import for their types only (found by `tsc -b`), which are checked but never bundled. ren desktop's
-`@catalyst` alias is in vite.config.ts and tsconfig.ren.json.
-
-Seven files come from ren desktop's fixes on top of b112adf (github.com/ImRonAI/TheBrowser pull 5, commit 96ff0d6):
-components/agent-panel/ContextPicker.tsx, components/build/CodeEditor.tsx and components/build/studio/CodePane.tsx fix
-the nine `tsc` errors ren desktop had at b112adf, so the pages type-check with none; components/home/FavoriteLinks.tsx
-keeps Discover's Add form off the screen's edge; and pages/ExecutePage.tsx, pages/ProjectsIndexPage.tsx and
-components/projects/CanonicalIssueWorkspace.tsx open ren's own pages through its tab store where Electron isn't.
-
-The phone's search page (src/search/) mounts SearchResultsPage as it is and supplies what Electron supplies on the
-desktop. The destinations page (src/destinations/) mounts HomePage on the tab its address names (Discover, Execute,
-Documents, Calendar, Vibe, Build) and, as App.tsx's MainContent does, the Projects and Documents pages its tab store
-opens, with SignInPage behind #signin: a story opens in the browser's tab, and the favorites are the app's (src/host.ts). The agent panel's chat (src/panel/) draws the conversation with those components
-the way AgentPanel.tsx does.
+The phone's mounts supply what Electron supplies on the desktop (src/host.ts: the workspace token, the favorites, the
+ren account the pages are signed in to, and the app's events):
+  src/search/        SearchResultsPage, with the query and level from the address
+  src/destinations/  HomePage on the tab its address names, DeepResearchPage for Research, the Projects and Documents
+                     pages its tab store opens, SignInPage behind #signin and OnboardingPage (the interview) for a
+                     signed-in account that hasn't finished it, as App.tsx does
+  src/context/       InterestsWidget and ContextBridge over the browser, for a signed-in account that finished the
+                     interview; the Context Agent hears the phone's pages ([browsing]) and the phone ([phone])
+  src/panel/         the agent panel's chat, drawn with the ai-elements the way AgentPanel.tsx draws it

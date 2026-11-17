@@ -91,6 +91,12 @@ class Browser(private val context: Context, private val store: BrowserStore, pri
     val fullscreen = MutableStateFlow<View?>(null)
     private var leaveFullscreen: WebChromeClient.CustomViewCallback? = null
 
+    /** A web page a tab finished loading, by address and title: ren's Context Agent hears about it. */
+    var visited: (url: String, title: String) -> Unit = { _, _ -> }
+
+    /** The ren account one of Ren's pages is signed in to, whenever it reports it. */
+    var accountReported: (RenAccount) -> Unit = {}
+
     /** Shows the system's file picker for a page's upload field; set by the activity while it is on screen. */
     var fileChooser: ((ValueCallback<Array<Uri>>, WebChromeClient.FileChooserParams) -> Boolean)? = null
 
@@ -289,8 +295,9 @@ class Browser(private val context: Context, private val store: BrowserStore, pri
         webViewClient = Pages(id)
         webChromeClient = Chrome(id)
         if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
-            // Ren's pages ask for the workspace token their requests carry and for the favorites, and give back the
-            // favorites Discover changed; no other origin reaches this listener.
+            // Ren's pages ask for the workspace token their requests carry and for the favorites, give back the
+            // favorites Discover changed and say which ren account they are signed in to; no other origin reaches this
+            // listener.
             WebViewCompat.addWebMessageListener(this, "RenHost", setOf("https://$ORIGIN_HOST")) { _, message, _, isMainFrame, reply ->
                 val asked = message.data?.let { runCatching { JSONObject(it) }.getOrNull() }
                 if (isMainFrame && asked != null) {
@@ -298,6 +305,7 @@ class Browser(private val context: Context, private val store: BrowserStore, pri
                         "token" -> reply.postMessage(JSONObject().put("type", "token").put("token", token()).toString())
                         "favorites" -> asked.optJSONArray("favorites")?.let { favorites.replace(Favorites.parse(it)) }
                             ?: reply.postMessage(JSONObject().put("type", "favorites").put("favorites", JSONArray(Favorites.json(favorites.list.value))).toString())
+                        "account" -> accountReported(RenAccount.parse(asked))
                     }
                 }
             }
@@ -344,6 +352,7 @@ class Browser(private val context: Context, private val store: BrowserStore, pri
         override fun onPageFinished(view: WebView, url: String) {
             sync(id, view)
             update(id) { it.copy(loading = false, progress = 100) }
+            if (!overHome.contains(id)) visited(url, view.title.orEmpty())
         }
 
         override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail?): Boolean {
@@ -409,10 +418,12 @@ class Browser(private val context: Context, private val store: BrowserStore, pri
         private const val TAP_MS = 60L
         private const val PAGES = "https://$ORIGIN_HOST/assets/ren/web"
 
-        /** The bundled page behind one of Ren's `ren://` addresses; null for a web address. */
+        /** The bundled page behind one of Ren's `ren://` addresses (a destination may name a part, `ren://discover#signin`); null for a web address. */
         internal fun internal(url: String): String? = when {
             Addresses.searchQuery(url) != null -> "$PAGES/search/index.html?${Uri.parse(url).encodedQuery.orEmpty()}"
-            else -> Destination.of(url)?.let { "$PAGES/destinations/index.html?tab=${it.id}" }
+            else -> Destination.of(url.substringBefore('#'))?.let { destination ->
+                "$PAGES/destinations/index.html?tab=${destination.id}" + url.substringAfter('#', "").let { if (it.isEmpty()) "" else "#$it" }
+            }
         }
 
         /** The address the bar shows for a loaded URL: Ren's pages by their `ren://` names. */

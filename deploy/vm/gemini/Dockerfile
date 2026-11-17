@@ -9,11 +9,18 @@ RUN UV_PYTHON_INSTALL_DIR=/opt/python uv venv /opt/gemini --python 3.12 \
 # image lacks; strands-agents-tools above vends the Tavily, Exa and Bright Data tools web_tools() gives.
 ARG REN_COMMIT=9ae76d00edfd998b3063cb9cde8bfe0bbea56ead
 RUN git clone --filter=blob:none --no-checkout https://github.com/Oubli-AI/ren.git /opt/ren \
+        strands-harness==0.4.0 mistralai==2.10.1 openai==2.50.0 strands-xai==0.6.1 xai-sdk==1.19.0 fastapi==0.162.0 uvicorn==0.54.0 elevenlabs==2.75.0
+# ren desktop's Brave Search tools and memory, as ren's own agents use them: ren's backend source at one commit, unmodified
+# (agent/api/core/brave_tools.py, agent/api/core/xai_model.py, agent/api/core/dreaming.py and what they import), with the
+# one package of ren's that the image lacks.
+ARG REN_COMMIT=10ceb73fcfd77efc350222dd0aaa800785d626d3
+RUN git clone --filter=blob:none --no-checkout https://github.com/ImRonAI/TheBrowser.git /opt/ren \
     && git -C /opt/ren sparse-checkout set agent \
     && git -C /opt/ren checkout --detach "$REN_COMMIT" \
     && uv pip install --python /opt/gemini/bin/python python-dotenv==1.2.1
-# ren's config makes its session folder when it is imported; it goes in the agents' home on the shared volume.
-ENV PYTHONPATH=/opt/ren SESSION_STORAGE_DIR=/config/emrys-gemini/ren
+# ren's config makes its session folder when it is imported; it goes in the agents' home on the shared volume, as do
+# the second brain and the journals (ren's `local` storage).
+ENV PYTHONPATH=/opt/ren SESSION_STORAGE_DIR=/config/emrys-gemini/ren PANEL_STORAGE=local PANEL_STORAGE_DIR=/config/emrys-gemini/storage
 COPY app.py providers.py live_model.py mistral_model.py media_capabilities.py context_windows.py /opt/gemini/
 USER 1000:1000
 WORKDIR /config/workspace

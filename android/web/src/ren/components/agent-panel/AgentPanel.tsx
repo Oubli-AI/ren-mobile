@@ -51,6 +51,9 @@ export const MODEL_SELECTOR_CLASS = 'h-8 min-w-0 max-w-[210px] rounded-full bord
 const headerIconButton = 'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-ink-secondary transition-colors hover:bg-surface-100 hover:text-ink dark:text-ink-inverse-secondary dark:hover:bg-surface-800 dark:hover:text-ink-inverse'
 /** What the header calls each conversation (the panel names the agent itself). */
 const HEADER_TITLES: Partial<Record<AgentDestination, string>> = { build: 'Build', search: 'Search' }
+/** GLM 5.3 Flash on NVIDIA NIM and on Mistral: the Build Agent runs it at max reasoning unless another level is picked. */
+const GLM_53_FLASH = new Set(['z-ai/glm-5.3-flash', 'zai-glm-5-3-flash'])
+const defaultEffort = (destination: AgentDestination, model: string) => destination === 'build' && GLM_53_FLASH.has(model) ? 'max' : ''
 /** Prompt starters for an empty conversation: they fill the composer, they never send on their own. */
 const STARTERS: Partial<Record<AgentDestination, string[]>> = {
   panel: ['Summarize this page', 'Research a topic and cite sources', 'Fill in this form for me', 'Make me a song to focus to'],
@@ -93,7 +96,7 @@ export function AgentConversation({ destination, embedded = false, onChat, hero,
   const liveHandOff = useRef<(() => Promise<boolean>) | null>(null)
   const registerHandOff = useCallback((handOff: (() => Promise<boolean>) | null) => { liveHandOff.current = handOff }, [])
   const [modeNotice, setModeNotice] = useState('')
-  const { panelWidth, setPanelWidth, setPanelMode, requestedAgent, requestAgent, requestedThread, requestThread } = usePanelAgentStore()
+  const { panelWidth, setPanelWidth, setPanelMode, requestedAgent, requestAgent, requestedThread, requestThread, requestedSend, requestSend } = usePanelAgentStore()
   const user = useAuthStore((state) => state.user?.id || 'default')
   const draftKey = articleDraftKey(user, destination)
   const draft = useArticleDraftStore((state) => state.drafts[draftKey] || EMPTY_ARTICLE_DRAFT)
@@ -230,8 +233,8 @@ export function AgentConversation({ destination, embedded = false, onChat, hero,
 
   useEffect(() => {
     setSelection((current) => current.model === DEFAULT_AGENT_MODEL && !current.provider
-      ? { model: defaultModel, provider: defaultProvider, effort: '' } : current)
-  }, [defaultModel, defaultProvider])
+      ? { model: defaultModel, provider: defaultProvider, effort: defaultEffort(destination, defaultModel) } : current)
+  }, [defaultModel, defaultProvider, destination])
 
   useEffect(() => {
     if (!isPanelOpen) return
@@ -333,7 +336,7 @@ export function AgentConversation({ destination, embedded = false, onChat, hero,
     }
     setModeNotice('')
     // Every agent starts on the default model (GLM 5.3 Flash); a plain new chat is with Ren and keeps the model in use.
-    setSelection(startWith ? { model: defaultModel, provider: defaultProvider, effort: '' } : { model, provider, effort })
+    setSelection(startWith ? { model: defaultModel, provider: defaultProvider, effort: defaultEffort(destination, defaultModel) } : { model, provider, effort })
     setAgentChoice(startWith ?? RON_AGENT)
     setOptions(runtimeOptions)
     sessionRef.current = ''
@@ -361,6 +364,28 @@ export function AgentConversation({ destination, embedded = false, onChat, hero,
     requestThread(null)
     void openRequested.current(requestedThread)
   }, [destination, requestedThread, requestThread, chat.connection])
+  // Ask Ren on an article: a new chat with the requested agent, then exactly that message and article. The composer
+  // keeps what the user was writing. The message goes only once the new chat is the one shown (its session changed).
+  const sendStarted = useRef<{ id: string; from: string } | null>(null)
+  useEffect(() => {
+    if (!requestedSend || requestedSend.destination !== destination || voice || chat.connection === 'loading') return
+    if (sendStarted.current?.id !== requestedSend.id) {
+      sendStarted.current = { id: requestedSend.id, from: chat.sessionId }
+      void startRequested.current(requestedSend.agent)
+      return
+    }
+    if (chat.sessionId === sendStarted.current.from || chat.messages.length || unavailable) return
+    requestSend(null)
+    followOutput.current = true
+    const { text, articles } = requestedSend
+    void sendLatest(text, 'message', undefined, undefined, articles).then((sent) => {
+      if (sent) return
+      // Not accepted: the request lands in the composer instead of being lost.
+      const store = useArticleDraftStore.getState()
+      for (const article of articles) store.attach(draftKey, article)
+      setInput((current) => current || text)
+    })
+  }, [requestedSend, requestSend, destination, voice, chat.connection, chat.sessionId, chat.messages.length, unavailable, sendLatest, draftKey, setInput])
   // Attachments go with a new message, never with steering.
   const attachmentCount = draft.articles.length + attachments.count
   const message = attachments.messageFor(input)
@@ -1296,6 +1321,7 @@ function reasoningSteps(text: string): { label: string; body: string }[] {
 
 function ReasoningChain({ text, path, streaming }: { text: string; path: string; streaming: boolean }) {
   const steps = useMemo(() => reasoningSteps(text), [text])
+  if (!steps.length) return null
   return <ChainOfThought className="my-3 space-y-2 text-xs" defaultOpen={streaming} isStreaming={streaming}>
     <ChainOfThoughtHeader>{streaming ? 'Thinking…' : 'Chain of Thought'}{path ? ` · ${path}` : ''}</ChainOfThoughtHeader>
     <ChainOfThoughtContent>

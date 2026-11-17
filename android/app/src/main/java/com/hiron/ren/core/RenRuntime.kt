@@ -2,10 +2,13 @@ package com.hiron.ren.core
 
 import com.hiron.ren.browser.Browser
 import com.hiron.ren.browser.BrowserStore
+import com.hiron.ren.browser.ContextWidget
 import com.hiron.ren.browser.Favorites
+import com.hiron.ren.browser.PhoneAction
 import android.app.Application
 import android.content.Context
 import com.hiron.ren.BuildConfig
+import com.hiron.ren.device.AppUsage
 import com.hiron.ren.device.DeviceTools
 import com.hiron.ren.device.RenCallScreening
 import com.hiron.ren.device.ReminderStore
@@ -15,6 +18,7 @@ import com.hiron.ren.mcp.HubLink
 import com.hiron.ren.mcp.PhoneMcpServer
 import com.hiron.ren.service.Notifications
 import com.hiron.ren.ui.ImageLoader
+import com.hiron.ren.ui.Plain
 import com.hiron.ren.voice.AgentTools
 import com.hiron.ren.voice.Assistant
 import com.hiron.ren.voice.RenAgent
@@ -98,6 +102,24 @@ class RenRuntime(private val app: Context) {
     val favorites = Favorites({ settings.favorites }, { settings.favorites = it })
     val browser = Browser(app, BrowserStore({ settings.browserTabs }, { settings.browserTabs = it }), favorites) { settings.geminiToken }
 
+    /** Which apps the user used, for the Context Agent. */
+    val appUsage = AppUsage(app)
+
+    /**
+     * ren desktop's Context widget and Context Agent, on the ren account the pages are signed in to: it hears the
+     * browser's pages, the apps the user used and what Ren did on the phone.
+     */
+    val contextWidget = ContextWidget(app, { settings.geminiToken }, ::phoneActivity, { settings.phoneReportedAt }, { settings.phoneReportedAt = it })
+
+    init {
+        browser.visited = contextWidget::visit
+        browser.accountReported = contextWidget::accountChanged
+    }
+
+    /** What the user did on the phone between two moments: the apps they used and what Ren did for them (the activity log). */
+    private fun phoneActivity(since: Long, until: Long) = appUsage.between(since, until) to
+        state.value.log.filter { it.at in since until until && it.kind in PHONE_ACTIONS }.map { PhoneAction(Plain.log(it.kind, it.text), it.at) }
+
     /** Result thumbnails and images, cached in memory only. */
     val images = ImageLoader(http)
 
@@ -112,10 +134,10 @@ class RenRuntime(private val app: Context) {
             Provider.Gemini, Provider.Nim, Provider.Mistral, Provider.Telnyx, Provider.Xai -> strands
         }
 
-    /** Switches provider; the running conversation ends, and the next one starts with [provider]. */
+    /** Switches provider; the conversation ends, and the next one starts with [provider]. */
     fun choose(provider: Provider) {
         if (provider == settings.provider) return
-        agent.stop()
+        newChat()
         settings.provider = provider
     }
 
@@ -187,6 +209,7 @@ class RenRuntime(private val app: Context) {
     /** Ends the conversation: its session stops and the chat clears, back to Ren on its stage. */
     fun newChat() {
         agent.stop()
+        strands.newConversation()
         update { it.copy(messages = emptyList(), activity = Activity.Idle, lastError = null) }
     }
 
@@ -209,3 +232,6 @@ class RenRuntime(private val app: Context) {
 
     private fun now() = System.currentTimeMillis()
 }
+
+/** The activity log's kinds that are things Ren did on the phone (its phone tools, approvals and calls), not its own errors or notes. */
+private val PHONE_ACTIONS = setOf("device", "approval", "call")

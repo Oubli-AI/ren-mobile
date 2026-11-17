@@ -1,3 +1,4 @@
+import java.util.Base64
 import java.util.Properties
 
 plugins {
@@ -18,7 +19,8 @@ android {
         ndk { abiFilters += "arm64-v8a" }
         versionCode = 13
         versionName = "0.5.0"
-        // Ready-to-use defaults from ren.local.properties (never committed); they stay editable in Settings.
+        // Ready-to-use defaults from ren.local.properties (never committed), or else from the build machine's
+        // environment (REN_ANSWERING_NUMBER and the rest, a cloud environment's secrets); they stay editable in Settings.
         val local = Properties().apply {
             rootProject.file("ren.local.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
         }
@@ -29,6 +31,28 @@ android {
         buildConfigField("String", "DEFAULT_GEMINI_TOKEN", baked("geminiToken"))
         // The agents' seven Brave search tools (client tools and on the hub), off unless `braveSearchTools=true`.
         buildConfigField("boolean", "BRAVE_SEARCH_TOOLS", (local.getProperty("braveSearchTools") == "true").toString())
+        fun baked(key: String, variable: String): String {
+            val value = local.getProperty(key) ?: System.getenv(variable).orEmpty()
+            return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+        }
+        buildConfigField("String", "DEFAULT_ANSWERING_NUMBER", baked("answeringNumber", "REN_ANSWERING_NUMBER"))
+        buildConfigField("String", "DEFAULT_BRAVE_SEARCH_KEY", baked("braveSearchKey", "REN_BRAVE_SEARCH_KEY"))
+        buildConfigField("String", "DEFAULT_BRAVE_ANSWERS_KEY", baked("braveAnswersKey", "REN_BRAVE_ANSWERS_KEY"))
+        buildConfigField("String", "DEFAULT_GEMINI_TOKEN", baked("geminiToken", "REN_GEMINI_TOKEN"))
+    }
+
+    signingConfigs {
+        getByName("debug") {
+            // The owner's debug keystore, base64 in REN_DEBUG_KEYSTORE, so a build on another machine (a cloud
+            // session) signs with the key the installed app has and installs over it. Its password and alias are
+            // the debug defaults.
+            System.getenv("REN_DEBUG_KEYSTORE")?.takeIf { it.isNotBlank() }?.let { encoded ->
+                val keystore = layout.buildDirectory.file("debug.keystore").get().asFile
+                keystore.parentFile.mkdirs()
+                keystore.writeBytes(Base64.getMimeDecoder().decode(encoded))
+                storeFile = keystore
+            }
+        }
     }
 
     buildTypes {
@@ -36,7 +60,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // Sideload builds are signed with the local debug key; a store build would use its own key.
+            // Sideload builds are signed with the owner's debug key; a store build would use its own key.
             signingConfig = signingConfigs.getByName("debug")
         }
     }

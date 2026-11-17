@@ -17,12 +17,18 @@ interface OnboardingAnswer {
   timestamp: number
 }
 
+interface OnboardingBackup {
+  answers: OnboardingAnswer[]
+  isComplete: boolean
+}
+
 interface OnboardingState {
   mode: OnboardingMode
   currentStep: OnboardingStep
   currentQuestionIndex: number
   answers: OnboardingAnswer[]
   isComplete: boolean
+  redoBackup: OnboardingBackup | null
   reasoning: {
     steps: Array<{
       type: 'thinking' | 'tool-use' | 'agent-task' | 'search' | 'conclusion'
@@ -42,7 +48,11 @@ interface OnboardingState {
   addReasoningStep: (type: string, content: string) => void
   setSystemPrompt: (prompt: string) => void
   completeOnboarding: () => void
+  /** The account's interview from another device (`accountProfileStore`). */
+  applyAccount: (answers: OnboardingAnswer[], isComplete: boolean) => void
   resetOnboarding: () => void
+  startRedo: () => void
+  cancelRedo: () => void
 }
 
 export type InterviewQuestionId =
@@ -90,6 +100,7 @@ export const useOnboardingStore = create<OnboardingState>()(
       currentQuestionIndex: 0,
       answers: [],
       isComplete: false,
+      redoBackup: null,
       reasoning: {
         steps: []
       },
@@ -170,7 +181,17 @@ export const useOnboardingStore = create<OnboardingState>()(
       },
 
       completeOnboarding: () => {
-        set({ isComplete: true, currentStep: 'complete' })
+        set({ isComplete: true, currentStep: 'complete', redoBackup: null })
+      },
+
+      applyAccount: (answers, isComplete) => {
+        set({
+          answers,
+          isComplete,
+          currentStep: isComplete ? 'complete' : 'interview',
+          currentQuestionIndex: isComplete ? 0 : Math.min(answers.length, INTERVIEW_QUESTIONS.length - 1),
+          redoBackup: null,
+        })
       },
 
       resetOnboarding: () => {
@@ -180,7 +201,41 @@ export const useOnboardingStore = create<OnboardingState>()(
           currentQuestionIndex: 0,
           answers: [],
           isComplete: false,
+          redoBackup: null,
           reasoning: { steps: [] }
+        })
+      },
+
+      startRedo: () => {
+        set((state) => ({
+          redoBackup: { answers: state.answers, isComplete: state.isComplete },
+          mode: 'type',
+          currentStep: 'interview',
+          currentQuestionIndex: 0,
+          answers: [],
+          isComplete: false,
+          reasoning: { steps: [] }
+        }))
+      },
+
+      cancelRedo: () => {
+        set((state) => {
+          if (!state.redoBackup) {
+            return {
+              isComplete: true,
+              currentStep: 'interview',
+              currentQuestionIndex: 0,
+              reasoning: { steps: [] }
+            }
+          }
+          return {
+            answers: state.redoBackup.answers,
+            isComplete: state.redoBackup.isComplete,
+            redoBackup: null,
+            currentStep: 'interview',
+            currentQuestionIndex: 0,
+            reasoning: { steps: [] }
+          }
         })
       }
     }),
@@ -194,6 +249,7 @@ export const useOnboardingStore = create<OnboardingState>()(
         currentQuestionIndex: state.currentQuestionIndex,
         isComplete: state.isComplete,
         answers: state.answers,
+        redoBackup: state.redoBackup,
       }),
       migrate: (persisted, version) => migrateOnboardingState(persisted, version),
     }

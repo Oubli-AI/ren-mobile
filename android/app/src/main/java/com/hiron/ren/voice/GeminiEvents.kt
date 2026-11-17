@@ -27,6 +27,9 @@ object GeminiEvents {
 
     private val PHONE = AgentTools.NAMES.toSet() + AgentTools.REQUEST_APPROVAL + SearchTools.NAMES.keys
 
+    /** The agents' private journal (ren's `journal` tool), which the chat never shows. */
+    private const val JOURNAL = "journal"
+
     /** [state] after [event]; events the chat doesn't show leave it unchanged. */
     fun apply(state: RenState, event: JSONObject, now: Long = System.currentTimeMillis()): RenState = when {
         event.has("type") -> bidi(state, event)
@@ -112,6 +115,7 @@ object GeminiEvents {
     private fun used(state: RenState, use: JSONObject): RenState {
         val id = use.optString("toolUseId").ifEmpty { return state }
         val name = use.optString("name").ifEmpty { return state }
+        if (name == JOURNAL) return state
         val activity = if (name in SearchTools.NAMES) Activity.Searching else Activity.Working
         return RenStore.turn(state.copy(activity = activity)) { m ->
             if (m.parts.any { it is ToolStep && it.id == id }) m
