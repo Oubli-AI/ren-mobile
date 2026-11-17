@@ -78,14 +78,18 @@ What the overhaul added, on the branch `claude/project-thread-tnj6xo` (PR #14) a
 - **Second brain for every agent** (2026-11-17, ren PR #25, owner: every agent that isn't a subagent has its own
   folder and the whole brain; subagents inherit their parent's): ren's search page and shopping agents, tool fixer,
   A2A Ren, teaching agents and OpenCode joined the agents that already had it. OpenCode reaches it through
-  `ren-memory` in `deploy/vm/laptop/opencode.json` (`http://ren:8765/opencode/mcp/`, the user as `X-Ren-User` from
-  `REN_USER_ID`, which the Context Agent sets when it starts OpenCode; without it the folder belongs to `default`),
+  `ren-memory` in `deploy/vm/laptop/opencode.json` (`http://ren:8765/memory/mcp/`, its folder as `X-Ren-Agent`
+  `opencode` and the user as `X-Ren-User` from `REN_USER_ID`, which the Context Agent sets when it starts OpenCode;
+  without it the folder belongs to `default`),
   installed at `~/.config/opencode/opencode.json` in the shared home. A dream that filed new memories is a notice
   over the Context widget's orb (`DreamNotice`); its Review is a checklist of the topics with a comment on each,
   sent to the dreaming agent, which applies it in its next dream. On the phone the notice takes the run notice's
   place (`layout` `notice`) and the checklist the whole screen (`panel`); Back closes it. The `gemini` service
-  restarts dream countdowns a restart cut (`resume_dreams`), as ren's API does. The ElevenLabs agents have no
-  brain: their tools and prompts are the owner's.
+  restarts dream countdowns a restart cut (`resume_dreams`), as ren's API does. The ElevenLabs text and voice
+  agents (owner, 2026-11-17) reach the same server (ren PR #26, `core/memory_mcp.py`) as the MCP servers
+  `ren-memory (text)` and `ren-memory (voice)` at `https://rivet.ron-ai.dev/memory/mcp/`, with Caddy's token
+  (`X-Ren-Token`, the workspace secret `ren_vm_token`), `X-Ren-Agent` `elevenlabs-text` or `elevenlabs-voice`, and
+  `X-Ren-User` from their `user_id`; each prompt ends with ren's `JOURNAL_DIRECTIVE`.
 - **Default browser** (2026-11-13): `MainActivity` takes `VIEW` `http`/`https` links (BROWSABLE, DEFAULT) and
   `APP_BROWSER`, so Android offers Ren for the browser role; a link from another app opens in a new tab in front.
   Onboarding's step 4 and Settings › What Ren can use › Default browser ask for the role
@@ -118,7 +122,7 @@ What the overhaul added, on the branch `claude/project-thread-tnj6xo` (PR #14) a
   since ren's Projects requests carry Supabase's bearer in `Authorization`). The page gets the
   token from the `RenHost` web message listener, which answers only the app's bundled origin
   (`https://appassets.androidplatform.net`). The backend is ren desktop's own backend on the VM, run as ren
-  runs it (`python agent/api/main.py`; `deploy/vm/ren`, image built from `Oubli-AI/ren` at `8b95dc7` (ren main with PRs #16 to #19, #22 to #25, on `2d24e4c`, which holds the pages' commit `0f6fa57`, the web tools (ren PR #11), the Context Agent with OpenCode (ren PR #12), the Search page off Brave (ren PR #13) and Deep Research as the Strands SDK documents it (ren PR #14: plain `Swarm`s and `GraphBuilder` graphs, the outer graph's `stream_async` events); PR #16 makes Mistral every agent's default and takes the harness's EnvironmentContext, which handed the agent ren's checkout path and AGENTS.md, off every user agent, owner 2026-11-17; PR #19 tells every swarm agent when it hands off, as the Strands swarm docs do; PR #22 sends every Mistral model its largest `max_tokens`: 262144 for Mistral Large 4, 131072 for the GLM and DeepSeek models Mistral hosts, the context window for the rest; PR #23 lets only the fact checker open sources and gives each Deep Research agent only the sections of its skill that fit its role; PR #24 gives Deep Research six levels after Perplexity's Agent API presets (fast, low, medium, high, xhigh and ultra, 5–8 up to 30–40 pages), a turn budget per agent with a wrap-up reminder over its last five turns, the Slidev skills on the deck agents, each run's report as a Document under a personal Deep Research page, and Print to PDF, HTML and Word on every Document) (scheduled specialist runs are left to ren desktop: `RON_AGENT_SCHEDULES=0`, which also stops the VM resuming runs), with electron-playwright-mcp (no remote: the VM's `ren/electron-playwright-mcp/` is a copy of its `pyproject.toml`, `README.md` and `src/electron_playwright_mcp` from the owner's checkout at `4612a9b`) and Playwright's Chromium for deep research's PDF, with the toolbox's Node 26.13.0 and pnpm for its Slidev deck, keys in
+  runs it (`python agent/api/main.py`; `deploy/vm/ren`, image built from `Oubli-AI/ren` at `7d3a9b2` (ren main with PRs #16 to #19, #22 to #26, on `2d24e4c`, which holds the pages' commit `0f6fa57`, the web tools (ren PR #11), the Context Agent with OpenCode (ren PR #12), the Search page off Brave (ren PR #13) and Deep Research as the Strands SDK documents it (ren PR #14: plain `Swarm`s and `GraphBuilder` graphs, the outer graph's `stream_async` events); PR #16 makes Mistral every agent's default and takes the harness's EnvironmentContext, which handed the agent ren's checkout path and AGENTS.md, off every user agent, owner 2026-11-17; PR #19 tells every swarm agent when it hands off, as the Strands swarm docs do; PR #22 sends every Mistral model its largest `max_tokens`: 262144 for Mistral Large 4, 131072 for the GLM and DeepSeek models Mistral hosts, the context window for the rest; PR #23 lets only the fact checker open sources and gives each Deep Research agent only the sections of its skill that fit its role; PR #24 gives Deep Research six levels after Perplexity's Agent API presets (fast, low, medium, high, xhigh and ultra, 5–8 up to 30–40 pages), a turn budget per agent with a wrap-up reminder over its last five turns, the Slidev skills on the deck agents, each run's report as a Document under a personal Deep Research page, and Print to PDF, HTML and Word on every Document) (scheduled specialist runs are left to ren desktop: `RON_AGENT_SCHEDULES=0`, which also stops the VM resuming runs), with electron-playwright-mcp (no remote: the VM's `ren/electron-playwright-mcp/` is a copy of its `pyproject.toml`, `README.md` and `src/electron_playwright_mcp` from the owner's checkout at `4612a9b`) and Playwright's Chromium for deep research's PDF, with the toolbox's Node 26.13.0 and pnpm for its Slidev deck, keys in
   `search.env`, Supabase's, `HF_TOKEN`, `PERPLEXITY_API_KEY` (its tool-repair fixer runs on Perplexity) and ren desktop's own providers (`RON_CHAT_PROVIDERS`, `TELNYX_API_KEY`, `GEMINI_API_KEY`, `MISTRAL_API_KEY`, `XAI_API_KEY`, 2026-11-16) in `ren.env`, so Deep Research picks ren desktop's default, Telnyx `moonshotai/Kimi-K3.1-Pro` (with only NIM it ran on `minimaxai/minimax-m3.1-flash`, which went silent mid-reply and failed the run); Deep Research's working files are on the `ren_data` volume (`RON_DEEP_RESEARCH_ARTIFACTS_DIR`, since a new container lost a run's report on 2026-11-17); its storage is ren desktop's Hugging Face bucket, see "Context
   widget"), at `https://rivet.ron-ai.dev/` behind the same token (Caddy sends every
   path the other services don't take to it, except ren's A2A endpoint). "Add search to Ren context" and "Search deeper" need ren desktop's context
@@ -515,7 +519,7 @@ cd deploy/vm/hub && uvx --python 3.12 --with fastmcp==3.4.0 --with mcp==1.26.0 -
    simplified Settings), CloudFS, and triggers and webhooks.
 7. **The Strands agents** (plan https://claude.ai/artifact/Ri9R22DZiVUhd2x2oW6CeL): they run on the Gemini API (AI
    Studio, owner, 2026-11-06), NIM, Mistral, Telnyx and xAI. The `gemini` and `search` images are built on the VM
-   (`emrys-gemini:1.64.0`, `ren-api:8b95dc7`) and start once their env files are in `/opt/emrys`: `gemini.env`
+   (`emrys-gemini:1.64.0`, `ren-api:7d3a9b2`) and start once their env files are in `/opt/emrys`: `gemini.env`
    (`GOOGLE_API_KEY`, `NVIDIA_NIM_API_KEY`, `MISTRAL_API_KEY`, `TELNYX_API_KEY`, `XAI_API_KEY`; without `TELNYX_MCP_AUTHORIZATION` oubliai-telnyx
    doesn't load there), `search.env` (`BRAVE_SEARCH_API_KEY`, `BRAVE_ANSWERS_API_KEY`, `NVIDIA_NIM_API_KEY`) and
    `ren.env` (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `HF_TOKEN`, `PERPLEXITY_API_KEY`, `RON_CHAT_PROVIDERS` and ren desktop's provider keys).
@@ -531,7 +535,7 @@ cd deploy/vm/hub && uvx --python 3.12 --with fastmcp==3.4.0 --with mcp==1.26.0 -
 9. **Telnyx** (PR #13): checked by mypy and offline (the model, its window from the catalogue, the catalogue's filter);
    not run live. It needs `TELNYX_API_KEY` in the VM's `gemini.env` and the `gemini` image rebuilt, then one typed
    conversation from Settings › Agents › Telnyx with a tool call.
-10. **Memory:** the `gemini` and `ren` images are pinned to ren `c625f02` (ren PR #25). Not run live: one
+10. **Memory:** the `gemini` and `ren` images are pinned to ren `7d3a9b2` (ren PRs #25 and #26). Not run live: one
     conversation, one dream and one review. The `gemini` service keeps its brain in ren's `local` storage on the VM
     under the app's install id, and the `ren` service in ren desktop's bucket under the account, so the phone's
     Strands agents and ren's pages don't share one brain yet.
