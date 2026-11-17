@@ -2,7 +2,7 @@
 # `python agent/api/main.py`): ren's own code (github.com/Oubli-AI/ren, was ImRonAI/TheBrowser) at one commit, unmodified, with its pinned
 # Strands source and requirements. compose.yaml sets what ren's deploy/ron.env.example leaves to the host.
 FROM python:3.14-slim-bookworm
-ARG REN_COMMIT=b1737652e60c42a238f8906b5c2c58458fb002b7
+ARG REN_COMMIT=e1de3a0e84a326bd9354579d5d0a7a93c6d17d89
 RUN apt-get update && apt-get install -y --no-install-recommends git build-essential socat && rm -rf /var/lib/apt/lists/*
 WORKDIR /opt/ren
 RUN git clone --filter=blob:none --no-checkout https://github.com/Oubli-AI/ren.git . \
