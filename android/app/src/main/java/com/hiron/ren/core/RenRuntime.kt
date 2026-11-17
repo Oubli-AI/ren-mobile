@@ -95,6 +95,9 @@ class RenRuntime(private val app: Context) {
     /** Brave Search for the agents' search tools, with the keys in Settings. */
     val search = BraveSearch(http, settings::braveSearchKey, settings::braveAnswersKey)
 
+    /** [search] for the agents' search tools, which they get only while `braveSearchTools` is on ([BuildConfig.BRAVE_SEARCH_TOOLS]). */
+    private val braveSearch: (suspend (SearchQuery) -> Result<SearchResults>)? = if (BuildConfig.BRAVE_SEARCH_TOOLS) search::search else null
+
     /** The browser's tabs. */
     val favorites = Favorites({ settings.favorites }, { settings.favorites = it })
     val browser = Browser(app, BrowserStore({ settings.browserTabs }, { settings.browserTabs = it }), favorites) { settings.geminiToken }
@@ -120,7 +123,7 @@ class RenRuntime(private val app: Context) {
     /** Result thumbnails and images, cached in memory only. */
     val images = ImageLoader(http)
 
-    private val elevenLabs = RenAgent(app, settings, tools::run, ::approve, ::update, { _robot.tryEmit(it) }, scope, search::search)
+    private val elevenLabs = RenAgent(app, settings, tools::run, ::approve, ::update, { _robot.tryEmit(it) }, scope, braveSearch)
     /** Gemini, NVIDIA NIM, Mistral and Telnyx in Strands on the workspace VM. */
     val strands = StrandsAgent(app, settings, http, ::update, { _robot.tryEmit(it) }, scope)
 
@@ -157,7 +160,7 @@ class RenRuntime(private val app: Context) {
         browser,
         level = { settings.searchLevel },
         approve = { input -> AgentTools.askApproval(input.opt("action_type") as? String, input.opt("details") as? String, ::approve) },
-        search = { name, input -> SearchTools.call(name, PhoneMcpServer.parameters(input), search::search, ::update) },
+        search = braveSearch?.let { brave -> { name, input -> SearchTools.call(name, PhoneMcpServer.parameters(input), brave, ::update) } },
         run = tools::run,
     )
 

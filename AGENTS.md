@@ -145,6 +145,16 @@ What the overhaul added, on the branch `claude/project-thread-tnj6xo` (PR #14) a
 - **The Strands agents on the hub** (`deploy/vm/gemini/app.py`): the server `ren-hub` (`http://hub:8300/mcp`,
   unprefixed) replaces the phone's Tailscale address, so Gemini, NIM and Mistral reach the phone and ren desktop
   whichever is attached.
+- **Web tools in place of Brave** (2026-11-17, ren `Oubli-AI/ren` PR #11): Brave's agent tools are off, not deleted.
+  On the VM ren's `brave_tools()` is empty unless `RON_BRAVE_TOOLS=1`, and every Strands agent (text on every provider,
+  Gemini Live) and ren's Deep Research get ren's `web_tools()` instead: strands_tools' Tavily (`TAVILY_API_KEY`), Exa
+  (`EXA_API_KEY`) and Bright Data (`BRIGHTDATA_API_KEY`, zone `BRIGHTDATA_ZONE`, default `web_unlocker1`) tools and
+  Olostep's hosted MCP server (`OLOSTEP_API_KEY`, tools `olostep_*`), each only where its key is set, beside Strands'
+  vended `http_request`. The keys go in `gemini.env` (Strands agents) and `ren.env` (ren's agents and Deep Research);
+  none were on the VM or the owner's Mac on 2026-11-17. On the phone the seven Brave search tools (client tools and on
+  the hub) are served only when `braveSearchTools=true` in `android/ren.local.properties`
+  (`BuildConfig.BRAVE_SEARCH_TOOLS`). The ElevenLabs agents get no new tools (their configuration is the owner's), and
+  the search page in the browser still searches Brave.
 - **ElevenLabs is out of credits (2026-11-12):** a typed question on the emulator opened a session with the text
   agent (tools registered, both MCP servers connected), and ElevenLabs closed it 8 s later with WebSocket code 1002,
   "This request exceeds your quota limit." The SDK reports any close but 1000 as `DisconnectionDetails.Error`, and the

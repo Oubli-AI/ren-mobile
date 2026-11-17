@@ -89,8 +89,9 @@ services:
     restart: unless-stopped
     env_file:
       - elevenlabs.env
+      # The model keys, and TAVILY_API_KEY, EXA_API_KEY, BRIGHTDATA_API_KEY and OLOSTEP_API_KEY for ren's web tools.
       - gemini.env
-      # The Brave keys, for ren's Brave tools.
+      # The Brave keys, for ren's Brave tools while RON_BRAVE_TOOLS=1.
       - search.env
     environment:
       # NIM's default text model (ren's `NIM_MODEL`; owner, 2026-11-13).
@@ -115,11 +116,14 @@ services:
   # Projects, Documents, Calendar, Vibe and Build, at https://rivet.ron-ai.dev/.
   ren:
     build: ./ren
+    image: ren-api:9ae76d0
     image: ren-api:0f6fa57
     restart: unless-stopped
     env_file:
       # The Brave keys and NIM's key.
       - search.env
+      # SUPABASE_URL and SUPABASE_ANON_KEY (ren's publishable key), for Projects signed in to a ren account, and
+      # TAVILY_API_KEY, EXA_API_KEY, BRIGHTDATA_API_KEY and OLOSTEP_API_KEY for ren's agents' web tools.
       # SUPABASE_URL and SUPABASE_ANON_KEY (ren's publishable key), for Projects signed in to a ren account;
       # SUPABASE_SERVICE_ROLE_KEY for stored and scheduled agents; HF_TOKEN for the storage bucket.
       - ren.env

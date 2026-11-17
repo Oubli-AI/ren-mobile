@@ -1,4 +1,9 @@
 # ren desktop's backend for the phone, as ren desktop runs it (its deploy/systemd/ron-api.service runs
+# `python agent/api/main.py`): ren's own code (github.com/Oubli-AI/ren) at one commit, unmodified, with its pinned
+# Strands source and requirements. compose.yaml sets what ren's deploy/ron.env.example leaves to the host.
+FROM python:3.14-slim-bookworm
+ARG REN_COMMIT=9ae76d00edfd998b3063cb9cde8bfe0bbea56ead
+RUN apt-get update && apt-get install -y --no-install-recommends git build-essential && rm -rf /var/lib/apt/lists/*
 # `python agent/api/main.py`): ren's own code (github.com/Oubli-AI/ren, was ImRonAI/TheBrowser) at one commit, unmodified, with its pinned
 # Strands source and requirements. compose.yaml sets what ren's deploy/ron.env.example leaves to the host.
 FROM python:3.14-slim-bookworm
