@@ -27,6 +27,8 @@ android {
         buildConfigField("String", "DEFAULT_BRAVE_SEARCH_KEY", baked("braveSearchKey"))
         buildConfigField("String", "DEFAULT_BRAVE_ANSWERS_KEY", baked("braveAnswersKey"))
         buildConfigField("String", "DEFAULT_GEMINI_TOKEN", baked("geminiToken"))
+        // The agents' seven Brave search tools (client tools and on the hub), off unless `braveSearchTools=true`.
+        buildConfigField("boolean", "BRAVE_SEARCH_TOOLS", (local.getProperty("braveSearchTools") == "true").toString())
     }
 
     buildTypes {

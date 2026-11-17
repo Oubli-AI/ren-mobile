@@ -44,8 +44,8 @@ import java.util.UUID
 /**
  * Ren's ElevenLabs agents, connected straight through the ElevenLabs Android SDK: [start] a voice or text
  * session, [sendText], [switchMode], [stop]. Every session starts with the user's id and their `perm_*` grants
- * as dynamic variables; the agents call the phone tools, `request_approval` and the search tools ([SearchTools])
- * as client tools. The chat is built from the session's server messages ([ChatEvents]).
+ * as dynamic variables; the agents call the phone tools, `request_approval` and, with a [search], the search tools
+ * ([SearchTools]) as client tools. The chat is built from the session's server messages ([ChatEvents]).
  */
 class RenAgent(
     private val context: Context,
@@ -55,7 +55,7 @@ class RenAgent(
     private val update: ((RenState) -> RenState) -> Unit,
     private val robot: (RobotCommand) -> Unit,
     private val scope: CoroutineScope,
-    private val search: suspend (SearchQuery) -> Result<SearchResults>,
+    private val search: (suspend (SearchQuery) -> Result<SearchResults>)?,
     private val connect: suspend (ConversationConfig, Context) -> ConversationSession = { config, context -> ConversationClient.startSession(config, context) },
 ) : Assistant {
     // Main thread only. Every start and stop moves [generation] on, so a stale start or callback can tell.
@@ -152,7 +152,7 @@ class RenAgent(
             dynamicVariables = settings.permissionVariables() + ("user_id" to settings.userId),
             textOnly = !voice,
             clientTools = AgentTools.build(::runOnPhone) + (AgentTools.REQUEST_APPROVAL to AgentTools.approval(approve)) +
-                SearchTools.build(search, update),
+                search?.let { SearchTools.build(it, update) }.orEmpty(),
             onConnect = { connected.complete(Unit) },
             onDisconnect = { details ->
                 connected.completeExceptionally(IllegalStateException("the agent ended the session"))

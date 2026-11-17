@@ -79,7 +79,7 @@ class HubLinkTest {
         }.start(wait = false)
     }
 
-    private fun attach(withToken: String = token) {
+    private fun attach(withToken: String = token, searches: Boolean = true) {
         val context = ApplicationProvider.getApplicationContext<Context>()
         var saved: String? = null
         var favorites: String? = null
@@ -91,9 +91,13 @@ class HubLinkTest {
                 calls += "request_approval" to input.toString()
                 Result.success("""{"approved":true,"remember_decision":false}""")
             },
-            search = { name, input ->
-                calls += name to input.toString()
-                if (input.has("q")) Result.success("""{"shown_on_screen":true}""") else Result.failure(IllegalArgumentException("Say what to search for."))
+            search = if (searches) {
+                { name, input ->
+                    calls += name to input.toString()
+                    if (input.has("q")) Result.success("""{"shown_on_screen":true}""") else Result.failure(IllegalArgumentException("Say what to search for."))
+                }
+            } else {
+                null
             },
         ) { tool, input ->
             calls += tool to input.toString()
@@ -127,6 +131,13 @@ class HubLinkTest {
             browser,
         )
         assertEquals(HubState.Attached, link.state.value)
+    }
+
+    @Test
+    fun withoutSearchThePhoneServesNoSearchTools() = runBlocking {
+        attach(searches = false)
+        val names = client().listTools().tools.map { it.name }
+        assertEquals(AgentTools.NAMES + AgentTools.REQUEST_APPROVAL + names.filter { it.startsWith("browser_") }, names)
     }
 
     @Test
