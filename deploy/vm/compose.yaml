@@ -116,7 +116,7 @@ services:
   # Projects, Documents, Calendar, Vibe and Build, at https://rivet.ron-ai.dev/.
   ren:
     build: ./ren
-    image: ren-api:f704aae
+    image: ren-api:5823e02
     restart: unless-stopped
     env_file:
       # The Brave keys and NIM's key.
@@ -135,6 +135,8 @@ services:
       RON_AGENT_SCHEDULES: "0"
       # Search sessions and the guest Projects database (projects.sqlite3).
       SESSION_STORAGE_DIR: /home/ren/data
+      # Deep Research's working files (reports, charts, PDFs), on the volume so a new container keeps them.
+      RON_DEEP_RESEARCH_ARTIFACTS_DIR: /home/ren/data/deep-research/artifacts
       NIM_MODEL: minimaxai/minimax-m3.1-flash
     mem_limit: 4g
     volumes:

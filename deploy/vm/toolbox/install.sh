@@ -5,7 +5,7 @@
 # run time and Desktop Commander and the hooks jobs only pass HOME and PATH through.
 set -eu
 
-NODE=26.13.0 # Only where the base image has no Node (the laptop); the computer image is node:26.13.0-bookworm.
+NODE=26.13.0 # Only where the base image has no Node (the laptop); the computer image is node:26.13.0-bookworm. ren's image (deploy/vm/ren) installs the same Node.
 NODE_SHA256=d28a96af6c38596f6d9d97c0ee531c13d238d757742387d1928de822d959e997
 GO=1.27.3
 GO_SHA256=65efbc80fdc1fa2cd2631cad5b481777a68e8725f34e89f50fc6ac714e379b40

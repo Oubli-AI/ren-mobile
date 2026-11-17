@@ -2,7 +2,7 @@
 # `python agent/api/main.py`): ren's own code (github.com/Oubli-AI/ren, was ImRonAI/TheBrowser) at one commit, unmodified, with its pinned
 # Strands source and requirements. compose.yaml sets what ren's deploy/ron.env.example leaves to the host.
 FROM python:3.14-slim-bookworm
-ARG REN_COMMIT=f704aaeae54297f4e41b2c12a93904d61c20d484
+ARG REN_COMMIT=5823e0290f50416724cf09f76a0ec8a670a631eb
 RUN apt-get update && apt-get install -y --no-install-recommends git build-essential socat && rm -rf /var/lib/apt/lists/*
 WORKDIR /opt/ren
 RUN git clone --filter=blob:none --no-checkout https://github.com/Oubli-AI/ren.git . \
@@ -17,10 +17,21 @@ RUN bash deploy/prepare-strands.sh && pip install --no-cache-dir -r agent/api/re
     && pip install --no-cache-dir 'fastmcp[apps]==3.4.0' 'mcp==1.26.0' 'pyyaml>=6.0.3' 'httpx>=0.28.1' \
     && pip install --no-cache-dir --ignore-requires-python --no-deps /opt/electron-playwright-mcp && pip check
 # Deep research prints its report with Playwright's Chromium (playwright is in ren's requirements); without it ren
-# writes a plain PDF. Its slides need Slidev on Node, which isn't here, so a run has no deck.
+# writes a plain PDF.
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
 RUN python -m playwright install --with-deps chromium
-RUN useradd --create-home --uid 1000 ren && install -d -o ren -g ren /home/ren/data
+# Its deck is a Slidev project, which its slidev skill builds and exports with pnpm on Node (@slidev/cli wants 22.22 or later); the
+# Node and pnpm are the toolbox's (deploy/vm/toolbox/install.sh). The export's playwright-chromium fetches its own
+# browser into PLAYWRIGHT_BROWSERS_PATH, so the agents' user owns it.
+ARG NODE=26.13.0
+ARG NODE_SHA256=d28a96af6c38596f6d9d97c0ee531c13d238d757742387d1928de822d959e997
+RUN apt-get update && apt-get install -y --no-install-recommends curl xz-utils && rm -rf /var/lib/apt/lists/* \
+    && curl -fsSLO "https://nodejs.org/dist/v$NODE/node-v$NODE-linux-x64.tar.xz" \
+    && echo "$NODE_SHA256  node-v$NODE-linux-x64.tar.xz" | sha256sum -c - \
+    && tar -xJf "node-v$NODE-linux-x64.tar.xz" -C /usr/local --strip-components=1 \
+        --exclude CHANGELOG.md --exclude LICENSE --exclude README.md \
+    && rm "node-v$NODE-linux-x64.tar.xz" && npm install -g pnpm@12.16.1 && npm cache clean --force
+RUN useradd --create-home --uid 1000 ren && install -d -o ren -g ren /home/ren/data && chown -R ren:ren /opt/ms-playwright
 USER 1000:1000
 ENV PYTHONPATH=/opt/ren PYTHONUNBUFFERED=1 API_HOST=0.0.0.0 API_PORT=8765
 EXPOSE 8765 8766
