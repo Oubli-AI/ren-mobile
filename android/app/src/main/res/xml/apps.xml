@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The APKs of the apps OpenCode built for the ren account, downloaded for Android's installer (browser/Applications.kt). -->
+<paths>
+    <cache-path name="apps" path="apps/" />
+</paths>

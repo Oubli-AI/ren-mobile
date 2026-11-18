@@ -154,7 +154,7 @@ export function reportAccount() {
     if (!useAuthStore.persist.hasHydrated() || !useOnboardingStore.persist.hasHydrated()) return
     const { isAuthenticated, isInitialized, user } = useAuthStore.getState()
     if (!isInitialized) return
-    const report = JSON.stringify({ type: "account", signedIn: isAuthenticated && user !== null, email: user?.email ?? "", surveyComplete: useOnboardingStore.getState().isComplete })
+    const report = JSON.stringify({ type: "account", signedIn: isAuthenticated && user !== null, email: user?.email ?? "", userId: user?.id ?? "", surveyComplete: useOnboardingStore.getState().isComplete })
     if (report === last) return
     last = report
     host?.postMessage(report)

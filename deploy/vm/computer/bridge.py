@@ -14,8 +14,9 @@ DESKTOP_COMMANDER = {
         "desktop-commander": {
             "command": "npx",
             "args": ["-y", "@wonderwhy-er/desktop-commander@0.3.1"],
-            # MCP stdio passes only a few variables through: npx needs the image's cache, OpenCode the Mistral key.
-            "env": {"npm_config_cache": os.environ["npm_config_cache"], "MISTRAL_API_KEY": os.environ["MISTRAL_API_KEY"]},
+            # MCP stdio passes only a few variables through: npx needs the image's cache, OpenCode the Mistral key,
+            # Gradle the JDK and the Android SDK.
+            "env": {name: os.environ[name] for name in ("npm_config_cache", "MISTRAL_API_KEY", "JAVA_HOME", "ANDROID_HOME")},
         }
     }
 }

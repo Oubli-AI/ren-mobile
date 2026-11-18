@@ -7,7 +7,9 @@ pull 18: frosted glass issue cards and Embed tabs), and lib/deep-research-api.ts
 c625f02 (pull 25: the dream's notice and review over the Context widget, and the search page sending its user), and Deep Research's pages, lib/project-documents.ts and the Documents page's Print menu from 8b95dc7 (main,
 pull 24: the six levels, the report as a Document, Print to PDF, HTML and Word), and index.css, pages/types/electron.ts,
 the editor (NotionEditor.tsx, TableMenu.tsx, blocks/RenTable.ts) and the Documents toolbar from 1bc8efc (main, pull 28:
-tables with resizable columns, a table bar and header colours, Embed tabs in the Insert menu).
+tables with resizable columns, a table bar and header colours, Embed tabs in the Insert menu), and the Context widget's
+lib/context-api.ts, stores/contextAgentStore.ts and interests/ContextAgents.tsx from beaa580 (main, pull 29: app
+recommendations the Context Agent builds with OpenCode).
 
   pages/SearchResultsPage.tsx                               ren's search results
   pages/HomePage.tsx, OnboardingPage.tsx, SignInPage.tsx    Discover and the destinations, the interview, sign-in
