@@ -65,7 +65,8 @@ services:
     pid: service:laptop
     environment:
       DISPLAY: ":1"
-    mem_limit: 4g
+    # OpenCode, and the Gradle and Kotlin daemons of the Android apps it builds (toolbox/android.sh).
+    mem_limit: 8g
     volumes:
       - laptop_home:/config
       - x11:/tmp/.X11-unix
@@ -116,7 +117,7 @@ services:
   # Projects, Documents, Calendar, Vibe and Build, at https://rivet.ron-ai.dev/.
   ren:
     build: ./ren
-    image: ren-api:5823e02
+    image: ren-api:beaa580
     restart: unless-stopped
     env_file:
       # The Brave keys and NIM's key.
@@ -138,9 +139,15 @@ services:
       # Deep Research's working files (reports, charts, PDFs), on the volume so a new container keeps them.
       RON_DEEP_RESEARCH_ARTIFACTS_DIR: /home/ren/data/deep-research/artifacts
       NIM_MODEL: minimaxai/minimax-m3.1-flash
+      # The Context Agent hands app builds to OpenCode on the computer, over the compose network (Caddy's token guards
+      # only the public route; ren needs a token set, which the computer's port does not check).
+      RON_COMPUTER_MCP_URL: http://computer:8080/computer/mcp
+      RON_COMPUTER_MCP_TOKEN: compose-network
     mem_limit: 4g
     volumes:
       - ren_data:/home/ren/data
+      # The shared home, read-only: ren serves the APKs OpenCode builds in /config/workspace to the phone.
+      - laptop_home:/config:ro
 
 volumes:
   ren_data:

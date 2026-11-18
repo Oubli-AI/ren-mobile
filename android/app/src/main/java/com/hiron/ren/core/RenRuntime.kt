@@ -1,5 +1,6 @@
 package com.hiron.ren.core
 
+import com.hiron.ren.browser.Applications
 import com.hiron.ren.browser.Browser
 import com.hiron.ren.browser.BrowserStore
 import com.hiron.ren.browser.ContextWidget
@@ -36,6 +37,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
@@ -111,9 +113,18 @@ class RenRuntime(private val app: Context) {
      */
     val contextWidget = ContextWidget(app, { settings.geminiToken }, ::phoneActivity, { settings.phoneReportedAt }, { settings.phoneReportedAt = it })
 
+    /** The apps OpenCode built for the ren account, on Home. */
+    val applications = Applications(app, http) { settings.geminiToken }
+
     init {
         browser.visited = contextWidget::visit
         browser.accountReported = contextWidget::accountChanged
+        scope.launch {
+            contextWidget.account.collect {
+                applications.userId = if (it.signedIn) it.userId else ""
+                applications.refresh()
+            }
+        }
     }
 
     /** What the user did on the phone between two moments: the apps they used and what Ren did for them (the activity log). */

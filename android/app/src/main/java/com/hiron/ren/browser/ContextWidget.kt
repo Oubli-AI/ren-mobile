@@ -21,12 +21,12 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /** The ren account the app's pages are signed in to, as they report it (ren desktop's auth and interview stores). */
-data class RenAccount(val signedIn: Boolean = false, val email: String = "", val surveyComplete: Boolean = false) {
+data class RenAccount(val signedIn: Boolean = false, val email: String = "", val surveyComplete: Boolean = false, val userId: String = "") {
     /** ren desktop's Context widget is there for a signed-in account that finished the interview. */
     val contextReady: Boolean get() = signedIn && surveyComplete
 
     companion object {
-        fun parse(json: JSONObject) = RenAccount(json.optBoolean("signedIn"), json.optString("email"), json.optBoolean("surveyComplete"))
+        fun parse(json: JSONObject) = RenAccount(json.optBoolean("signedIn"), json.optString("email"), json.optBoolean("surveyComplete"), json.optString("userId"))
     }
 }
 

@@ -1,5 +1,6 @@
 package com.hiron.ren.ui
 
+import android.widget.Toast
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -37,6 +38,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Android
 import androidx.compose.material.icons.outlined.Biotech
 import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.CalendarToday
@@ -54,11 +56,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -74,6 +78,7 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -86,11 +91,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.hiron.ren.browser.Applications
 import com.hiron.ren.browser.Destination
 import com.hiron.ren.browser.Favorite
 import com.hiron.ren.browser.Favorites
+import com.hiron.ren.browser.RenApplication
 import com.hiron.ren.browser.SearchLevel
 import com.hiron.ren.core.RenRuntime
+import kotlinx.coroutines.launch
 
 const val HOME_SEARCH_TAG = "home-search"
 const val HOME_SEARCH_HINT = "Ask me anything. I dare you."
@@ -137,6 +145,12 @@ internal fun BrowserHome(runtime: RenRuntime, onGo: (String) -> Unit) {
         }
         Spacer(Modifier.height(36.dp))
         FavoriteLinks(favorites, runtime.favorites, onGo)
+        val apps by runtime.applications.list.collectAsState()
+        LaunchedEffect(Unit) { runtime.applications.refresh() }
+        if (apps.isNotEmpty()) {
+            Spacer(Modifier.height(28.dp))
+            AppLinks(apps, runtime.applications, onGo)
+        }
         Spacer(Modifier.height(32.dp))
     }
 }
@@ -292,16 +306,51 @@ private fun FavoriteTile(favorite: Favorite, onOpen: () -> Unit, onRemove: () ->
     }
 }
 
-/** The site's icon from Google's favicon service, as ren desktop shows it; a globe while it loads or when it can't. */
+/**
+ * The apps OpenCode built for the ren account, as ren desktop's sidebar shows them: icon tiles with the name under
+ * them. A web app opens in this tab; an Android app downloads and Android's installer opens on it.
+ */
 @Composable
-private fun SiteIcon(url: String, size: Dp) {
+private fun AppLinks(list: List<RenApplication>, applications: Applications, onGo: (String) -> Unit) {
+    val p = LocalPalette.current
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    Text("APPLICATIONS", style = Type.labelMd, color = p.muted, modifier = Modifier.fillMaxWidth().padding(start = 4.dp, bottom = 10.dp))
+    LazyRow(Modifier.fillMaxWidth().semantics { contentDescription = "Applications" }, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        items(list, key = { it.id }) { app ->
+            Column(
+                Modifier.width(72.dp).clip(RoundedCornerShape(Radius.card)).clickable(role = Role.Button) {
+                    if (!app.android) onGo(app.location)
+                    else scope.launch {
+                        Toast.makeText(context, "Downloading ${app.name}…", Toast.LENGTH_SHORT).show()
+                        applications.install(app)?.let { Toast.makeText(context, it, Toast.LENGTH_LONG).show() }
+                    }
+                }.padding(4.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                val shape = RoundedCornerShape(Radius.card)
+                Box(Modifier.size(48.dp).clip(shape).background(p.card).border(1.dp, p.line, shape), contentAlignment = Alignment.Center) {
+                    if (app.android) Icon(Icons.Outlined.Android, contentDescription = null, tint = p.accent, modifier = Modifier.size(24.dp))
+                    else SiteIcon(app.location, 28.dp, app.icon)
+                }
+                Text(app.name, style = Type.labelMd, color = p.ink2, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }
+}
+
+/** [icon], else the site's icon from Google's favicon service, as ren desktop shows it; a globe while it loads or when it can't. */
+@Composable
+private fun SiteIcon(url: String, size: Dp, icon: String = "") {
     val p = LocalPalette.current
     val images = LocalImages.current
     val px = with(LocalDensity.current) { size.roundToPx() }
-    val icon = produceState<ImageBitmap?>(null, url, images) {
-        value = Favorites.icon(url)?.let { images?.bitmap(it, px * 2) }
+    val image = produceState<ImageBitmap?>(null, url, icon, images) {
+        value = icon.takeIf(String::isNotBlank)?.let { images?.bitmap(it, px * 2) }
+            ?: Favorites.icon(url)?.let { images?.bitmap(it, px * 2) }
     }.value
-    if (icon != null) Image(icon, contentDescription = null, modifier = Modifier.size(size))
+    if (image != null) Image(image, contentDescription = null, modifier = Modifier.size(size))
     else Icon(Icons.Outlined.Public, contentDescription = null, tint = p.muted, modifier = Modifier.size(size))
 }
 

@@ -17,8 +17,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends xdotool xfce4-s
 # linuxserver's wrapped-chromium, as the laptop (webtop) has it at /usr/local/bin.
 COPY wrapped-chromium /usr/local/bin/wrapped-chromium
 COPY bridge.py hooks.py /opt/bridge/
-# The laptop's user and home, where OpenCode, the workspace and Rust (rustup's ~/.cargo) live.
+# The laptop's user and home, where OpenCode, the workspace, Rust (rustup's ~/.cargo) and the JDK, Gradle and Android
+# SDK (toolbox/android.sh) live.
 USER 1000:1000
-ENV HOME=/config PATH=/config/.opencode/bin:/config/.cargo/bin:$PATH
+ENV HOME=/config JAVA_HOME=/config/.jdk ANDROID_HOME=/config/Android/Sdk \
+    PATH=/config/.opencode/bin:/config/.cargo/bin:/config/.jdk/bin:/config/.gradle-dist/bin:/config/Android/Sdk/platform-tools:$PATH
 EXPOSE 8080
 CMD ["/opt/bridge/bin/python", "/opt/bridge/bridge.py"]
