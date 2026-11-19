@@ -147,6 +147,11 @@ dependencies {
     implementation(libs.mcp.client)
     implementation(libs.ktor.client.cio)
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.androidx.browser)
+    implementation(libs.okhttp.dnsoverhttps)
+    implementation(libs.mozilla.publicsuffixlist)
+    implementation(libs.mozilla.sitepermissions)
+    implementation(libs.mozilla.concept.engine)
     debugImplementation(libs.compose.ui.tooling)
     debugImplementation(libs.compose.ui.test.manifest)
 

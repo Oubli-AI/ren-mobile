@@ -29,13 +29,25 @@ What the overhaul added, on the branch `claude/project-thread-tnj6xo` (PR #14) a
   moves and renderer, with Cato's blue changed to volt and an sRGB step added to the body shader (Cato's phone tier
   skips it, so its white shell draws grey without the bloom pass). The app drives it through `window.ren.*`
   (`src/robot/bridge.ts`, `ui/RobotView.kt`).
-- **Browser** (`browser/Browser.kt`, `browser/Addresses.kt`, `ui/BrowserScreen.kt`, `ui/BrowserHome.kt`): the app
-  opens on it. Tabs are real WebViews, made on a tab's first navigation; an address bar that loads addresses and
-  searches phrases (ported from ren desktop's `navigable-url.ts` and `UrlBar.tsx`); back, forward, reload, stop; a tabs
-  sheet; downloads, uploads and fullscreen video; new windows become tabs; page permissions are refused. Home is
-  `ren://home`: a switcher to ren desktop's destinations, the logotype, a search box ("Ask me anything. I dare you.", sized to fit
-  the width), the five search levels and the favorite links. **Ask Ren** slides the agent panel (`HomeScreen.kt` under
-  a header) over the browser.
+- **Browser** (`browser/Browser.kt`, `browser/Addresses.kt`, `browser/BrowserDns.kt`, `browser/ContentBlocker.kt`,
+  `browser/SitePermissionsManager.kt`, `browser/BrowserHistory.kt`, `browser/Omnibox.kt`,
+  `browser/RenCustomTabsService.kt`, `ui/BrowserScreen.kt`, `ui/BrowserSheets.kt`, `ui/BrowserHome.kt`): the app
+  opens on it. Tabs are real WebViews, made on a tab's first navigation, with normal and private (WebView multi-profile)
+  tabs, saved tab state, recently-closed tab reopen, desktop-site mode, find in page, pull-to-refresh, context menus,
+  print/PDF, downloads (including `blob:`/`data:`), uploads, fullscreen video, HTTP auth and JS dialogs, inline page
+  error and TLS warning cards, and Custom Tabs. The address bar uses Mozilla's Public Suffix List to tell URLs from
+  search phrases (ported from ren desktop's `navigable-url.ts` and `UrlBar.tsx`), shows omnibox suggestions from open
+  tabs, bookmarks and history, strips tracking parameters, supports HTTPS-First, and routes searches through the chosen
+  search engine (default Ren). **Secure DNS** (`BrowserDns.kt`) defaults to Cloudflare DoH with Quad9, AdGuard, Custom
+  DoH and Automatic (system) modes via a loopback HTTP/`CONNECT` proxy (`ProxyController`, 15 s header timeout,
+  unbounded relay sockets for long-lived SSE/WebSocket streams, and system DNS fallback on DoH transport failure while
+  keeping NXDOMAIN/NODATA/SERVFAIL authoritative). **Shields** (`ContentBlocker.kt`) blocks third-party ad, tracker and
+  fingerprinting hosts (with per-site toggle and badge count) and clears browsing data from Settings. **Site
+  permissions** (`SitePermissionsManager.kt`) prompt per origin for camera, microphone, geolocation, protected media and
+  sensors (remembered in Mozilla's `SitePermissionsStorage` for normal tabs, temporary in private tabs, and revocable in
+  Settings). Home is `ren://home`: a switcher to ren desktop's destinations, the logotype, a search box ("Ask me
+  anything. I dare you.", sized to fit the width), the five search levels and the favorite links. **Ask Ren** slides the
+  agent panel (`HomeScreen.kt` under a header) over the browser.
 - **Favorites** (2026-11-13, `browser/Favorites.kt`): one list, kept by the app (`Settings.favorites`), starting with
   ren desktop's `DEFAULT_FAVORITES` and added and normalized as its `favoritesStore.ts` does. Home shows them under
   the search box in one row that scrolls sideways (2026-11-15; long-press removes, Add opens a dialog); Discover shows the same list through ren's own store, which

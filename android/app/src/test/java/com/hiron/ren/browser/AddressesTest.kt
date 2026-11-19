@@ -1,5 +1,7 @@
 package com.hiron.ren.browser
 
+import kotlinx.coroutines.runBlocking
+import mozilla.components.lib.publicsuffixlist.PublicSuffixList
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -7,6 +9,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 /** The address bar's rules, with the cases of ren desktop's own `navigable-url.test.ts`. */
@@ -79,5 +82,66 @@ class AddressesTest {
         assertTrue(Addresses.secure("https://example.com"))
         assertTrue(Addresses.secure("ren://home"))
         assertFalse(Addresses.secure("http://example.com"))
+    }
+
+    @Test
+    fun dottedNumbersVersionTagsAndInvalidHostSyntaxSearchInsteadOfNavigating() {
+        listOf(
+            "3.14",
+            "v2.5",
+            "1.0.2",
+            "192.168.1",
+            "999.999.999.999",
+            "..",
+            ".example.com",
+            "example.com.",
+            "example..com",
+            "site:example.com",
+            "tim@oubliai.com",
+        ).forEach { token ->
+            assertFalse("Expected $token not to look like a URL", Addresses.looksLikeUrl(token))
+        }
+        assertTrue(Addresses.looksLikeUrl("192.168.1.1"))
+        assertTrue(Addresses.looksLikeUrl("[::1]:8765"))
+        assertTrue(Addresses.looksLikeUrl("[2001:db8::1]/status"))
+        assertTrue(Addresses.looksLikeUrl("localhost.example.com"))
+        assertTrue(Addresses.looksLikeUrl("1.2.3.4.example.com"))
+        assertEquals("ren://search?q=3.14&level=low", Addresses.resolve("3.14", SearchLevel.Balanced))
+        assertEquals("ren://search?q=v2.5&level=low", Addresses.resolve("v2.5", SearchLevel.Balanced))
+        assertEquals("ren://search?q=192.168.1&level=low", Addresses.resolve("192.168.1", SearchLevel.Balanced))
+        assertEquals("ren://search?q=..&level=low", Addresses.resolve("..", SearchLevel.Balanced))
+    }
+
+    @Test
+    fun searchEnginesFormatQueriesAndPreserveDestinations() {
+        assertEquals(SearchEngine.Ren, SearchEngine.Default)
+        assertEquals(SearchEngine.DuckDuckGo, SearchEngine.of("ddg"))
+        assertEquals(SearchEngine.Startpage, SearchEngine.of("startpage"))
+        assertNull(SearchEngine.of("unknown"))
+
+        assertEquals("ren://search?q=a%20b&level=fast", SearchEngine.Ren.url("a b", SearchLevel.Fast))
+        assertEquals("https://search.brave.com/search?q=a%20b", SearchEngine.Brave.url("a b", SearchLevel.Fast))
+        assertEquals("https://duckduckgo.com/?q=a%20b", SearchEngine.DuckDuckGo.url("a b", SearchLevel.Fast))
+        assertEquals("https://www.google.com/search?q=a%20b", SearchEngine.Google.url("a b", SearchLevel.Fast))
+        assertEquals("https://www.startpage.com/sp/search?query=a%20b", SearchEngine.Startpage.url("a b", SearchLevel.Fast))
+
+        assertEquals("ren://discover#signin", Addresses.resolve("ren://discover#signin", SearchLevel.Balanced, SearchEngine.Brave))
+        assertEquals("https://duckduckgo.com/?q=kotlin%20flows", Addresses.resolve("kotlin flows", SearchLevel.Balanced, SearchEngine.DuckDuckGo))
+    }
+
+    @Test
+    fun publicSuffixListNavigatesRealDomainsAndSearchesUnknownSuffixes() {
+        val psl = PublicSuffixList(RuntimeEnvironment.getApplication())
+        runBlocking {
+            assertEquals("https://example.com", Addresses.resolve("example.com", SearchLevel.Balanced, SearchEngine.Ren, psl))
+            assertEquals("https://bbc.co.uk", Addresses.resolve("bbc.co.uk", SearchLevel.Balanced, SearchEngine.Ren, psl))
+            assertEquals("https://bbc.co.uk/news", Addresses.resolve("bbc.co.uk/news", SearchLevel.Balanced, SearchEngine.Ren, psl))
+            assertEquals("http://localhost:3000", Addresses.resolve("localhost:3000", SearchLevel.Balanced, SearchEngine.Ren, psl))
+            assertEquals("http://192.168.1.1:8080", Addresses.resolve("192.168.1.1:8080", SearchLevel.Balanced, SearchEngine.Ren, psl))
+            assertEquals("https://devbox:5173/app", Addresses.resolve("devbox:5173/app", SearchLevel.Balanced, SearchEngine.Ren, psl))
+            assertEquals("ren://search?q=node.js&level=low", Addresses.resolve("node.js", SearchLevel.Balanced, SearchEngine.Ren, psl))
+            assertEquals("ren://search?q=Dr.Smith&level=low", Addresses.resolve("Dr.Smith", SearchLevel.Balanced, SearchEngine.Ren, psl))
+            assertEquals("https://search.brave.com/search?q=foo.notatld", Addresses.resolve("foo.notatld", SearchLevel.Balanced, SearchEngine.Brave, psl))
+        }
     }
 }

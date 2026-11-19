@@ -2,10 +2,13 @@ package com.hiron.ren.core
 
 import com.hiron.ren.browser.Applications
 import com.hiron.ren.browser.Browser
+import com.hiron.ren.browser.BrowserDns
+import com.hiron.ren.browser.BrowserHistory
 import com.hiron.ren.browser.BrowserStore
 import com.hiron.ren.browser.ContextWidget
 import com.hiron.ren.browser.Favorites
 import com.hiron.ren.browser.PhoneAction
+import com.hiron.ren.browser.SitePermissionsManager
 import android.app.Application
 import android.content.Context
 import com.hiron.ren.BuildConfig
@@ -38,6 +41,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import mozilla.components.lib.publicsuffixlist.PublicSuffixList
 import okhttp3.OkHttpClient
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
@@ -92,7 +96,13 @@ public class RenRuntime(private val app: Context) {
     /** Approvals the agents are waiting on, by request id. */
     private val pending = ConcurrentHashMap<String, CompletableDeferred<ApprovalAnswer>>()
 
-    private val http = OkHttpClient()
+    private val pslScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+    internal val publicSuffixList: PublicSuffixList = PublicSuffixList(app, Dispatchers.Unconfined, pslScope)
+    internal val browserDns: BrowserDns = BrowserDns(app, settings.dnsMode, settings.customDohUrl, settings.shieldsEnabled) { host ->
+        !settings.isShieldsEnabledFor(host)
+    }
+
+    private val http: OkHttpClient = OkHttpClient.Builder().dns(browserDns).build()
 
     /** Brave Search for the agents' search tools, with the keys in Settings. */
     public val search: BraveSearch = BraveSearch(http, settings::braveSearchKey, settings::braveAnswersKey)
@@ -102,7 +112,25 @@ public class RenRuntime(private val app: Context) {
 
     /** The browser's tabs. */
     public val favorites: Favorites = Favorites({ settings.favorites }, { settings.favorites = it })
-    public val browser: Browser = Browser(app, BrowserStore({ settings.browserTabs }, { settings.browserTabs = it }), favorites) { settings.geminiToken }
+    internal val history: BrowserHistory = BrowserHistory({ settings.browserHistory }, { settings.browserHistory = it })
+    internal val sitePermissions: SitePermissionsManager = SitePermissionsManager(app)
+    public val browser: Browser = Browser(
+        context = app,
+        store = BrowserStore({ settings.browserTabs }, { settings.browserTabs = it }),
+        favorites = favorites,
+        token = { settings.geminiToken },
+        history = history,
+        sitePermissions = sitePermissions,
+        publicSuffixList = publicSuffixList,
+        browserSettings = settings,
+        dns = browserDns,
+    )
+
+    /** Applies updated DNS, Shields and WebView preferences to [browserDns] and open browser tabs. */
+    internal fun applyBrowserPreferences() {
+        browserDns.configure(settings.dnsMode, settings.customDohUrl, settings.shieldsEnabled)
+        browser.applyWebPreferences()
+    }
 
     /** Which apps the user used, for the Context Agent. */
     public val appUsage: AppUsage = AppUsage(app)
@@ -117,6 +145,7 @@ public class RenRuntime(private val app: Context) {
     public val applications: Applications = Applications(app, http) { settings.geminiToken }
 
     init {
+        scope.launch(Dispatchers.IO) { publicSuffixList.prefetch().await() }
         browser.visited = contextWidget::visit
         browser.accountReported = contextWidget::accountChanged
         scope.launch {
