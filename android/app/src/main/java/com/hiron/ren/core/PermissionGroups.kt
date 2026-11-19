@@ -10,7 +10,7 @@ public object PermissionGroups {
     /** The runtime permissions Ren asks for, in the order Settings lists them. */
     public val ALL: List<PermissionGroup> = buildList {
         add(PermissionGroup("Texts", "Send and read SMS", listOf(Manifest.permission.SEND_SMS, Manifest.permission.READ_SMS)))
-        add(PermissionGroup("Contacts", "Find people by name", listOf(Manifest.permission.READ_CONTACTS)))
+        add(PermissionGroup("Contacts", "Find and save people", listOf(Manifest.permission.READ_CONTACTS, Manifest.permission.WRITE_CONTACTS)))
         add(PermissionGroup("Calendar", "Read and add events", listOf(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR)))
         add(PermissionGroup("Phone", "Place calls and read recent calls", listOf(Manifest.permission.CALL_PHONE, Manifest.permission.READ_CALL_LOG)))
         add(PermissionGroup("Microphone", "Talk to Ren out loud", listOf(Manifest.permission.RECORD_AUDIO)))

@@ -27,6 +27,9 @@ public class DeviceTools(
         "contacts_search" to Tool(listOf(Manifest.permission.READ_CONTACTS)) {
             messaging.contacts(it.req("query"), it.optInt("limit", 10))
         },
+        "contact_save" to Tool(listOf(Manifest.permission.READ_CONTACTS, Manifest.permission.WRITE_CONTACTS)) {
+            messaging.saveContact(it.req("name"), it.strings("phones"), it.strings("emails"))
+        },
         "calls_recent" to Tool(listOf(Manifest.permission.READ_CALL_LOG)) { messaging.recentCalls(it.optInt("limit", 20)) },
         "phone_call" to Tool(listOf(Manifest.permission.CALL_PHONE)) { messaging.call(it.req("number")) },
         "calendar_list" to Tool(listOf(Manifest.permission.READ_CALENDAR)) {
@@ -86,6 +89,9 @@ public class DeviceTools(
 }
 
 public class MissingInput(field: String) : IllegalArgumentException("Missing required input \"$field\".")
+
+internal fun JSONObject.strings(key: String): List<String> =
+    optJSONArray(key)?.let { list -> (0 until list.length()).map { list.optString(it).trim() }.filter(String::isNotEmpty) }.orEmpty()
 
 internal fun JSONObject.req(key: String): String =
     optString(key).takeIf { has(key) && !isNull(key) && it.isNotBlank() } ?: throw MissingInput(key)

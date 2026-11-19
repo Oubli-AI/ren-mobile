@@ -7,6 +7,8 @@ import com.hiron.ren.browser.BrowserHistory
 import com.hiron.ren.browser.BrowserStore
 import com.hiron.ren.browser.ContextWidget
 import com.hiron.ren.browser.Favorites
+import com.hiron.ren.browser.PhoneChat
+import com.hiron.ren.browser.PhoneReport
 import com.hiron.ren.browser.PhoneAction
 import com.hiron.ren.browser.SitePermissionsManager
 import android.app.Application
@@ -14,7 +16,9 @@ import android.content.Context
 import com.hiron.ren.BuildConfig
 import com.hiron.ren.device.AppUsage
 import com.hiron.ren.device.DeviceTools
+import com.hiron.ren.device.Messaging
 import com.hiron.ren.device.RenCallScreening
+import com.hiron.ren.device.RenNotificationListener
 import com.hiron.ren.device.ReminderStore
 import com.hiron.ren.device.ReminderStoreFile
 import com.hiron.ren.device.Reminders
@@ -148,6 +152,7 @@ public class RenRuntime(private val app: Context) {
         scope.launch(Dispatchers.IO) { publicSuffixList.prefetch().await() }
         browser.visited = contextWidget::visit
         browser.accountReported = contextWidget::accountChanged
+        RenNotificationListener.posted = contextWidget::notification
         contextWidget.asked = ::opened
         scope.launch {
             contextWidget.account.collect {
@@ -199,9 +204,29 @@ public class RenRuntime(private val app: Context) {
         }
     }
 
-    /** What the user did on the phone between two moments: the apps they used and what Ren did for them (the activity log). */
-    private fun phoneActivity(since: Long, until: Long) = appUsage.between(since, until) to
-        state.value.log.filter { it.at in since until until && it.kind in PHONE_ACTIONS }.map { PhoneAction(Plain.log(it.kind, it.text), it.at) }
+    /** The user's chat messages the Context Agent has already heard. */
+    private var heard = emptySet<String>()
+
+    /**
+     * What happened on the phone between two moments: the apps the user used, what Ren did for them (the activity
+     * log), their calls and texts, and what they said to Ren since the last report with Ren's answers.
+     */
+    private fun phoneActivity(since: Long, until: Long): PhoneReport {
+        val messages = state.value.messages.filter { !it.system }
+        val chats = messages.mapIndexedNotNull { i, message ->
+            if (!message.fromUser || message.id in heard) return@mapIndexedNotNull null
+            PhoneChat(message.text, messages.getOrNull(i + 1)?.takeIf { !it.fromUser }?.text.orEmpty())
+        }
+        heard = messages.filter { it.fromUser }.map { it.id }.toSet()
+        val messaging = Messaging(app)
+        return PhoneReport(
+            apps = appUsage.between(since, until),
+            actions = state.value.log.filter { it.at in since until until && it.kind in PHONE_ACTIONS }.map { PhoneAction(Plain.log(it.kind, it.text), it.at) },
+            calls = messaging.calls(PHONE_ROWS, since),
+            sms = messaging.texts(null, PHONE_ROWS, since),
+            chats = chats,
+        )
+    }
 
     /** Result thumbnails and images, cached in memory only. */
     public val images: ImageLoader = ImageLoader(http)
@@ -318,3 +343,6 @@ public class RenRuntime(private val app: Context) {
 
 /** The activity log's kinds that are things Ren did on the phone (its phone tools, approvals and calls), not its own errors or notes. */
 private val PHONE_ACTIONS = setOf("device", "approval", "call")
+
+/** The most calls and the most texts one phone report carries, as many as `calls_recent` and `sms_list` return. */
+private const val PHONE_ROWS: Int = 100

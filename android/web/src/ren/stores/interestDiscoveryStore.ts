@@ -15,8 +15,8 @@ export interface DiscoveryStory {
   description: string
   source: string
   url: string
-  imageUrl?: string
-  publishedAt?: string
+  imageUrl?: string | undefined
+  publishedAt?: string | undefined
 }
 
 /** A specialist the user saved, or one the Context Agent recommends for this interest. */
@@ -53,6 +53,7 @@ interface InterestDiscoveryState {
 
   selectInterest: (id: string, label: string, category: InterestCategory) => void
   clearSelection: () => void
+  resetDiscovery: () => void
   fetchDiscoveryContent: (interestLabel: string, category: InterestCategory) => Promise<void>
 }
 
@@ -93,6 +94,19 @@ export const useInterestDiscoveryStore = create<InterestDiscoveryState>()((set, 
   clearSelection: () => {
     requestId++
     set({ selectedInterestId: null, selectedInterestLabel: null, selectedInterestCategory: null, content: null, error: null, isLoading: false })
+  },
+
+  resetDiscovery: () => {
+    requestId++
+    set({
+      selectedInterestId: null,
+      selectedInterestLabel: null,
+      selectedInterestCategory: null,
+      content: null,
+      error: null,
+      isLoading: false,
+      storiesByLabel: {},
+    })
   },
 
   fetchDiscoveryContent: async (interestLabel, category) => {

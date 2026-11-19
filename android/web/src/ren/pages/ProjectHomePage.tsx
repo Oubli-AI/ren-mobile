@@ -2,6 +2,7 @@ import { Fragment, useCallback, useMemo, useState, useEffect, type DragEvent } f
 import { ChevronDown, ChevronRight, Plus, ArrowUp, ArrowDown, FilePlus, MessagesSquare } from 'lucide-react'
 import { useProjectsStore, projectSelectors, projectUtils } from '@/stores/projectsStore'
 import { useNavigationStore } from '@/stores/navigationStore'
+import { useTabPane } from '@/context/TabPaneContext'
 import {
   INTERNAL_PROJECT_VIEWS,
   ProjectView,
@@ -45,6 +46,7 @@ interface ProjectHomePageProps {
 }
 
 export function ProjectHomePage({ projectKey, documentId }: ProjectHomePageProps) {
+  const { isSplitPane } = useTabPane()
   const { projects, issues, updateProject, people, isInitialized, isLoading, userId } = useProjectsStore()
   const { setActiveTab } = useNavigationStore()
   const { openPanel } = useAgentUi()
@@ -57,8 +59,8 @@ export function ProjectHomePage({ projectKey, documentId }: ProjectHomePageProps
   const onDraftStarted = useCallback(() => setNewDocumentRequested(false), [])
 
   useEffect(() => {
-    setActiveTab('execute')
-  }, [setActiveTab])
+    if (!isSplitPane) setActiveTab('execute')
+  }, [isSplitPane, setActiveTab])
 
   // Following a page link (e.g. from an issue's Documents) shows that page.
   useEffect(() => {
@@ -119,7 +121,16 @@ export function ProjectHomePage({ projectKey, documentId }: ProjectHomePageProps
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <ProjectPeople project={project} people={projectPeople} />
               <Button type="button" variant="outline" className="rounded-full" title="Discuss this project with its agent in the Agent Panel; it can create and edit issues"
-                onClick={() => { usePanelAgentStore.getState().requestAgent(projectChoices([project])[0]); openPanel() }}>
+                onClick={() => {
+                  const choice = projectChoices([{
+                    id: project.id,
+                    name: project.name,
+                    key: project.key,
+                    ...(project.summary !== undefined ? { summary: project.summary } : {}),
+                  }])[0] ?? null
+                  usePanelAgentStore.getState().requestAgent(choice)
+                  openPanel()
+                }}>
                 <MessagesSquare />
                 Ask the project agent
               </Button>
@@ -192,7 +203,7 @@ export function ProjectHomePage({ projectKey, documentId }: ProjectHomePageProps
           />
         )}
         {activeView === 'docs' && (
-          <ProjectDocuments key={`${userId}:${project.id}`} project={project} openDocumentId={documentId}
+          <ProjectDocuments key={`${userId}:${project.id}`} project={project} {...(documentId !== undefined ? { openDocumentId: documentId } : {})}
             startWithDraft={newDocumentRequested} onDraftStarted={onDraftStarted} onIssueSelect={setSelectedIssueId} />
         )}
         {activeView === 'settings' && (
@@ -649,7 +660,7 @@ function ProjectBoardView({
                 <IssueCard
                   key={issue.id}
                   issue={issue}
-                  issueKey={project ? `${project.key}-${issue.number}` : undefined}
+                  {...(project ? { issueKey: `${project.key}-${issue.number}` } : {})}
                   people={people}
                   issues={projectIssues}
                   dragging={draggingId === issue.id}
@@ -673,7 +684,7 @@ function ProjectBoardView({
         isOpen={createStatus !== null}
         onClose={() => setCreateStatus(null)}
         projectId={projectId}
-        initialStatus={createStatus || undefined}
+        {...(createStatus ? { initialStatus: createStatus } : {})}
       />
     </div>
   )

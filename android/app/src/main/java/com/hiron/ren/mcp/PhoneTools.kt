@@ -11,7 +11,7 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 
 /**
- * The phone tools as MCP tools: the same 18 names and inputs [com.hiron.ren.device.DeviceTools] runs ([all]), then
+ * The phone tools as MCP tools: the same 19 names and inputs [com.hiron.ren.device.DeviceTools] runs ([all]), then
  * `request_approval` ([approval]) and the search tools ([searches]), the rest of what the agents call on the phone.
  */
 internal object PhoneTools {
@@ -27,6 +27,10 @@ internal object PhoneTools {
         tool("sms_send", "Send a text message.", false, required("to", "body"), "to" to str("Phone number or contact name"), "body" to str("The message")),
         tool("sms_list", "Recent text messages, newest first.", true, none(), "contact" to str("Only messages with this contact"), "limit" to int("How many, default 20")),
         tool("contacts_search", "Find contacts by name or number.", true, required("query"), "query" to str("Name or number"), "limit" to int("How many, default 10")),
+        tool(
+            "contact_save", "Save a person in the phone's contacts; a contact with exactly this name gets the numbers and emails it lacks.", false,
+            required("name"), "name" to str("Their name"), "phones" to strings("Their phone numbers"), "emails" to strings("Their email addresses"),
+        ),
         tool("calls_recent", "Recent calls, newest first.", true, none(), "limit" to int("How many, default 20")),
         tool("phone_call", "Place a phone call from this phone.", false, required("number"), "number" to str("The number to call")),
         tool("calendar_list", "Upcoming calendar events.", true, none(), "days" to int("How many days ahead, default 7"), "query" to str("Only events matching this text")),
@@ -95,6 +99,11 @@ internal object PhoneTools {
     private fun required(vararg keys: String): List<String> = keys.toList()
     private fun none(): List<String> = emptyList()
     private fun str(description: String): JsonObject = buildJsonObject { put("type", "string"); put("description", description) }
+    private fun strings(description: String): JsonObject = buildJsonObject {
+        put("type", "array")
+        put("items", buildJsonObject { put("type", "string") })
+        put("description", description)
+    }
     private fun int(description: String): JsonObject = buildJsonObject { put("type", "integer"); put("description", description) }
     private fun enum(vararg values: String): JsonObject = buildJsonObject { put("type", "string"); putJsonArray("enum") { values.forEach { add(it) } } }
     private fun fresh(): JsonObject = buildJsonObject { put("type", "string"); put("description", FRESHNESS); putJsonArray("enum") { listOf("pd", "pw", "pm", "py").forEach { add(it) } } }

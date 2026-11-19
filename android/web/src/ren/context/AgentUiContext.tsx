@@ -61,12 +61,6 @@ interface AgentUiContextValue {
 
 const AgentUiContext = createContext<AgentUiContextValue | null>(null)
 
-function setElectronPanelOpen(isOpen: boolean): void {
-  if (typeof window !== 'undefined' && window.electron?.browser) {
-    window.electron.browser.setPanelOpen(isOpen)
-  }
-}
-
 export function AgentUiProvider({ children }: { children: ReactNode }) {
   const [isPanelOpen, setIsPanelOpen] = useState(false)
   const [interactionMode, setInteractionMode] = useState<'voice' | 'text'>('text')
@@ -84,20 +78,14 @@ export function AgentUiProvider({ children }: { children: ReactNode }) {
 
   const openPanel = useCallback(() => {
     setIsPanelOpen(true)
-    setElectronPanelOpen(true)
   }, [])
 
   const closePanel = useCallback(() => {
     setIsPanelOpen(false)
-    setElectronPanelOpen(false)
   }, [])
 
   const togglePanel = useCallback(() => {
-    setIsPanelOpen((prev) => {
-      const next = !prev
-      setElectronPanelOpen(next)
-      return next
-    })
+    setIsPanelOpen((prev) => !prev)
   }, [])
 
   const setAskRonStep = useCallback((step: AskRonStep) => {
@@ -182,7 +170,7 @@ export function AgentUiProvider({ children }: { children: ReactNode }) {
     if (agentPanelQueuedPrompts.length === 0) return null
     const [nextPrompt, ...remaining] = agentPanelQueuedPrompts
     setAgentPanelQueuedPrompts(remaining)
-    return nextPrompt
+    return nextPrompt ?? null
   }, [agentPanelQueuedPrompts])
 
   const value = useMemo<AgentUiContextValue>(() => ({
@@ -242,6 +230,52 @@ export function AgentUiProvider({ children }: { children: ReactNode }) {
     consumeAgentPanelPrompt,
     consumeAgentPanelAttachments,
   ])
+
+  return (
+    <AgentUiContext.Provider value={value}>
+      {children}
+    </AgentUiContext.Provider>
+  )
+}
+
+export function SurfaceAgentUiProvider({
+  onOpenPanel,
+  onSendToAgentPanel,
+  children,
+}: {
+  onOpenPanel: () => void
+  onSendToAgentPanel: (prompt: string, attachments?: PromptAttachment[]) => void
+  children: ReactNode
+}) {
+  const value = useMemo<AgentUiContextValue>(() => ({
+    isPanelOpen: false,
+    interactionMode: 'text',
+    isViewingScreen: false,
+    screenshotData: null,
+    askRonStep: 'closed',
+    askRonSelectedText: null,
+    askRonSourceUrl: null,
+    askRonOptions: [],
+    askRonThinkingText: '',
+    askRonPendingPrompt: null,
+    agentPanelQueuedPrompts: [],
+    agentPanelQueuedAttachments: [],
+    togglePanel: onOpenPanel,
+    openPanel: onOpenPanel,
+    closePanel: () => {},
+    setInteractionMode: () => {},
+    startViewingScreen: () => onOpenPanel(),
+    stopViewingScreen: () => {},
+    startAskRon: async () => onOpenPanel(),
+    setAskRonStep: () => {},
+    selectAskRonOption: async () => {},
+    submitCustomAskRon: async () => {},
+    closeAskRon: () => {},
+    consumeAskRonPendingPrompt: () => null,
+    sendToAgentPanel: onSendToAgentPanel,
+    consumeAgentPanelPrompt: () => null,
+    consumeAgentPanelAttachments: () => [],
+  }), [onOpenPanel, onSendToAgentPanel])
 
   return (
     <AgentUiContext.Provider value={value}>

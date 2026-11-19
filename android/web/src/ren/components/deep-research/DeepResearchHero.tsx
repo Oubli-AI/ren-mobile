@@ -42,6 +42,7 @@ import {
 } from '@/lib/chat-context'
 import {
   DEPTH_METADATA,
+  type DeepResearchSelection,
   type FormationTopology,
   type ResearchDepth,
 } from '@/lib/deep-research-api'
@@ -156,10 +157,11 @@ function Spotlight() {
 }
 
 export interface DeepResearchHeroProps {
-  userId?: string
+  userId?: string | undefined
   depth: ResearchDepth
   depths: readonly ResearchDepth[]
   preferredModel: AgentModelSelection
+  defaultSelection?: DeepResearchSelection | undefined
   starting: boolean
   available: boolean
   error: string | null
@@ -170,10 +172,10 @@ export interface DeepResearchHeroProps {
   onSubmit: (params: {
     query: string
     depth: ResearchDepth
-    context?: string
-    provider?: string | null
-    modelId?: string | null
-    reasoningEffort?: string | null
+    context?: string | undefined
+    provider?: string | null | undefined
+    modelId?: string | null | undefined
+    reasoningEffort?: string | null | undefined
   }) => void
 }
 
@@ -182,6 +184,7 @@ export function DeepResearchHero({
   depth,
   depths,
   preferredModel,
+  defaultSelection,
   starting,
   available,
   error,
@@ -196,9 +199,9 @@ export function DeepResearchHero({
   const resolvedUserId = userId || authUserId
   const { refresh: refreshModels, ...modelCatalogue } = useAgentModels()
   const effectiveModel =
-    preferredModel.model || modelCatalogue.defaultModel || DEFAULT_AGENT_MODEL
+    preferredModel.model || defaultSelection?.model_id || modelCatalogue.defaultModel || DEFAULT_AGENT_MODEL
   const effectiveProvider =
-    preferredModel.provider || modelCatalogue.defaultProvider
+    preferredModel.provider || defaultSelection?.provider || modelCatalogue.defaultProvider
   const draftKey = useMemo(
     () => articleDraftKey(resolvedUserId, 'search', 'deep-research'),
     [resolvedUserId],
@@ -320,8 +323,8 @@ export function DeepResearchHero({
       query: finalQuery,
       depth,
       context: contextMarkdown,
-      provider: effectiveProvider || null,
-      modelId: effectiveModel || null,
+      provider: preferredModel.model ? preferredModel.provider || effectiveProvider || null : null,
+      modelId: preferredModel.model || null,
       reasoningEffort: preferredModel.effort || null,
     })
   }
@@ -350,7 +353,8 @@ export function DeepResearchHero({
         }
         if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey)) {
           e.preventDefault()
-          chooseMention(mentionResults[selectedMention].item)
+          const picked = mentionResults[selectedMention]
+          if (picked) chooseMention(picked.item)
           return
         }
       }
@@ -575,9 +579,9 @@ export function DeepResearchHero({
 
           <p className="mt-2.5 text-center font-sans text-[12.5px] text-ink-muted dark:text-ink-inverse-muted">
             <span className="font-medium text-ink-secondary dark:text-ink-inverse-secondary">
-              {activeDepthMeta.label}
+              {activeDepthMeta?.label}
             </span>{' '}
-            — {activeDepthMeta.description}
+            — {activeDepthMeta?.description}
           </p>
         </motion.form>
 

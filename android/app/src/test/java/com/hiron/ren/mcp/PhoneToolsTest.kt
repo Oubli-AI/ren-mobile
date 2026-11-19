@@ -16,6 +16,7 @@ class PhoneToolsTest {
         "sms_send" to setOf("to", "body"),
         "sms_list" to setOf("contact", "limit"),
         "contacts_search" to setOf("query", "limit"),
+        "contact_save" to setOf("name", "phones", "emails"),
         "calls_recent" to setOf("limit"),
         "phone_call" to setOf("number"),
         "calendar_list" to setOf("days", "query"),

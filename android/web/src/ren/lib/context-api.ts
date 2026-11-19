@@ -28,20 +28,20 @@ export interface ContextItem {
 
 export interface NewContextItem {
   kind: Exclude<ContextKind, 'screenshot' | 'recording' | 'file'>
-  title?: string
-  text?: string
-  url?: string
+  title?: string | undefined
+  text?: string | undefined
+  url?: string | undefined
   /** kind=thread: the panel session to transcribe. */
-  sessionId?: string
+  sessionId?: string | undefined
 }
 
 export interface NewContextFile {
   kind: 'screenshot' | 'recording' | 'image' | 'video' | 'file'
   blob: Blob
   name: string
-  title?: string
-  source?: string
-  text?: string
+  title?: string | undefined
+  source?: string | undefined
+  text?: string | undefined
 }
 
 export interface SpecialistAgent {
@@ -69,9 +69,26 @@ export interface TopicReview { key: string; right: boolean; comment: string }
 
 export type InterestCategory = 'technology' | 'design' | 'ai' | 'privacy' | 'productivity' | 'learning' | 'entertainment' | 'news' | 'other'
 export interface AgentInterest { label: string; weight: number; category: InterestCategory; reason: string }
-/** What a recommendation builds: a specialist agent (`recommend_agent`) or an app OpenCode makes (`recommend_app`). */
-export type RecommendationKind = 'agent' | 'web' | 'android'
-export interface AgentRecommendation { id: string; kind: RecommendationKind; name: string; description: string; interest: string; rationale: string; tools: string[]; skills: string[] }
+/** What a recommendation builds: a specialist agent, a project, or an app OpenCode makes. */
+export type RecommendationKind = 'agent' | 'web' | 'android' | 'project'
+export interface AgentRecommendation {
+  id: string; kind: RecommendationKind; name: string; description: string; interest: string; rationale: string
+  tools: string[]; skills: string[]; key?: string; issues?: string[]
+}
+
+/** A drafted reply to an incoming text or app notification (`draft_reply`). Sent only after approval. */
+export interface ReplyDraft {
+  id: string; sender: string; app: string; incoming: string; draft: string; notification_key: string; to: string
+}
+
+/** A live notification posted by an app on the user's phone (`RenNotificationListener.onNotificationPosted`). */
+export interface PhoneNotification {
+  key: string; app: string; package: string; title: string; text: string; at: string; can_reply: boolean
+  category?: string | null; number?: string; messages?: { from: string; text: string; at: string }[]
+}
+
+export interface SearchObservation { query: string; summary?: string; at: number }
+export interface ChatObservation { channel: string; user: string; assistant?: string; at: number }
 
 /** An app OpenCode built for the account (`register_application`, `GET /context/applications`). */
 export interface Application {
@@ -176,7 +193,8 @@ export function dreamTime(version: string): string {
 /** "memory/brain/<agent>/<topic>.md" as the notice names it: the topic's heading, else its file name, and the agent. */
 export function dreamTopicLabel(topic: DreamTopic): { title: string; agent: string } {
   const [, , agent = '', file = ''] = topic.key.split('/')
-  const heading = topic.text?.split('\n', 1)[0].replace(/^#+\s*/, '').trim()
+  const firstLine = topic.text?.split('\n', 1)[0]
+  const heading = firstLine?.replace(/^#+\s*/, '').trim()
   return { title: heading || file.replace(/\.md$/, '').replace(/-/g, ' '), agent }
 }
 
@@ -234,7 +252,7 @@ export function plainSummary(markdown: string): string {
  * follows it ("429 Too Many Requests. {'message': …}"). The full error stays on the run and in its thread.
  */
 export function runErrorLine(error: string): string {
-  const lead = error.split(/[{[]/, 1)[0].replace(/\s+/g, ' ').trim()
+  const lead = (error.split(/[{[]/, 1)[0] ?? '').replace(/\s+/g, ' ').trim()
   return lead || plainSummary(error)
 }
 
@@ -277,7 +295,7 @@ export function isObservable(url: string): boolean {
 /** Add a visit unless it repeats the previous page (same URL without hash) or is not observable. */
 export function recordVisit(queue: Visit[], visit: Visit, limit = 40): Visit[] {
   if (!isObservable(visit.url)) return queue
-  const key = visit.url.split('#')[0]
+  const key = visit.url.split('#')[0] ?? visit.url
   const last = queue[queue.length - 1]
   if (last && last.url.split('#')[0] === key) {
     return visit.title && visit.title !== last.title ? [...queue.slice(0, -1), { ...last, title: visit.title }] : queue
@@ -285,10 +303,19 @@ export function recordVisit(queue: Visit[], visit: Visit, limit = 40): Visit[] {
   return [...queue, { ...visit, url: key }].slice(-limit)
 }
 
-/** Send once enough pages piled up, or the oldest unsent page has waited long enough. */
-export function browsingDue(queue: Visit[], now: number, minPages = 5, maxWaitMs = 3 * 60_000): boolean {
-  if (!queue.length) return false
-  return queue.length >= minPages || now - queue[0].at >= maxWaitMs
+/** Send once enough observations piled up, or the oldest unsent one has waited long enough. */
+export function browsingDue(
+  queue: Visit[], now: number, minPages = 5, maxWaitMs = 3 * 60_000,
+  searches: SearchObservation[] = [], chats: ChatObservation[] = [],
+): boolean {
+  const total = queue.length + searches.length + chats.length
+  if (!total) return false
+  const oldest = Math.min(
+    queue[0]?.at ?? Infinity,
+    searches[0]?.at ?? Infinity,
+    chats[0]?.at ?? Infinity,
+  )
+  return total >= minPages || now - oldest >= maxWaitMs
 }
 
 const clock = (at: number) => new Date(at).toISOString().slice(11, 16)
@@ -296,25 +323,108 @@ const graphLine = (graph: { label: string; weight: number }[]) => graph.length
   ? graph.map((node) => `${node.label} (${node.weight.toFixed(2)})`).join(', ')
   : '(empty)'
 
-export function browsingTurn(visits: Visit[], graph: { label: string; weight: number }[]): string {
-  const lines = visits.map((visit) => `- ${clock(visit.at)} ${visit.title.trim() || '(untitled)'} — ${visit.url}`)
-  return `[browsing]\nPages the user visited:\n${lines.join('\n')}\n\nCurrent interest graph: ${graphLine(graph)}`
+export function browsingTurn(
+  visits: Visit[], graph: { label: string; weight: number }[],
+  searches: SearchObservation[] = [], chats: ChatObservation[] = [],
+): string {
+  const sections: string[] = ['[browsing]']
+  if (visits.length) {
+    const lines = visits.map((visit) => `- ${clock(visit.at)} ${visit.title.trim() || '(untitled)'} — ${visit.url}`)
+    sections.push(`Pages the user visited:\n${lines.join('\n')}`)
+  }
+  if (searches.length) {
+    const lines = searches.map((item) => `- ${clock(item.at)} "${item.query.trim()}"${item.summary?.trim() ? ` — ${item.summary.trim().slice(0, 240)}` : ''}`)
+    sections.push(`Searches the user ran:\n${lines.join('\n')}`)
+  }
+  if (chats.length) {
+    const lines = chats.map((item) => `- ${clock(item.at)} [${item.channel}] User: ${item.user.trim().slice(0, 300)}`
+      + (item.assistant?.trim() ? ` | Ren: ${item.assistant.trim().slice(0, 240)}` : ''))
+    sections.push(`Chats and user responses:\n${lines.join('\n')}`)
+  }
+  sections.push(`Current interest graph: ${graphLine(graph)}`)
+  return sections.join('\n\n')
 }
 
-/** What the user did on their phone between two reports (ren mobile): the apps they used and what Ren did there. */
-export interface PhoneApp { name: string; minutes: number }
-export interface PhoneAction { text: string; at: number }
-export interface PhoneActivity { since: number; until: number; apps: PhoneApp[]; actions: PhoneAction[] }
+/** All phone logs and app data since the last report (ren mobile): every app session, runtime/MCP logs, calls, SMS, notifications, calendar, reminders and device state. */
+export interface PhoneApp { name: string; minutes: number; package?: string; seconds?: number; opens?: number }
+export interface PhoneAction { text: string; at: number; kind?: string }
+export interface PhoneCall { kind: string; number: string; name?: string | null; seconds: number; at: string }
+export interface PhoneSms { from: string; number: string; contact?: string | null; text: string; at: string; unread?: boolean }
+export interface PhoneEvent { title: string; start: string; end: string; location?: string; all_day?: boolean; calendar?: string }
+export interface PhoneReminder { id: string; text: string; at: string }
+export interface PhoneDeviceStatus {
+  battery_percent?: number; charging?: boolean; network?: string; notifications?: boolean; app_operator?: boolean
+}
+export interface PhoneActivity {
+  since: number
+  until: number
+  apps: PhoneApp[]
+  actions: PhoneAction[]
+  calls?: PhoneCall[]
+  sms?: PhoneSms[]
+  notifications?: PhoneNotification[]
+  events?: PhoneEvent[]
+  reminders?: PhoneReminder[]
+  device?: PhoneDeviceStatus | null
+}
 
 const moment = (at: number) => new Date(at).toISOString().slice(0, 16).replace('T', ' ')
 
-/** Pages visited in the phone's browser are browsing turns; this is the rest of the phone. */
+export function hasPhoneActivity(activity: PhoneActivity): boolean {
+  return Boolean(
+    activity.apps.length || activity.actions.length || activity.calls?.length || activity.sms?.length
+    || activity.notifications?.length || activity.events?.length || activity.reminders?.length,
+  )
+}
+
+function appSpan(app: PhoneApp): string {
+  const pkg = app.package?.trim() ? ` (${app.package.trim()})` : ''
+  const span = typeof app.seconds === 'number'
+    ? (app.seconds >= 60 ? `${Math.floor(app.seconds / 60)}m ${app.seconds % 60}s (${app.seconds}s)` : `${app.seconds}s`)
+    : `${app.minutes} min`
+  const opens = typeof app.opens === 'number' && app.opens > 0 ? `, ${app.opens} open${app.opens === 1 ? '' : 's'}` : ''
+  return `- ${app.name.trim() || '(unnamed app)'}${pkg} — ${span}${opens}`
+}
+
+/** Pages visited in the phone's browser are browsing turns; this carries all phone logs and app data. */
 export function phoneTurn(activity: PhoneActivity, graph: { label: string; weight: number }[]): string {
-  const apps = activity.apps.map((app) => `- ${app.name.trim() || '(unnamed app)'} — ${app.minutes} min`)
-  const actions = activity.actions.map((action) => `- ${moment(action.at)} ${action.text.trim()}`)
-  return `[phone]\nThe user's phone from ${moment(activity.since)} to ${moment(activity.until)} UTC.\n`
-    + `Apps they used (time on screen):\n${apps.join('\n') || '(none)'}\n\n`
-    + `What Ren did on the phone for them:\n${actions.join('\n') || '(nothing)'}\n\nCurrent interest graph: ${graphLine(graph)}`
+  const apps = activity.apps.map(appSpan)
+  const actions = activity.actions.map((action) =>
+    `- ${moment(action.at)}${action.kind ? ` [${action.kind}]` : ''} ${action.text.trim()}`)
+  const sections = [
+    `[phone]\nThe user's phone from ${moment(activity.since)} to ${moment(activity.until)} UTC.`,
+  ]
+  if (activity.device && typeof activity.device.battery_percent === 'number' && activity.device.battery_percent >= 0) {
+    const charging = activity.device.charging ? ' (charging)' : ''
+    const net = activity.device.network ? `, network: ${activity.device.network}` : ''
+    sections.push(`Device status: battery ${activity.device.battery_percent}%${charging}${net}`)
+  }
+  sections.push(`Apps used (all foreground sessions):\n${apps.join('\n') || '(none)'}`)
+  sections.push(`Phone runtime & tool logs:\n${actions.join('\n') || '(nothing)'}`)
+  if (activity.calls?.length) {
+    const calls = activity.calls.map((call) =>
+      `- ${call.at} [${call.kind}] ${call.name ? `${call.name} (${call.number})` : call.number || '(unknown)'} — ${call.seconds}s`)
+    sections.push(`Call log:\n${calls.join('\n')}`)
+  }
+  if (activity.sms?.length) {
+    const sms = activity.sms.map((msg) =>
+      `- ${msg.at} ${msg.from === 'me' ? `me -> ${msg.contact ? `${msg.contact} (${msg.number})` : msg.number}` : `${msg.from} (${msg.number})`}: ${msg.text.trim().slice(0, 500)}`)
+    sections.push(`SMS / text messages:\n${sms.join('\n')}`)
+  }
+  if (activity.notifications?.length) {
+    const notes = activity.notifications.map((n) =>
+      `- ${n.at} [${n.app} / ${n.package}] ${n.title || '(no title)'}: ${n.text.trim().slice(0, 400)}`)
+    sections.push(`App notifications:\n${notes.join('\n')}`)
+  }
+  if (activity.events?.length || activity.reminders?.length) {
+    const items = [
+      ...(activity.events ?? []).map((ev) => `- [calendar] ${ev.start} – ${ev.end} ${ev.title}${ev.location ? ` @ ${ev.location}` : ''}`),
+      ...(activity.reminders ?? []).map((rem) => `- [reminder ${rem.id}] ${rem.at} ${rem.text}`),
+    ]
+    sections.push(`Calendar & reminders:\n${items.join('\n')}`)
+  }
+  sections.push(`Current interest graph: ${graphLine(graph)}`)
+  return sections.join('\n\n')
 }
 
 export function contextAddedTurn(item: ContextItem, graph: { label: string; weight: number }[]): string {
@@ -323,8 +433,43 @@ export function contextAddedTurn(item: ContextItem, graph: { label: string; weig
   return `[context added] ${item.kind}: ${item.title}${source}${preview}\n(id ${item.id}; read it in full with search_memory)\n\nCurrent interest graph: ${graphLine(graph)}`
 }
 
+export const TWICE_DAILY_MS = 12 * 60 * 60_000
+
+export function reviewDue(lastReviewAt: number, hasNewNotes: boolean, now: number, intervalMs = TWICE_DAILY_MS): boolean {
+  return hasNewNotes && now - lastReviewAt >= intervalMs
+}
+
+export function notificationTurn(notification: PhoneNotification, graph: { label: string; weight: number }[]): string {
+  const thread = notification.messages?.length
+    ? `\nRecent thread:\n${notification.messages.map((m) => `- ${m.from}: ${m.text}`).join('\n')}`
+    : ''
+  const target = [
+    notification.can_reply ? `notification_key=${notification.key}` : 'can_reply=false',
+    notification.number ? `number=${notification.number}` : '',
+  ].filter(Boolean).join(', ')
+  return `[notification] App: ${notification.app} (${notification.package})\n`
+    + `From/Title: ${notification.title || '(none)'}\n`
+    + `Text: ${notification.text || '(empty)'}\n`
+    + `Reply target: ${target}${thread}\n\nCurrent interest graph: ${graphLine(graph)}`
+}
+
+export function sendReplyTurn(draft: ReplyDraft, text: string): string {
+  return `[send_reply ${draft.id}] The user tapped Send on this reply. Ask for approval with phone_request_approval(action_type="send_messages", ...) FIRST, then send only if approved.\n`
+    + JSON.stringify({ ...draft, draft: text })
+}
+
+export function reviewTurn(graph: { label: string; weight: number }[], existingRecommendations: string[]): string {
+  const known = existingRecommendations.length ? existingRecommendations.join(', ') : '(none)'
+  return `[review]\nTwice-daily review of your journal and long-term memory.\n`
+    + `Already recommended: ${known}\n`
+    + `Current interest graph: ${graphLine(graph)}`
+}
+
 export function approveAgentTurn(recommendation: AgentRecommendation): string {
   // Recommendations saved before apps existed carry no kind: they are agents.
+  if (recommendation.kind === 'project') {
+    return `[approve_project ${recommendation.id}] Create the project "${recommendation.name}" now.\nRecommendation: ${JSON.stringify(recommendation)}`
+  }
   if (recommendation.kind === 'web' || recommendation.kind === 'android') {
     return `[approve_app ${recommendation.id}] Build the ${recommendation.kind === 'web' ? 'web' : 'Android'} app "${recommendation.name}" now.\nRecommendation: ${JSON.stringify(recommendation)}`
   }
@@ -338,7 +483,7 @@ const record = (value: unknown): Record<string, unknown> => value && typeof valu
 function jsonBlock(output: unknown, key: string): unknown {
   if (!Array.isArray(output)) return undefined
   for (const block of output) {
-    const json = record(record(block).json)
+    const json = record(record(block)["json"])
     if (key in json) return json[key]
   }
   return undefined
@@ -349,22 +494,33 @@ export function interestsFromOutput(output: unknown): AgentInterest[] | null {
   if (!Array.isArray(value)) return null
   return value.flatMap((item) => {
     const entry = record(item)
-    const label = typeof entry.label === 'string' ? entry.label.trim() : ''
-    const weight = typeof entry.weight === 'number' && Number.isFinite(entry.weight) ? Math.max(0, Math.min(1, entry.weight)) : NaN
+    const label = typeof entry["label"] === 'string' ? entry["label"].trim() : ''
+    const weight = typeof entry["weight"] === 'number' && Number.isFinite(entry["weight"]) ? Math.max(0, Math.min(1, entry["weight"])) : NaN
     if (!label || Number.isNaN(weight)) return []
-    const category = CATEGORIES.includes(entry.category as InterestCategory) ? entry.category as InterestCategory : 'other'
-    return [{ label, weight, category, reason: typeof entry.reason === 'string' ? entry.reason : '' }]
+    const category = CATEGORIES.includes(entry["category"] as InterestCategory) ? entry["category"] as InterestCategory : 'other'
+    return [{ label, weight, category, reason: typeof entry["reason"] === 'string' ? entry["reason"] : '' }]
   })
 }
 
 export function recommendationFromOutput(output: unknown): AgentRecommendation | null {
   const entry = record(jsonBlock(output, 'agent_recommendation'))
   const strings = (value: unknown) => Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
-  if (typeof entry.id !== 'string' || typeof entry.name !== 'string') return null
-  const kind: RecommendationKind = entry.kind === 'web' || entry.kind === 'android' ? entry.kind : 'agent'
+  if (typeof entry["id"] !== 'string' || typeof entry["name"] !== 'string') return null
+  const kind: RecommendationKind = entry["kind"] === 'web' || entry["kind"] === 'android' || entry["kind"] === 'project' ? entry["kind"] : 'agent'
   return {
-    id: entry.id, kind, name: entry.name, description: String(entry.description ?? ''), interest: String(entry.interest ?? ''),
-    rationale: String(entry.rationale ?? ''), tools: strings(entry.tools), skills: strings(entry.skills),
+    id: entry["id"], kind, name: entry["name"], description: String(entry["description"] ?? ''), interest: String(entry["interest"] ?? ''),
+    rationale: String(entry["rationale"] ?? ''), tools: strings(entry["tools"]), skills: strings(entry["skills"]),
+    ...(typeof entry["key"] === 'string' && entry["key"] ? { key: entry["key"] } : {}),
+    ...(Array.isArray(entry["issues"]) ? { issues: strings(entry["issues"]) } : {}),
+  }
+}
+
+export function replyDraftFromOutput(output: unknown): ReplyDraft | null {
+  const entry = record(jsonBlock(output, 'reply_draft'))
+  if (typeof entry["id"] !== 'string' || typeof entry["sender"] !== 'string' || typeof entry["app"] !== 'string' || typeof entry["draft"] !== 'string') return null
+  return {
+    id: entry["id"], sender: entry["sender"], app: entry["app"], incoming: String(entry["incoming"] ?? ''),
+    draft: entry["draft"], notification_key: String(entry["notification_key"] ?? ''), to: String(entry["to"] ?? ''),
   }
 }
 
@@ -375,34 +531,45 @@ export interface ContextRunResults {
   /** The newest graph the agent wrote in these messages, if any. */
   interests: AgentInterest[] | null
   recommendations: AgentRecommendation[]
+  replyDrafts: ReplyDraft[]
   /** Names of specialists saved with create_harness. */
   created: string[]
+  /** Names of projects created with create_project. */
+  createdProjects: string[]
 }
 
 export function contextResults(messages: PanelMessage[]): ContextRunResults {
   let interests: AgentInterest[] | null = null
   const recommendations: AgentRecommendation[] = []
+  const replyDrafts: ReplyDraft[] = []
   const created: string[] = []
+  const createdProjects: string[] = []
   for (const part of finishedTools(messages)) {
     if (part.name === 'update_interest_graph') interests = interestsFromOutput(part.output) ?? interests
-    else if (part.name === 'recommend_agent' || part.name === 'recommend_app') {
+    else if (part.name === 'recommend_agent' || part.name === 'recommend_app' || part.name === 'recommend_project') {
       const recommendation = recommendationFromOutput(part.output)
       if (recommendation) recommendations.push(recommendation)
+    } else if (part.name === 'draft_reply') {
+      const draft = replyDraftFromOutput(part.output)
+      if (draft) replyDrafts.push(draft)
     } else if (part.name === 'create_harness') {
-      const name = record(firstJson(part.output)).name // create_harness returns its listing as JSON text
+      const name = record(firstJson(part.output))["name"] // create_harness returns its listing as JSON text
       if (typeof name === 'string') created.push(name)
+    } else if (part.name === 'create_project') {
+      const name = record(firstJson(part.output))["name"]
+      if (typeof name === 'string') createdProjects.push(name)
     }
   }
-  return { interests, recommendations, created }
+  return { interests, recommendations, replyDrafts, created, createdProjects }
 }
 
 function firstJson(output: unknown): unknown {
   if (!Array.isArray(output)) return undefined
   for (const block of output) {
     const entry = record(block)
-    if ('json' in entry) return entry.json
-    if (typeof entry.text === 'string') {
-      try { return JSON.parse(entry.text) } catch { /* plain text */ }
+    if ('json' in entry) return entry["json"]
+    if (typeof entry["text"] === 'string') {
+      try { return JSON.parse(entry["text"]) } catch { /* plain text */ }
     }
   }
   return undefined
@@ -425,7 +592,7 @@ export function agentServesInterest(agent: SpecialistAgent, label: string, built
   const key = label.trim().toLowerCase()
   if (!key) return false
   if (builtFor?.trim().toLowerCase() === key) return true
-  const instructions = typeof agent.config?.instructions === 'string' ? agent.config.instructions : ''
+  const instructions = typeof agent.config?.["instructions"] === 'string' ? agent.config["instructions"] : ''
   const text = `${agent.name}\n${agent.description}\n${instructions}`.toLowerCase()
   const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   return new RegExp(`(^|[^a-z0-9])${escaped}($|[^a-z0-9])`).test(text)
@@ -471,7 +638,7 @@ export function formatBytes(size: number): string {
 /** A data: URL (e.g. `browser.screenshot()`) as a Blob. */
 export function dataUrlBlob(dataUrl: string): Blob {
   const match = /^data:([^;,]+)(;base64)?,(.*)$/s.exec(dataUrl)
-  if (!match) throw new Error('Not a data URL')
+  if (!match || match[1] === undefined || match[3] === undefined) throw new Error('Not a data URL')
   const [, type, base64, payload] = match
   const bytes = base64 ? Uint8Array.from(atob(payload), (char) => char.charCodeAt(0)) : new TextEncoder().encode(decodeURIComponent(payload))
   return new Blob([bytes], { type })
