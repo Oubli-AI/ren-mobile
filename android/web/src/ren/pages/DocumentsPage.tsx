@@ -4,7 +4,7 @@ import { PageBackground } from '@/components/shared/PageBackground'
 import { Marker } from '@/components/brand'
 import { DocumentWorkspace, type DocumentScope } from '@/components/projects/documents/ProjectDocuments'
 import { IssueDrawer } from '@/components/projects/IssueDrawer'
-import { openInternalUrl } from '@/components/board/task-detail/editor/extensions/blocks/workspace'
+import { navigateTabByIdOrActive, useTabPane } from '@/context/TabPaneContext'
 import { useElementWidth } from '@/hooks/useElementWidth'
 import { documentsLibraryUrl, parseDocumentsLibraryUrl } from '@/lib/project-documents'
 import { isGuestUserId, openSignIn } from '@/lib/sign-in'
@@ -21,6 +21,7 @@ const STACK_BELOW = 760
  * the link to a page reopens it here.
  */
 export function DocumentsPage({ documentId }: { documentId: string | null }) {
+  const { tabId } = useTabPane()
   const { userId, error, initialize } = useProjectsStore()
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null)
   const contentRef = useRef<HTMLDivElement>(null)
@@ -37,11 +38,12 @@ export function DocumentsPage({ documentId }: { documentId: string | null }) {
   const followPage = useCallback((id: string | null) => {
     shownRef.current = id
     const tabs = useTabStore.getState()
-    const url = tabs.tabs.find((tab) => tab.id === tabs.activeTabId)?.url
+    const targetId = tabId ?? tabs.activeTabId
+    const url = tabs.tabs.find((tab) => tab.id === targetId)?.url
     if (!parseDocumentsLibraryUrl(url)) return
     const next = documentsLibraryUrl(id)
-    if (url !== next) openInternalUrl(next)
-  }, [])
+    if (url !== next) navigateTabByIdOrActive(targetId, next)
+  }, [tabId])
 
   // ron://documents while a page is open (the sidebar's Documents) keeps that page and names it again.
   useEffect(() => {
@@ -74,7 +76,7 @@ export function DocumentsPage({ documentId }: { documentId: string | null }) {
 
         <div className="mt-8">
           {userId ? (
-            <DocumentWorkspace key={userId} scope={LIBRARY} openDocumentId={documentId ?? undefined} onIssueSelect={setSelectedIssueId}
+            <DocumentWorkspace key={userId} scope={LIBRARY} {...(documentId !== null ? { openDocumentId: documentId } : {})} onIssueSelect={setSelectedIssueId}
               onPageChange={followPage} stacked={width > 0 && width < STACK_BELOW} />
           ) : error ? (
             <div role="alert" className="rounded-2xl bg-danger/10 px-4 py-3 text-[13px] text-danger">{error}</div>

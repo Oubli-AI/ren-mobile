@@ -3,6 +3,9 @@ package com.hiron.ren.device
 import android.app.Activity
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
+import android.Manifest
+import android.content.ContentProviderOperation
+import android.content.pm.PackageManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -63,14 +66,21 @@ public class Messaging(private val context: Context) {
     }
 
     public suspend fun list(contact: String?, limit: Int): ToolResult = withContext(Dispatchers.IO) {
+        val rows = texts(contact, limit, 0L)
+        ToolResult.ok(JSONObject().put("messages", rows).put("count", rows.length()))
+    }
+
+    /** Texts, newest first, from [since] on (`sms_list`'s rows); none without the SMS permission. */
+    public fun texts(contact: String?, limit: Int, since: Long): JSONArray {
+        val rows = JSONArray()
+        if (!granted(Manifest.permission.READ_SMS)) return rows
         val want = contact?.let { Phones.digits(it).takeLast(7) }?.takeIf { it.length >= 4 }
         val nameFilter = contact?.takeIf { want == null }?.lowercase()
-        val rows = JSONArray()
         val names = HashMap<String, String?>()
         context.contentResolver.query(
             Telephony.Sms.CONTENT_URI,
             arrayOf(Telephony.Sms.ADDRESS, Telephony.Sms.BODY, Telephony.Sms.DATE, Telephony.Sms.TYPE, Telephony.Sms.READ),
-            null, null, "${Telephony.Sms.DATE} DESC",
+            "${Telephony.Sms.DATE} >= ?", arrayOf(since.toString()), "${Telephony.Sms.DATE} DESC",
         )?.use { c ->
             while (c.moveToNext() && rows.length() < limit.coerceIn(1, 100)) {
                 val address = c.getString(0).orEmpty()
@@ -88,7 +98,7 @@ public class Messaging(private val context: Context) {
                 )
             }
         }
-        ToolResult.ok(JSONObject().put("messages", rows).put("count", rows.length()))
+        return rows
     }
 
     public suspend fun contacts(query: String, limit: Int): ToolResult = withContext(Dispatchers.IO) {
@@ -134,12 +144,58 @@ public class Messaging(private val context: Context) {
         ToolResult.ok(JSONObject().put("contacts", JSONArray(byId.values.take(limit))))
     }
 
+    /** Saves [name] in the phone's contacts: a contact with exactly that name gets the [phones] and [emails] it lacks. */
+    public suspend fun saveContact(name: String, phones: List<String>, emails: List<String>): ToolResult = withContext(Dispatchers.IO) {
+        val resolver = context.contentResolver
+        val raw = resolver.query(
+            ContactsContract.RawContacts.CONTENT_URI, arrayOf(ContactsContract.RawContacts._ID),
+            "${ContactsContract.RawContacts.DISPLAY_NAME_PRIMARY} = ? AND ${ContactsContract.RawContacts.DELETED} = 0", arrayOf(name), null,
+        )?.use { if (it.moveToFirst()) it.getLong(0) else null }
+        val known = mutableSetOf<String>()
+        if (raw != null) {
+            resolver.query(
+                ContactsContract.Data.CONTENT_URI, arrayOf(ContactsContract.Data.DATA1),
+                "${ContactsContract.Data.RAW_CONTACT_ID} = ?", arrayOf(raw.toString()), null,
+            )?.use { while (it.moveToNext()) it.getString(0)?.let { value -> known += key(value) } }
+        }
+        val ops = ArrayList<ContentProviderOperation>()
+        fun row(mime: String) = ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI).withValue(ContactsContract.Data.MIMETYPE, mime)
+            .let { if (raw == null) it.withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, 0) else it.withValue(ContactsContract.Data.RAW_CONTACT_ID, raw) }
+        if (raw == null) {
+            ops += ContentProviderOperation.newInsert(ContactsContract.RawContacts.CONTENT_URI)
+                .withValue(ContactsContract.RawContacts.ACCOUNT_TYPE, null).withValue(ContactsContract.RawContacts.ACCOUNT_NAME, null).build()
+            ops += row(ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE)
+                .withValue(ContactsContract.CommonDataKinds.StructuredName.DISPLAY_NAME, name).build()
+        }
+        val added = (phones + emails).filter { known.add(key(it)) }
+        added.forEach { value ->
+            ops += if (value in emails) {
+                row(ContactsContract.CommonDataKinds.Email.CONTENT_ITEM_TYPE).withValue(ContactsContract.CommonDataKinds.Email.ADDRESS, value)
+                    .withValue(ContactsContract.CommonDataKinds.Email.TYPE, ContactsContract.CommonDataKinds.Email.TYPE_OTHER).build()
+            } else {
+                row(ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE).withValue(ContactsContract.CommonDataKinds.Phone.NUMBER, value)
+                    .withValue(ContactsContract.CommonDataKinds.Phone.TYPE, ContactsContract.CommonDataKinds.Phone.TYPE_MOBILE).build()
+            }
+        }
+        if (ops.isNotEmpty()) resolver.applyBatch(ContactsContract.AUTHORITY, ops)
+        ToolResult.ok(JSONObject().put("name", name).put("created", raw == null).put("added", JSONArray(added)))
+    }
+
+    /** A number by its digits and an email in lower case, so the same one written differently matches. */
+    private fun key(value: String): String = if ('@' in value) value.trim().lowercase() else value.filter(Char::isDigit).takeLast(10)
+
     public suspend fun recentCalls(limit: Int): ToolResult = withContext(Dispatchers.IO) {
+        ToolResult.ok(JSONObject().put("calls", calls(limit, 0L)))
+    }
+
+    /** Calls, newest first, from [since] on (`calls_recent`'s rows); none without the call log permission. */
+    public fun calls(limit: Int, since: Long): JSONArray {
         val rows = JSONArray()
+        if (!granted(Manifest.permission.READ_CALL_LOG)) return rows
         context.contentResolver.query(
             CallLog.Calls.CONTENT_URI,
             arrayOf(CallLog.Calls.NUMBER, CallLog.Calls.CACHED_NAME, CallLog.Calls.TYPE, CallLog.Calls.DATE, CallLog.Calls.DURATION),
-            null, null, "${CallLog.Calls.DATE} DESC",
+            "${CallLog.Calls.DATE} >= ?", arrayOf(since.toString()), "${CallLog.Calls.DATE} DESC",
         )?.use { c ->
             while (c.moveToNext() && rows.length() < limit.coerceIn(1, 100)) {
                 rows.put(
@@ -152,8 +208,10 @@ public class Messaging(private val context: Context) {
                 )
             }
         }
-        ToolResult.ok(JSONObject().put("calls", rows))
+        return rows
     }
+
+    private fun granted(permission: String) = ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
 
     public fun call(number: String): ToolResult {
         if (Phones.digits(number).length < 3) return ToolResult.error("\"$number\" is not a phone number.")

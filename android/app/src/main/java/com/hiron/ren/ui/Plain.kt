@@ -10,6 +10,7 @@ public object Plain {
         "sms_send" to ("Send a text" to "Sent a text"),
         "sms_list" to ("Read your texts" to "Read texts"),
         "contacts_search" to ("Look up a contact" to "Looked up a contact"),
+        "contact_save" to ("Save a contact" to "Saved a contact"),
         "calls_recent" to ("Check recent calls" to "Checked recent calls"),
         "phone_call" to ("Place a call" to "Placed a call"),
         "calendar_list" to ("Check your calendar" to "Checked the calendar"),

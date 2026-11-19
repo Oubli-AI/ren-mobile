@@ -1,8 +1,9 @@
 /*
  * ren desktop's Context widget on the phone: its orb and panel (InterestsWidget) and what feeds its Context Agent
  * (ContextBridge), unmodified, on a page the app lays over the browser. As on the desktop the agent learns from the
- * pages the user visits, here the phone's browser (`visit`), and from the phone itself: the apps the user used and
- * what Ren did there (`phone`, the Context Agent's [phone] turn).
+ * pages and searches the user visits, here the phone's browser (`visit`, `search`), and from the phone itself: chats
+ * with Ren there (`chat`), every notification another app posts (`notification`, the Context Agent's [notification]
+ * turn), and the apps the user used, their calls and texts and what Ren did there (`phone`, its [phone] turn).
  *
  * It shows only for a signed-in ren account that finished the interview, on either device: the same account, context,
  * interview and interest graph as ren desktop's. The page tells the app what to make room for (`layout`): nothing, the orb, the orb with a finished
@@ -34,6 +35,9 @@ reportAccount()
 onApp((event) => {
   const store = useContextAgentStore.getState()
   if (event.type === "visit") store.observeVisit(event.url, event.title)
+  else if (event.type === "search") store.observeSearch(event.query)
+  else if (event.type === "chat") store.observeChat(event.channel, event.user, event.assistant)
+  else if (event.type === "notification") void store.alertNotification(event.notification)
   else if (event.type === "phone") void store.reportPhone(event.activity)
   else if (event.type === "close") {
     useInterestsStore.getState().setExpanded(false)

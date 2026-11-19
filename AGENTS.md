@@ -102,6 +102,16 @@ What the overhaul added, on the branch `claude/project-thread-tnj6xo` (PR #14) a
   `ren-memory (text)` and `ren-memory (voice)` at `https://rivet.ron-ai.dev/memory/mcp/`, with Caddy's token
   (`X-Ren-Token`, the workspace secret `ren_vm_token`), `X-Ren-Agent` `elevenlabs-text` or `elevenlabs-voice`, and
   `X-Ren-User` from their `user_id`; each prompt ends with ren's `JOURNAL_DIRECTIVE`.
+- **The Context Agent hears the phone** (2026-11-19, ren PRs #31 and #32, the pages synced from ren `4bdf100`): every
+  notification another app posts goes to the page at once (`RenNotificationListener.posted`, the `notifications_list`
+  row as ren's `PhoneNotification`), where ren's store gives the agent a `[notification]` turn: it journals it, keeps
+  the person (`remember_person` in the brain's `people`, and the phone's own contacts through the new phone tool
+  `contact_save`) and drafts a reply to a message from a person, which the widget shows with Send; Send asks
+  `request_approval` first, then replies through `notification_reply` or `sms_send`. A search in the browser
+  (`search`), the chats with Ren on the phone (`chat`, channel "Ren on the phone") and, in each `[phone]` report, the
+  calls and texts since the last one (`calls_recent` and `sms_list` rows, `Messaging.calls` and `texts`) go with the
+  apps and Ren's actions. Twice a day the agent reviews its journal and, with OpenCode, recommends projects, apps and
+  agents. Contacts in Settings › What Ren can use asks for `WRITE_CONTACTS` too. Not run live (owner tests).
 - **Apps the Context Agent builds** (2026-11-17, ren PR #29): when the computer is configured, the Context Agent
   suggests a web or Android app (`recommend_app`, the same card as its agents, labelled Web app or Android app); Build
   sends `[approve_app <id>]`, OpenCode builds it in `/config/workspace` (a web app deployed with Vercel, with its
@@ -145,7 +155,7 @@ What the overhaul added, on the branch `claude/project-thread-tnj6xo` (PR #14) a
   since ren's Projects requests carry Supabase's bearer in `Authorization`). The page gets the
   token from the `RenHost` web message listener, which answers only the app's bundled origin
   (`https://appassets.androidplatform.net`). The backend is ren desktop's own backend on the VM, run as ren
-  runs it (`python agent/api/main.py`; `deploy/vm/ren`, image built from `Oubli-AI/ren` at `beaa580` (ren main with PRs #16 to #19, #21 to #29, on `2d24e4c`, which holds the pages' commit `0f6fa57`, the web tools (ren PR #11), the Context Agent with OpenCode (ren PR #12), the Search page off Brave (ren PR #13) and Deep Research as the Strands SDK documents it (ren PR #14: plain `Swarm`s and `GraphBuilder` graphs, the outer graph's `stream_async` events); PR #16 makes Mistral every agent's default and takes the harness's EnvironmentContext, which handed the agent ren's checkout path and AGENTS.md, off every user agent, owner 2026-11-17; PR #19 tells every swarm agent when it hands off, as the Strands swarm docs do; PR #22 sends every Mistral model its largest `max_tokens`: 262144 for Mistral Large 4, 131072 for the GLM and DeepSeek models Mistral hosts, the context window for the rest; PR #23 lets only the fact checker open sources and gives each Deep Research agent only the sections of its skill that fit its role; PR #24 gives Deep Research six levels after Perplexity's Agent API presets (fast, low, medium, high, xhigh and ultra, 5–8 up to 30–40 pages), a turn budget per agent with a wrap-up reminder over its last five turns, the Slidev skills on the deck agents, each run's report as a Document under a personal Deep Research page, and Print to PDF, HTML and Word on every Document; PR #27 lists and opens runs saved before the levels, mapping standard, deep and exhaustive to low, medium and ultra; PR #21 takes the overall time cap off the top-level graph, so only each swarm keeps `RON_DEEP_RESEARCH_EXECUTION_TIMEOUT` (3 h)) (scheduled specialist runs are left to ren desktop: `RON_AGENT_SCHEDULES=0`, which also stops the VM resuming runs), with electron-playwright-mcp (no remote: the VM's `ren/electron-playwright-mcp/` is a copy of its `pyproject.toml`, `README.md` and `src/electron_playwright_mcp` from the owner's checkout at `4612a9b`) and Playwright's Chromium for deep research's PDF, with the toolbox's Node 26.13.0 and pnpm for its Slidev deck, keys in
+  runs it (`python agent/api/main.py`; `deploy/vm/ren`, image built from `Oubli-AI/ren` at `4bdf100` (ren main through PR #36; before it `beaa580`, ren main with PRs #16 to #19, #21 to #29, on `2d24e4c`, which holds the pages' commit `0f6fa57`, the web tools (ren PR #11), the Context Agent with OpenCode (ren PR #12), the Search page off Brave (ren PR #13) and Deep Research as the Strands SDK documents it (ren PR #14: plain `Swarm`s and `GraphBuilder` graphs, the outer graph's `stream_async` events); PR #16 makes Mistral every agent's default and takes the harness's EnvironmentContext, which handed the agent ren's checkout path and AGENTS.md, off every user agent, owner 2026-11-17; PR #19 tells every swarm agent when it hands off, as the Strands swarm docs do; PR #22 sends every Mistral model its largest `max_tokens`: 262144 for Mistral Large 4, 131072 for the GLM and DeepSeek models Mistral hosts, the context window for the rest; PR #23 lets only the fact checker open sources and gives each Deep Research agent only the sections of its skill that fit its role; PR #24 gives Deep Research six levels after Perplexity's Agent API presets (fast, low, medium, high, xhigh and ultra, 5–8 up to 30–40 pages), a turn budget per agent with a wrap-up reminder over its last five turns, the Slidev skills on the deck agents, each run's report as a Document under a personal Deep Research page, and Print to PDF, HTML and Word on every Document; PR #27 lists and opens runs saved before the levels, mapping standard, deep and exhaustive to low, medium and ultra; PR #21 takes the overall time cap off the top-level graph, so only each swarm keeps `RON_DEEP_RESEARCH_EXECUTION_TIMEOUT` (3 h)) (scheduled specialist runs are left to ren desktop: `RON_AGENT_SCHEDULES=0`, which also stops the VM resuming runs), with electron-playwright-mcp (no remote: the VM's `ren/electron-playwright-mcp/` is a copy of its `pyproject.toml`, `README.md` and `src/electron_playwright_mcp` from the owner's checkout at `4612a9b`) and Playwright's Chromium for deep research's PDF, with the toolbox's Node 26.13.0 and pnpm for its Slidev deck, keys in
   `search.env`, Supabase's, `HF_TOKEN`, `PERPLEXITY_API_KEY` (its tool-repair fixer runs on Perplexity) and ren desktop's own providers (`RON_CHAT_PROVIDERS`, `TELNYX_API_KEY`, `GEMINI_API_KEY`, `MISTRAL_API_KEY`, `XAI_API_KEY`, 2026-11-16) in `ren.env`, so Deep Research picks ren desktop's default, Telnyx `moonshotai/Kimi-K3.1-Pro` (with only NIM it ran on `minimaxai/minimax-m3.1-flash`, which went silent mid-reply and failed the run); Deep Research's working files are on the `ren_data` volume (`RON_DEEP_RESEARCH_ARTIFACTS_DIR`, since a new container lost a run's report on 2026-11-17); its storage is ren desktop's Hugging Face bucket, see "Context
   widget"), at `https://rivet.ron-ai.dev/` behind the same token (Caddy sends every
   path the other services don't take to it, except ren's A2A endpoint). "Add search to Ren context" and "Search deeper" need ren desktop's context
@@ -162,7 +172,7 @@ What the overhaul added, on the branch `claude/project-thread-tnj6xo` (PR #14) a
 - **The phone on the hub** (`mcp/HubLink.kt`, `mcp/HubService.kt`, `mcp/PhoneMcpServer.kt`, `mcp/BrowserTools.kt`;
   Settings › Remote tools): a foreground service keeps the phone attached with the Kotlin MCP SDK 0.16.0
   (`Server.createSession(WebSocketClientTransport)`), proves the link with a ping every 20 s and retries from 2 s to
-  60 s. It serves the 18 phone tools, `request_approval`, the seven searches and 13 browser tools (`browser_tabs`,
+  60 s. It serves the 19 phone tools, `request_approval`, the seven searches and 13 browser tools (`browser_tabs`,
   `browser_open`, `browser_navigate`, `browser_back`, `browser_forward`, `browser_reload`, `browser_select`,
   `browser_close`, `browser_read`, `browser_click`, `browser_type`, `browser_scroll`, `browser_screenshot`) through the
   same handlers as the client tools. `HubLink.tools()` and `call()` make the phone an MCP client of the hub too. The
@@ -265,9 +275,9 @@ answers their client tools on the phone. Nothing sits in between: no backend, no
     `perm_install_apps`, `perm_cloud_coding`, `perm_deploy`, `perm_create_music`), each `granted` or `prompt`, from
     Settings › Permissions (`core/Approvals.kt`, `core/Settings.kt`). How the agents use them is set in their prompts,
     which the owner manages.
-- **Client tools** (`AgentTools` in `voice/RenAgent.kt`, run by `device/DeviceTools.kt`), 18 phone tools with no gate
-  on the phone: `sms_send`, `sms_list`, `contacts_search`, `calls_recent`, `phone_call`, `calendar_list`,
-  `calendar_create`, `notifications_list`, `notification_reply`, `reminder_create`, `reminders_list`,
+- **Client tools** (`AgentTools` in `voice/RenAgent.kt`, run by `device/DeviceTools.kt`), 19 phone tools with no gate
+  on the phone: `sms_send`, `sms_list`, `contacts_search`, `contact_save`, `calls_recent`, `phone_call`,
+  `calendar_list`, `calendar_create`, `notifications_list`, `notification_reply`, `reminder_create`, `reminders_list`,
   `reminder_cancel`, `email_draft`, `apps_list`, `app_open`, `device_status`, `screen_read`, `screen_act`.
 - **`request_approval`** (client tool, `action_type` + `details`): shows the native approval sheet (`ui/ApprovalSheet.kt`)
   with what Emrys wants to do, an "Always allow" switch, Deny, and Approve behind biometrics or the screen lock. It
@@ -557,7 +567,7 @@ cd deploy/vm/hub && uvx --python 3.12 --with fastmcp==3.4.0 --with mcp==1.26.0 -
    simplified Settings), CloudFS, and triggers and webhooks.
 7. **The Strands agents** (plan https://claude.ai/artifact/Ri9R22DZiVUhd2x2oW6CeL): they run on the Gemini API (AI
    Studio, owner, 2026-11-06), NIM, Mistral, Telnyx and xAI. The `gemini` and `search` images are built on the VM
-   (`emrys-gemini:1.64.0`, `ren-api:beaa580`) and start once their env files are in `/opt/emrys`: `gemini.env`
+   (`emrys-gemini:1.64.0`, `ren-api:4bdf100`) and start once their env files are in `/opt/emrys`: `gemini.env`
    (`GOOGLE_API_KEY`, `NVIDIA_NIM_API_KEY`, `MISTRAL_API_KEY`, `TELNYX_API_KEY`, `XAI_API_KEY`; without `TELNYX_MCP_AUTHORIZATION` oubliai-telnyx
    doesn't load there), `search.env` (`BRAVE_SEARCH_API_KEY`, `BRAVE_ANSWERS_API_KEY`, `NVIDIA_NIM_API_KEY`) and
    `ren.env` (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `HF_TOKEN`, `PERPLEXITY_API_KEY`, `RON_CHAT_PROVIDERS` and ren desktop's provider keys).
@@ -573,7 +583,7 @@ cd deploy/vm/hub && uvx --python 3.12 --with fastmcp==3.4.0 --with mcp==1.26.0 -
 9. **Telnyx** (PR #13): checked by mypy and offline (the model, its window from the catalogue, the catalogue's filter);
    not run live. It needs `TELNYX_API_KEY` in the VM's `gemini.env` and the `gemini` image rebuilt, then one typed
    conversation from Settings › Agents › Telnyx with a tool call.
-10. **Memory:** the `gemini` image is pinned to ren `7d3a9b2` and the `ren` image to `beaa580`, both with ren PRs #25 and #26. Not run live: one
+10. **Memory:** the `gemini` image is pinned to ren `7d3a9b2` and the `ren` image to `4bdf100`, both with ren PRs #25 and #26. Not run live: one
     conversation, one dream and one review. The `gemini` service keeps its brain in ren's `local` storage on the VM
     under the app's install id, and the `ren` service in ren desktop's bucket under the account, so the phone's
     Strands agents and ren's pages don't share one brain yet.

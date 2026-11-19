@@ -1,4 +1,4 @@
-import { useEffect, useRef, type CSSProperties, type KeyboardEvent } from 'react'
+import { useEffect, useLayoutEffect, useRef, type CSSProperties, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { motion, AnimatePresence, useDragControls } from 'framer-motion'
 import { Network, Pin, X } from 'lucide-react'
 import { RenMark } from '@/components/brand'
@@ -6,18 +6,29 @@ import { Shimmer } from '@/components/ai-elements/shimmer'
 import { BRAND } from '@/lib/brand'
 import { useContextAgentStore, type ContextTab } from '@/stores/contextAgentStore'
 import { useInterestDiscoveryStore } from '@/stores/interestDiscoveryStore'
-import { useNavigationStore } from '@/stores/navigationStore'
-import { useTabStore } from '@/stores/tabStore'
 import { useInterestsStore } from '@/stores/interestsStore'
 import { cn } from '@/utils/cn'
 import { NeuralCanvas } from './NeuralCanvas'
 import { InterestDiscoveryPanel } from './InterestDiscoveryPanel'
 import { ContextTray } from './ContextTray'
-import { ContextAgents } from './ContextAgents'
+import { ContextAgents, ReplyDraftNotice } from './ContextAgents'
 import { ContextAsk } from './ContextAsk'
 import { AgentRunNotice } from './AgentRuns'
 import { DreamNotice } from './DreamNotice'
 import { runNotifications } from '@/lib/context-api'
+
+interface SurfaceBridgeWindow {
+  contextSurface?: {
+    reportMetrics?: (metrics: { pillWidth?: number; noticeHeight?: number; orbHovered?: boolean }) => void
+    dragStart?: (surface: 'widget' | 'discovery') => void
+    dragMove?: (surface: 'widget' | 'discovery') => void
+    dragEnd?: (surface: 'widget' | 'discovery') => void
+  }
+}
+
+function getContextSurface() {
+  return typeof window !== 'undefined' ? (window as unknown as SurfaceBridgeWindow).contextSurface : undefined
+}
 
 const TABS: { id: ContextTab; label: string }[] = [
   { id: 'interests', label: 'Interests' },
@@ -46,45 +57,64 @@ let focusPanel = false
 let refocusOrb = false
 
 /**
- * The Context widget: the Ren mark at the bottom right of every page (websites included — the shell
- * reserves its strip through `interests:set-inset`), and the Context Agent's panel.
+ * Widget surface body (`CollapsedOrb`, `AgentRunNotice`, and `ExpandedPanel`), rendered inside
+ * Electron's `ContextSurface.widgetView` (and inline inside `<InterestsWidget />` in browser previews).
  */
-export function InterestsWidget() {
+export function InterestsWidgetSurface() {
   const isExpanded = useInterestsStore((state) => state.isExpanded)
   const isInitialized = useInterestsStore((state) => state.isInitialized)
   const { toggleExpanded, setExpanded, initializeFromOnboarding } = useInterestsStore.getState()
 
   useEffect(() => {
-    if (!isInitialized) initializeFromOnboarding()
+    if (!isInitialized && !getContextSurface()) initializeFromOnboarding()
   }, [isInitialized, initializeFromOnboarding])
-  // Build is a full-height workspace with its own agent and a composer along the bottom edge: the orb would sit on
-  // its send button, so it steps aside there (it stays on websites, where the shell reserves its strip).
-  const onBuild = useNavigationStore((state) => state.activeTab === 'build')
-  const internalPage = useTabStore((state) => {
-    const url = state.tabs.find((tab) => tab.id === state.activeTabId)?.url ?? 'ron://home'
-    return url.startsWith('ron://') && !url.startsWith('ron://project') && !url.startsWith('ron://read')
-  })
-  const hidden = onBuild && internalPage
-  const open = () => { focusPanel = true; toggleExpanded() }
+
+  const open = () => {
+    focusPanel = true
+    getContextSurface()?.reportMetrics?.({ orbHovered: false })
+    toggleExpanded()
+  }
   // Pin only keeps the panel open when work is handed to the Agent Panel (`yieldToPanel`); Close always closes it.
-  const close = () => { refocusOrb = !hidden; setExpanded(false) }
+  const close = () => {
+    const surface = getContextSurface()
+    if (!surface) {
+      refocusOrb = true
+    } else {
+      surface.reportMetrics?.({ orbHovered: false })
+    }
+    useInterestDiscoveryStore.getState().clearSelection()
+    setExpanded(false)
+  }
 
   return (
     <>
       <AnimatePresence>
-        {!isExpanded && !hidden && (
+        {!isExpanded && (
           <div className="fixed bottom-5 right-5 z-40">
             <CollapsedOrb key="collapsed" onClick={open} />
           </div>
         )}
       </AnimatePresence>
+      {/* A drafted reply to a message or notification: Send asks for approval first. */}
+      {!isExpanded && <ReplyDraftNotice />}
       {/* A specialist's finished run (scheduled or Run now): Review opens its session in the Agent Panel. */}
-      {!isExpanded && !hidden && <AgentRunNotice />}
+      {!isExpanded && <AgentRunNotice />}
       {/* A dream that filed new memories: Review is a checklist with comments for the dreaming agent. */}
-      {!isExpanded && !hidden && <DreamNotice />}
+      {!isExpanded && <DreamNotice />}
       <AnimatePresence>
         {isExpanded && <ExpandedPanel key="expanded" onClose={close} />}
       </AnimatePresence>
+    </>
+  )
+}
+
+/**
+ * Full Context widget for inline rendering when not hosted in Electron's native `ContextSurface`.
+ */
+export function InterestsWidget() {
+  return (
+    <>
+      <InterestsWidgetSurface />
       <InterestDiscoveryPanel />
     </>
   )
@@ -93,19 +123,39 @@ export function InterestsWidget() {
 function CollapsedOrb({ onClick }: { onClick: () => void }) {
   const status = useContextAgentStore((state) => state.status)
   const unseen = useContextAgentStore((state) => state.unseen)
+  const draftCount = useContextAgentStore((state) => state.replyDrafts.length)
   const recordingSince = useContextAgentStore((state) => state.recordingSince)
   // An add, upload or capture in flight ("Adding to your context…") counts as work too.
   const busy = useContextAgentStore((state) => state.busy)
   const finishedRuns = useContextAgentStore((state) => runNotifications(state.runs).length)
+  const hasDream = useContextAgentStore((state) => Boolean(state.dream))
   const top = useInterestsStore((state) => [...state.nodes].sort((a, b) => b.weight - a.weight).slice(0, 2).map((node) => node.label).join('|'))
   const labels = top ? top.split('|') : []
+  const showHoverPills = labels.length > 0 && finishedRuns === 0 && draftCount === 0 && !hasDream
+  const pillRowRef = useRef<HTMLDivElement>(null)
   const working = status === 'running' || Boolean(busy)
   const state = recordingSince ? 'recording your screen'
     : busy ? busy.replace(/…$/, '')
+    : draftCount ? `${draftCount} reply draft${draftCount === 1 ? '' : 's'}`
     : finishedRuns ? `${finishedRuns} agent run${finishedRuns === 1 ? '' : 's'} to review`
     : unseen ? 'new agent recommendation'
     : working ? 'agent working'
     : null
+
+  useLayoutEffect(() => {
+    const surface = getContextSurface()
+    const row = pillRowRef.current
+    if (!surface?.reportMetrics || !row) return
+    surface.reportMetrics({ pillWidth: Math.ceil(row.scrollWidth) })
+  }, [top, showHoverPills])
+
+  const setHovered = (hovered: boolean) => {
+    const surface = getContextSurface()
+    if (!surface?.reportMetrics) return
+    const pillWidth = pillRowRef.current ? Math.ceil(pillRowRef.current.scrollWidth) : undefined
+    surface.reportMetrics({ orbHovered: hovered && showHoverPills, ...(pillWidth !== undefined ? { pillWidth } : {}) })
+  }
+
   const refocus = (node: HTMLButtonElement | null) => {
     if (node && refocusOrb) {
       refocusOrb = false
@@ -125,6 +175,10 @@ function CollapsedOrb({ onClick }: { onClick: () => void }) {
       exit={{ scale: 0.9, opacity: 0 }}
       transition={{ duration: 0.22, ease: EASE }}
       onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onFocus={() => setHovered(true)}
+      onBlur={() => setHovered(false)}
       className={cn(
         'pointer-events-auto group relative block h-[52px] w-[52px] cursor-pointer rounded-[12px] shadow-float transition-shadow duration-200 ease-out',
         'hover:ring-4 hover:ring-blurple-500/25 dark:hover:ring-blurple-400/30',
@@ -133,28 +187,30 @@ function CollapsedOrb({ onClick }: { onClick: () => void }) {
       )}
     >
       <RenMark className="h-[52px] w-[52px]" />
-      {labels.length > 0 && (
-        <div className="pointer-events-none absolute -top-9 right-0 flex gap-1 whitespace-nowrap opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100">
+      {showHoverPills && (
+        <div ref={pillRowRef} className="pointer-events-none absolute -top-9 right-0 flex gap-1 whitespace-nowrap opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100">
           {labels.map((label) => <span key={label} className="inline-flex h-6 items-center rounded-full border border-border bg-popover px-2.5 text-[12px] font-medium text-popover-foreground shadow-float">{label}</span>)}
         </div>
       )}
       {recordingSince
         ? <span className="absolute -right-1 -top-1 h-3.5 w-3.5 rounded-full bg-danger ring-2 ring-surface-0 dark:ring-surface-900" title="Recording your screen" />
-        : (unseen || finishedRuns > 0) && <span className="absolute -right-1 -top-1 h-3.5 w-3.5 rounded-full bg-blurple-600 ring-2 ring-surface-0 dark:bg-blurple-400 dark:ring-surface-900" title={finishedRuns ? 'Agent runs to review' : 'New agent recommendation'} />}
+        : (unseen || draftCount > 0 || finishedRuns > 0) && <span className="absolute -right-1 -top-1 h-3.5 w-3.5 rounded-full bg-blurple-600 ring-2 ring-surface-0 dark:bg-blurple-400 dark:ring-surface-900" title={draftCount ? 'Drafted reply ready' : finishedRuns ? 'Agent runs to review' : 'New agent recommendation'} />}
     </motion.button>
   )
 }
 
 function ExpandedPanel({ onClose }: { onClose: () => void }) {
+  const inNativeSurface = Boolean(getContextSurface())
   const dragControls = useDragControls()
   const constraintsRef = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
+  const nativeDraggingRef = useRef(false)
   const tabRefs = useRef<Partial<Record<ContextTab, HTMLButtonElement | null>>>({})
   const tab = useContextAgentStore((state) => state.tab)
   const pinned = useContextAgentStore((state) => state.pinned)
   const status = useContextAgentStore((state) => state.status)
   const activity = useContextAgentStore((state) => state.activity)
-  const unseen = useContextAgentStore((state) => state.unseen || runNotifications(state.runs).length > 0)
+  const unseen = useContextAgentStore((state) => state.unseen || state.replyDrafts.length > 0 || runNotifications(state.runs).length > 0)
   const itemCount = useContextAgentStore((state) => state.items.length)
   const recordingSince = useContextAgentStore((state) => state.recordingSince)
   const { setTab, setPinned } = useContextAgentStore.getState()
@@ -168,6 +224,29 @@ function ExpandedPanel({ onClose }: { onClose: () => void }) {
     focusPanel = false
     panelRef.current?.focus({ preventScroll: true })
   }, [])
+
+  const onHeaderPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return
+    const surface = getContextSurface()
+    if (surface?.dragStart) {
+      nativeDraggingRef.current = true
+      event.currentTarget.setPointerCapture(event.pointerId)
+      surface.dragStart('widget')
+      return
+    }
+    dragControls.start(event)
+  }
+
+  const onHeaderPointerMove = () => {
+    if (!nativeDraggingRef.current) return
+    getContextSurface()?.dragMove?.('widget')
+  }
+
+  const endNativeDrag = () => {
+    if (!nativeDraggingRef.current) return
+    nativeDraggingRef.current = false
+    getContextSurface()?.dragEnd?.('widget')
+  }
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     // Inner widgets that use Escape themselves (suggestion lists, pickers) mark it handled.
@@ -188,22 +267,23 @@ function ExpandedPanel({ onClose }: { onClose: () => void }) {
     else if (event.key === 'Home') next = 0
     else if (event.key === 'End') next = TABS.length - 1
     else return
+    const targetTab = TABS[next]
+    if (!targetTab) return
     event.preventDefault()
-    const id = TABS[next].id
+    const id = targetTab.id
     setTab(id)
     tabRefs.current[id]?.focus()
   }
 
   return (
     <>
-      <div ref={constraintsRef} className="pointer-events-none fixed inset-4 z-40" />
+      {!inNativeSurface && <div ref={constraintsRef} className="pointer-events-none fixed inset-4 z-40" />}
       <motion.div
-        drag
-        dragControls={dragControls}
+        drag={!inNativeSurface}
         dragListener={false}
         dragMomentum={false}
         dragElastic={0.1}
-        dragConstraints={constraintsRef}
+        {...(inNativeSurface ? {} : { dragControls, dragConstraints: constraintsRef })}
         initial={{ scale: 0.96, opacity: 0, x: 0, y: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.96, opacity: 0 }}
@@ -214,11 +294,23 @@ function ExpandedPanel({ onClose }: { onClose: () => void }) {
         role="dialog"
         aria-label="Context"
         data-testid="context-panel"
-        className="fixed bottom-6 right-6 z-50 h-[560px] w-[520px] origin-bottom-right cursor-default focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
+        className={cn(
+          inNativeSurface
+            ? 'fixed inset-2 z-50'
+            : 'fixed bottom-6 right-6 z-50 h-[560px] w-[520px]',
+          'origin-bottom-right cursor-default focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0',
+        )}
       >
         {/* The surface lives on an inner layer: `ron-glass-panel` positions itself relatively in Glass. */}
         <div className="ron-glass-panel flex h-full w-full flex-col overflow-hidden rounded-2xl border border-surface-200 bg-surface-0 text-ink shadow-float dark:border-surface-800 dark:bg-surface-900 dark:text-ink-inverse">
-          <div className="flex h-12 flex-shrink-0 cursor-grab select-none items-center justify-between gap-3 pl-4 pr-2.5 active:cursor-grabbing" onPointerDown={(event) => dragControls.start(event)}>
+          <div
+            className="flex h-12 flex-shrink-0 cursor-grab select-none items-center justify-between gap-3 pl-4 pr-2.5 active:cursor-grabbing"
+            onPointerDown={onHeaderPointerDown}
+            onPointerMove={onHeaderPointerMove}
+            onPointerUp={endNativeDrag}
+            onPointerCancel={endNativeDrag}
+            onLostPointerCapture={endNativeDrag}
+          >
             <div className="flex min-w-0 items-center gap-2.5">
               <RenMark className="h-6 w-6 flex-shrink-0" title={BRAND.name} />
               <h2 className="font-display text-[15px] font-bold leading-tight tracking-tight text-ink dark:text-ink-inverse">Context</h2>
@@ -273,7 +365,7 @@ function ExpandedPanel({ onClose }: { onClose: () => void }) {
 function InterestsTab() {
   const nodeCount = useInterestsStore((state) => state.nodes.length)
   const watchBrowsing = useContextAgentStore((state) => state.watchBrowsing)
-  const pending = useContextAgentStore((state) => state.visits.length)
+  const pending = useContextAgentStore((state) => state.visits.length + state.searches.length + state.chats.length)
   const status = useContextAgentStore((state) => state.status)
   const { setWatchBrowsing, flushBrowsing } = useContextAgentStore.getState()
 

@@ -1,6 +1,6 @@
 import { ReactNode, useState, useEffect } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
-import { ContextMenu } from '@/components/shared/ContextMenu'
+import { ContextMenu, pasteTargetOf } from '@/components/shared/ContextMenu'
 import { Marker, RenWordmark } from '@/components/brand'
 import { AgentUiProvider } from '@/context/AgentUiContext'
 import { BRAND } from '@/lib/brand'
@@ -34,7 +34,8 @@ function AuthPageLayoutInner({ children }: AuthPageLayoutProps) {
     x: number
     y: number
     isOpen: boolean
-    selectedText?: string
+    selectedText?: string | undefined
+    pasteTarget?: HTMLElement | null | undefined
   }>({
     x: 0,
     y: 0,
@@ -52,6 +53,7 @@ function AuthPageLayoutInner({ children }: AuthPageLayoutProps) {
         y: e.clientY,
         isOpen: true,
         selectedText,
+        pasteTarget: pasteTargetOf(e),
       })
     }
 
@@ -146,7 +148,8 @@ function AuthPageLayoutInner({ children }: AuthPageLayoutProps) {
         x={contextMenu.x}
         y={contextMenu.y}
         isOpen={contextMenu.isOpen}
-        selectedText={contextMenu.selectedText}
+        {...(contextMenu.selectedText !== undefined ? { selectedText: contextMenu.selectedText } : {})}
+        {...(contextMenu.pasteTarget !== undefined ? { pasteTarget: contextMenu.pasteTarget } : {})}
         onClose={() => setContextMenu(prev => ({ ...prev, isOpen: false }))}
       />
     </div>

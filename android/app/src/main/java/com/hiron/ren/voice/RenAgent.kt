@@ -284,7 +284,7 @@ public class RenAgent(
 public object AgentTools {
     /** Every phone tool the agents call, by its client tool name. */
     public val NAMES: List<String> = listOf(
-        "sms_send", "sms_list", "contacts_search", "calls_recent", "phone_call", "calendar_list", "calendar_create",
+        "sms_send", "sms_list", "contacts_search", "contact_save", "calls_recent", "phone_call", "calendar_list", "calendar_create",
         "notifications_list", "notification_reply", "reminder_create", "reminders_list", "reminder_cancel", "email_draft",
         "apps_list", "app_open", "device_status", "screen_read", "screen_act",
     )

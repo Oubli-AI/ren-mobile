@@ -21,6 +21,10 @@ public class RenNotificationListener : NotificationListenerService() {
         instance = this
     }
 
+    override fun onNotificationPosted(sbn: StatusBarNotification) {
+        if (sbn.packageName != packageName) record(this, sbn)?.let(posted)
+    }
+
     override fun onListenerDisconnected() {
         if (instance === this) instance = null
     }
@@ -35,6 +39,10 @@ public class RenNotificationListener : NotificationListenerService() {
         private var instance: RenNotificationListener? = null
 
         public val connected: Boolean get() = instance != null
+
+        /** Every notification another app posts, as [list] lists it (`PhoneNotification` in ren's context-api). */
+        @Volatile
+        public var posted: (JSONObject) -> Unit = {}
 
         public fun list(context: Context, app: String?): ToolResult {
             val listener = instance ?: return notConnected()

@@ -1,10 +1,13 @@
 /**
  * Prompt attachments: what rides along with a chat message as its own text content block.
  *
- * - A paste longer than 300 characters leaves the textarea the moment it lands and becomes an attachment
- *   card, named at once from its own text and renamed when the title model answers (`POST /attachments/title`).
+ * - A paste (⌘/Ctrl+V or the context menu's Paste) leaves the textarea the moment it lands and becomes an
+ *   attachment card, named at once from its own text; a paste longer than 300 characters is renamed when the
+ *   title model answers (`POST /attachments/title`).
  * - Anything picked in the context menu or with `@` (a tab, a previous chat, an issue, a project, a date, an
  *   interest, a project page, a saved file) is an attachment too; its text is read when the message is sent.
+ * - What another surface opens in Ren (Ask Ren on a selection, Ask Ren on saved context) is an attachment card in
+ *   the panel's composer (`selectionAttachment`, `AgentUiContext.sendToAgentPanel`).
  *
  * The agent reads every attachment's full text: each one is a native text content block of the user message,
  * framed as `<attachment …>…</attachment>` (built identically by `agent/api/core/prompt_attachments.py`), so it
@@ -15,7 +18,7 @@
  * Pure (relative imports only) so `node --experimental-strip-types --test src/lib/prompt-attachments.test.ts` runs it.
  */
 
-/** Pastes longer than this leave the textarea and become a text attachment. */
+/** Pastes longer than this are named by the title model; a shorter one keeps the name taken from its text. */
 export const PASTED_PROMPT_CHARACTER_LIMIT = 300
 
 /** Sent with a pasted-prompt attachment so the model treats the attachment as the task. */
@@ -47,9 +50,9 @@ export interface PromptAttachment {
   /** Exactly what the agent reads. */
   text: string
   /** A tab's address. */
-  url?: string
+  url?: string | undefined
   /** Where the text came from, in a few words (a context item's description). */
-  source?: string
+  source?: string | undefined
 }
 
 export interface TextMatch {
@@ -64,6 +67,11 @@ export function messageForPastedPrompt(text: string, includesPastedPrompt: boole
   if (!trimmed || trimmed === PASTED_PROMPT_INSTRUCTION) return PASTED_PROMPT_INSTRUCTION
   if (trimmed.includes(PASTED_PROMPT_INSTRUCTION)) return trimmed
   return `${PASTED_PROMPT_INSTRUCTION}\n\n${trimmed}`
+}
+
+/** Every paste with any text becomes an attachment. */
+export function isAttachablePaste(text: string): boolean {
+  return text.trim().length > 0
 }
 
 export function isLongPaste(text: string): boolean {
@@ -122,7 +130,7 @@ export async function requestPasteTitle(apiBase: string, text: string, signal?: 
       body: JSON.stringify({ text }),
       headers: { 'Content-Type': 'application/json' },
       method: 'POST',
-      signal,
+      ...(signal ? { signal } : {}),
     })
     if (!response.ok) return null
     const { title }: { title?: unknown } = await response.json()
@@ -191,9 +199,9 @@ export function clipWithNote(text: string, max: number): string {
 
 /** The fields of an open tab's context (`tabs:get-context`) that become its attachment text. */
 export interface TabContext {
-  url?: string
-  title?: string
-  dom?: { text?: string; metas?: { name: string; content: string }[] }
+  url?: string | undefined
+  title?: string | undefined
+  dom?: { text?: string | undefined; metas?: { name: string; content: string }[] | undefined } | undefined
 }
 
 /** An open tab as text: its description, then the page's readable text (no markup), clipped. */
@@ -209,9 +217,9 @@ export interface ContextSource {
   id: string
   type: ContextAttachmentKind
   name: string
-  description?: string
-  meta?: string
-  url?: string
+  description?: string | undefined
+  meta?: string | undefined
+  url?: string | undefined
 }
 
 /** A context-menu item as an attachment carrying `text` (read at send, or as the user edited it). */
@@ -222,6 +230,20 @@ export function contextAttachment(item: ContextSource, text: string): PromptAtta
     text: clipAttachmentText(text.trim() ? text : `${item.name} (no text)`).text,
     ...(item.url ? { url: item.url.slice(0, 4096) } : {}), ...(source ? { source } : {}),
   }
+}
+
+/** Text selected on a page and opened with Ask Ren, as an attachment: the page's tab kind, with the page's address. */
+export function selectionAttachment(text: string, sourceUrl: string): PromptAttachment {
+  const url = /^https?:/i.test(sourceUrl) ? sourceUrl.slice(0, 4096) : undefined
+  return {
+    id: `selection-${crypto.randomUUID()}`, kind: 'tab', title: titleFromPastedText(text), source: 'Selected text',
+    text: clipAttachmentText(text.trim()).text, ...(url ? { url } : {}),
+  }
+}
+
+/** A message with its attachments as the blocks the agent reads, for a surface that takes text only (Live). */
+export function withAttachmentBlocks(text: string, attachments: readonly PromptAttachment[]): string {
+  return [text.trim(), ...attachments.map(attachmentBlock)].filter(Boolean).join('\n\n')
 }
 
 /** What each kind is called on its card. */
@@ -271,14 +293,16 @@ const ATTRIBUTE = /\s+([a-z]+)="([^"]*)"/g
 /** The attachment a user-message text block carries, or null for any other text. */
 export function parseAttachmentBlock(text: string): PromptAttachment | null {
   const match = BLOCK.exec(text)
-  if (!match) return null
+  if (!match || match[1] === undefined || match[2] === undefined) return null
   const fields: Record<string, string> = {}
-  for (const [, name, value] of match[1].matchAll(ATTRIBUTE)) fields[name] = unescapeAttribute(value)
-  const kind = fields.kind as AttachmentKind
-  if (!fields.id || !fields.title || !ATTACHMENT_KINDS.includes(kind)) return null
+  for (const [, name, value] of match[1].matchAll(ATTRIBUTE)) {
+    if (name !== undefined && value !== undefined) fields[name] = unescapeAttribute(value)
+  }
+  const kind = fields["kind"] as AttachmentKind
+  if (!fields["id"] || !fields["title"] || !ATTACHMENT_KINDS.includes(kind)) return null
   return {
-    id: fields.id, kind, title: fields.title, text: match[2].replace(ESCAPED_CLOSING, (tag) => `</${tag.slice(3)}`),
-    ...(fields.url ? { url: fields.url } : {}), ...(fields.source ? { source: fields.source } : {}),
+    id: fields["id"], kind, title: fields["title"], text: match[2].replace(ESCAPED_CLOSING, (tag) => `</${tag.slice(3)}`),
+    ...(fields["url"] ? { url: fields["url"] } : {}), ...(fields["source"] ? { source: fields["source"] } : {}),
   }
 }
 
@@ -293,7 +317,7 @@ export function messageTitle(texts: string[]): string {
     const pasted = texts.map(parseAttachmentBlock).find((attachment) => attachment?.kind === 'pasted')
     if (pasted) return pasted.title.slice(0, 200)
   }
-  return first.split(/\r?\n/)[0].slice(0, 200)
+  return (first.split(/\r?\n/)[0] ?? '').slice(0, 200)
 }
 
 // ── The editor shown on hover (a sandboxed document in WebPreviewBody) ───────

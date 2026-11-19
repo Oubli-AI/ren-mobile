@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { X } from 'lucide-react'
 import { RenMark } from '@/components/brand'
@@ -44,11 +44,24 @@ function runText(run: AgentRun): string {
 /** The Context Agent's notification above the orb: the newest finished run the user has not opened. */
 export function AgentRunNotice() {
   const runs = useContextAgentStore((state) => state.runs)
+  const draftsWaiting = useContextAgentStore((state) => state.replyDrafts.length > 0)
   const notices = useMemo(() => runNotifications(runs), [runs])
   const review = useReviewRun()
   const now = useNow()
+  const cardRef = useRef<HTMLDivElement>(null)
   const run = notices[0]
-  if (!run) return null
+  useLayoutEffect(() => {
+    const el = cardRef.current
+    const report = (window as { contextSurface?: { reportMetrics?: (m: { noticeHeight?: number }) => void } }).contextSurface?.reportMetrics
+    if (!el || !report || draftsWaiting) return
+    const sync = () => report({ noticeHeight: Math.ceil(el.getBoundingClientRect().height) })
+    sync()
+    const observer = new ResizeObserver(sync)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [run?.id, notices.length, draftsWaiting])
+
+  if (!run || draftsWaiting) return null
   const text = runText(run)
   const more = notices.length - 1
   const openAgents = () => {
@@ -58,6 +71,7 @@ export function AgentRunNotice() {
 
   return (
     <motion.div
+      ref={cardRef}
       key={run.id}
       role="status"
       aria-live="polite"

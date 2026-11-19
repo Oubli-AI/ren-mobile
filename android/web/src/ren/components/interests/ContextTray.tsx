@@ -7,6 +7,7 @@ import { useAgentUi } from '@/context/AgentUiContext'
 import { API_BASE_URL } from '@/lib/api-base'
 import { createContextClient, formatBytes, type ContextItem, type ContextKind } from '@/lib/context-api'
 import { kindLabel } from '@/lib/issue-attachments'
+import { clipWithNote, type PromptAttachment } from '@/lib/prompt-attachments'
 import { useContextAgentStore } from '@/stores/contextAgentStore'
 import { cn } from '@/utils/cn'
 import { SendToIssue } from './SendToIssue'
@@ -17,7 +18,8 @@ const KIND_ICONS: Partial<Record<ContextKind, typeof LinkIcon>> = {
   selection: ChatBubbleBottomCenterTextIcon, thread: ChatBubbleLeftRightIcon, document: DocumentTextIcon,
   screenshot: CameraIcon, recording: VideoCameraIcon, file: PaperClipIcon, note: PencilSquareIcon,
 }
-const MAX_PROMPT_CHARS = 24_000
+/** What one saved item carries into the panel (the `@` menu's saved items carry the same). */
+const SAVED_CONTEXT_MAX = 12_000
 
 const hostOf = (value: string) => { try { return new URL(value).hostname } catch { return '' } }
 const elapsed = (since: number, now: number) => {
@@ -75,18 +77,41 @@ export function ContextTray() {
     if (fileInput.current) fileInput.current.value = ''
   }
 
+  /** Ask Ren: the chosen items open in the panel's composer as attachment cards, for the user's question. */
   const askRon = async (targets: ContextItem[]) => {
-    const parts: string[] = []
-    let budget = MAX_PROMPT_CHARS
-    for (const item of targets) {
-      const markdown = await client.markdown(item.id).catch(() => `# ${item.id} ${item.title}`)
-      const clipped = markdown.length > budget ? `${markdown.slice(0, Math.max(0, budget))}\n\n…(truncated; the full item is in my context store as ${item.id})` : markdown
-      budget -= clipped.length
-      parts.push(clipped)
-      if (budget <= 0) break
+    const surface = (window as { contextSurface?: { dispatch?: (action: unknown) => Promise<unknown> } }).contextSurface
+    if (surface?.dispatch) {
+      await surface.dispatch({ type: 'ask-ron-items', itemIds: targets.map((item) => item.id) })
+      return
     }
-    sendToAgentPanel(`Here is context I saved (${targets.length} item${targets.length === 1 ? '' : 's'}). Read it and help me with it.\n\n${parts.join('\n\n---\n\n')}`)
+    const attachments = await Promise.all(targets.map(async (item): Promise<PromptAttachment> => {
+      const markdown = await client.markdown(item.id).catch(() => `# ${item.title || item.kind}`)
+      const url = /^https?:/i.test(item.source) ? item.source.slice(0, 4096) : undefined
+      return {
+        id: `context-${item.id}`.slice(0, 200), kind: 'file', title: (item.title || item.source || kindLabel(item.kind)).slice(0, 300),
+        text: clipWithNote(markdown, SAVED_CONTEXT_MAX), source: `Saved ${kindLabel(item.kind).toLowerCase()}`, ...(url ? { url } : {}),
+      }
+    }))
+    sendToAgentPanel('', attachments)
     yieldToPanel()
+  }
+
+  const handleStartRecord = () => {
+    const surface = (window as { contextSurface?: { triggerGesture?: (kind: 'upload' | 'record') => void } }).contextSurface
+    if (surface?.triggerGesture) {
+      surface.triggerGesture('record')
+      return
+    }
+    void startRecording()
+  }
+
+  const handleTriggerUpload = () => {
+    const surface = (window as { contextSurface?: { triggerGesture?: (kind: 'upload' | 'record') => void } }).contextSurface
+    if (surface?.triggerGesture) {
+      surface.triggerGesture('upload')
+      return
+    }
+    fileInput.current?.click()
   }
 
   return <div className="flex h-full flex-col">
@@ -94,10 +119,10 @@ export function ContextTray() {
       <button type="button" className={iconButton} title="Screenshot this page" aria-label="Screenshot" onClick={() => void captureScreenshot()} disabled={Boolean(busy)}><CameraIcon className="h-4 w-4" /></button>
       {recordingSince
         ? <button type="button" className={cn(ghostButton, 'gap-1.5 text-red-600 hover:text-red-600 dark:text-red-400 dark:hover:text-red-400')} onClick={() => void stopRecording()}><StopIcon className="h-4 w-4" />Stop {elapsed(recordingSince, now)}</button>
-        : <button type="button" className={iconButton} title="Record screen" aria-label="Record screen" onClick={() => void startRecording()}><VideoCameraIcon className="h-4 w-4" /></button>}
+        : <button type="button" className={iconButton} title="Record screen" aria-label="Record screen" onClick={handleStartRecord}><VideoCameraIcon className="h-4 w-4" /></button>}
       <button type="button" className={cn(iconButton, form === 'link' && 'bg-surface-100 text-ink dark:bg-surface-850 dark:text-ink-inverse')} title="Add a link" aria-label="Link" aria-pressed={form === 'link'} onClick={() => setForm(form === 'link' ? null : 'link')}><LinkIcon className="h-4 w-4" /></button>
       <button type="button" className={cn(iconButton, form === 'note' && 'bg-surface-100 text-ink dark:bg-surface-850 dark:text-ink-inverse')} title="Add a note" aria-label="Note" aria-pressed={form === 'note'} onClick={() => setForm(form === 'note' ? null : 'note')}><PencilSquareIcon className="h-4 w-4" /></button>
-      <button type="button" className={iconButton} title="Upload files" aria-label="Upload" onClick={() => fileInput.current?.click()} disabled={Boolean(busy)}><ArrowUpTrayIcon className="h-4 w-4" /></button>
+      <button type="button" className={iconButton} title="Upload files" aria-label="Upload" onClick={handleTriggerUpload} disabled={Boolean(busy)}><ArrowUpTrayIcon className="h-4 w-4" /></button>
       <input ref={fileInput} type="file" multiple hidden aria-label="Upload files to context" accept="image/*,video/*,.pdf,.txt,.md,.csv,.json"
         onChange={(event) => void upload(event.target.files)} />
     </div>

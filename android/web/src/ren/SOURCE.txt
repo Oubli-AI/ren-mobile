@@ -1,15 +1,6 @@
-ren desktop's pages and components, unmodified: github.com/Oubli-AI/ren (was ImRonAI/TheBrowser) at 0f6fa57 (branch
-claude/ren-account-sync, pull 8: main at 41f674f, with deep research's formation graph and the phone's [phone] turn,
-plus the interview and interest graph kept on the account, /context/profile), with Deep Research's pages and libs from
-bf91e1c (branch claude/vm-deep-research, with pull 14: Deep Research built as the Strands SDK documents it), and the
-issue cards, the editor's blocks, document-ron.ts and ron-draft.ts from 5909d6a (branch claude/issue-glass-embed-tabs,
-pull 18: frosted glass issue cards and Embed tabs), and lib/deep-research-api.ts from e1de3a0 (main, pull 23: the agents' scoped roles), and the rest from main at
-c625f02 (pull 25: the dream's notice and review over the Context widget, and the search page sending its user), and Deep Research's pages, lib/project-documents.ts and the Documents page's Print menu from 8b95dc7 (main,
-pull 24: the six levels, the report as a Document, Print to PDF, HTML and Word), and index.css, pages/types/electron.ts,
-the editor (NotionEditor.tsx, TableMenu.tsx, blocks/RenTable.ts) and the Documents toolbar from 1bc8efc (main, pull 28:
-tables with resizable columns, a table bar and header colours, Embed tabs in the Insert menu), and the Context widget's
-lib/context-api.ts, stores/contextAgentStore.ts and interests/ContextAgents.tsx from beaa580 (main, pull 29: app
-recommendations the Context Agent builds with OpenCode).
+ren desktop's pages and components, unmodified: github.com/Oubli-AI/ren (was ImRonAI/TheBrowser) at 4bdf100 (main,
+pull 36; with pulls 31 and 32: the Context Agent's drafted replies, twice-daily reviews with OpenCode, people and every
+phone log, and its [notification] turn).
 
   pages/SearchResultsPage.tsx                               ren's search results
   pages/HomePage.tsx, OnboardingPage.tsx, SignInPage.tsx    Discover and the destinations, the interview, sign-in

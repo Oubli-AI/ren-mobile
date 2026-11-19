@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { X } from 'lucide-react'
 import { RenMark } from '@/components/brand'
@@ -17,7 +17,7 @@ const EASE = [0.19, 1, 0.22, 1] as const
  */
 export function DreamNotice() {
   const dream = useContextAgentStore((state) => state.dream)
-  const runsWaiting = useContextAgentStore((state) => runNotifications(state.runs).length > 0)
+  const runsWaiting = useContextAgentStore((state) => state.replyDrafts.length > 0 || runNotifications(state.runs).length > 0)
   if (!dream || runsWaiting) return null
   return <DreamCard key={dream.version} dream={dream} />
 }
@@ -26,13 +26,26 @@ function DreamCard({ dream }: { dream: Dream }) {
   const reviewing = useContextAgentStore((state) => state.reviewingDream)
   const { setReviewingDream, reviewDream } = useContextAgentStore.getState()
   const [review, setReview] = useState<TopicReview[]>(() => dream.topics.map(({ key }) => ({ key, right: true, comment: '' })))
+  const cardRef = useRef<HTMLDivElement>(null)
   const labels = dream.topics.map(dreamTopicLabel)
   const count = `${dream.topics.length} topic${dream.topics.length === 1 ? '' : 's'}`
   const mark = (index: number, patch: Partial<TopicReview>) =>
     setReview(review.map((entry, at) => at === index ? { ...entry, ...patch } : entry))
 
+  useLayoutEffect(() => {
+    const el = cardRef.current
+    const report = (window as { contextSurface?: { reportMetrics?: (m: { noticeHeight?: number }) => void } }).contextSurface?.reportMetrics
+    if (!el || !report) return
+    const sync = () => report({ noticeHeight: Math.ceil(el.getBoundingClientRect().height) })
+    sync()
+    const observer = new ResizeObserver(sync)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [dream.version, reviewing, dream.topics.length])
+
   return (
     <motion.div
+      ref={cardRef}
       role="status"
       aria-live="polite"
       aria-label={`Ren filed new memories: ${count}`}
@@ -58,21 +71,26 @@ function DreamCard({ dream }: { dream: Dream }) {
         {reviewing ? <>
           <p className={cn('mt-2', mutedText)}>Uncheck anything wrong and say why. Ren fixes it in its next dream and keeps your notes for every dream after.</p>
           <ul data-testid="dream-topics" className="mt-2 max-h-[min(420px,calc(100vh-260px))] min-h-0 flex-1 space-y-1.5 overflow-y-auto">
-            {dream.topics.map((topic, index) => <li key={topic.key} className="rounded-lg border border-surface-200 px-2.5 py-2 dark:border-surface-800">
-              <label className="flex items-start gap-2">
-                <input type="checkbox" checked={review[index].right} onChange={(event) => mark(index, { right: event.target.checked })}
-                  aria-label={`${labels[index].title} is right`} className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 accent-blurple-600 dark:accent-blurple-400" />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[12px] font-semibold">{labels[index].title}
-                    <span className="font-normal text-ink-muted dark:text-ink-inverse-muted"> · {labels[index].agent}</span></span>
-                  <span className={cn('line-clamp-3 whitespace-pre-line', mutedText)}>
-                    {topic.text === null ? 'Removed' : topic.text.split('\n').slice(1).join('\n').trim()}
+            {dream.topics.map((topic, index) => {
+              const entry = review[index]
+              const label = labels[index]
+              if (!entry || !label) return null
+              return <li key={topic.key} className="rounded-lg border border-surface-200 px-2.5 py-2 dark:border-surface-800">
+                <label className="flex items-start gap-2">
+                  <input type="checkbox" checked={entry.right} onChange={(event) => mark(index, { right: event.target.checked })}
+                    aria-label={`${label.title} is right`} className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 accent-blurple-600 dark:accent-blurple-400" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[12px] font-semibold">{label.title}
+                      <span className="font-normal text-ink-muted dark:text-ink-inverse-muted"> · {label.agent}</span></span>
+                    <span className={cn('line-clamp-3 whitespace-pre-line', mutedText)}>
+                      {topic.text === null ? 'Removed' : topic.text.split('\n').slice(1).join('\n').trim()}
+                    </span>
                   </span>
-                </span>
-              </label>
-              <input type="text" value={review[index].comment} onChange={(event) => mark(index, { comment: event.target.value })}
-                maxLength={2000} placeholder="Comment" aria-label={`Comment on ${labels[index].title}`} className={cn(field, 'mt-1.5')} />
-            </li>)}
+                </label>
+                <input type="text" value={entry.comment} onChange={(event) => mark(index, { comment: event.target.value })}
+                  maxLength={2000} placeholder="Comment" aria-label={`Comment on ${label.title}`} className={cn(field, 'mt-1.5')} />
+              </li>
+            })}
           </ul>
           <div className="mt-2.5 flex items-center justify-end gap-2">
             <button type="button" onClick={() => setReviewingDream(false)} className={ghostButton}>Later</button>

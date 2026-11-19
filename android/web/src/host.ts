@@ -8,7 +8,7 @@
  * favorite links, which the app keeps for its home page and Discover alike.
  */
 import { API_BASE_URL } from "@/lib/api-base"
-import type { PhoneAction, PhoneActivity, PhoneApp } from "@/lib/context-api"
+import type { PhoneAction, PhoneActivity, PhoneApp, PhoneCall, PhoneNotification, PhoneSms } from "@/lib/context-api"
 import { useAuthStore } from "@/stores/authStore"
 import type { Favorite } from "@/stores/favoritesStore"
 import { useOnboardingStore } from "@/stores/onboardingStore"
@@ -17,11 +17,15 @@ import { useOnboardingStore } from "@/stores/onboardingStore"
 type Answer = { type: "token"; token: string } | { type: "favorites"; favorites: Favorite[] }
 
 /**
- * What the app tells the Context widget's page unasked: a page the phone's browser loaded, what the user did on the
- * phone since the last report, and the panel's Back and Settings' Sign out.
+ * What the app tells the Context widget's page unasked: a page the phone's browser loaded, a search there, a chat
+ * with Ren on the phone, a notification another app posted, what happened on the phone since the last report, and the
+ * panel's Back and Settings' Sign out.
  */
 export type AppEvent =
   | { type: "visit"; url: string; title: string }
+  | { type: "search"; query: string }
+  | { type: "chat"; channel: string; user: string; assistant: string }
+  | { type: "notification"; notification: PhoneNotification }
   | { type: "phone"; activity: PhoneActivity }
   | { type: "close" }
   | { type: "sign-out" }
@@ -59,12 +63,56 @@ function phoneAction(value: unknown): PhoneAction[] {
     : []
 }
 
+function text(value: Record<string, unknown>, key: string): string {
+  const field = value[key]
+  return typeof field === "string" ? field : ""
+}
+
+function list(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : []
+}
+
+function phoneCall(value: unknown): PhoneCall[] {
+  const call = record(value)
+  const seconds = call?.["seconds"]
+  return call !== null && typeof seconds === "number"
+    ? [{ kind: text(call, "kind"), number: text(call, "number"), name: text(call, "name") || null, seconds, at: text(call, "at") }]
+    : []
+}
+
+function phoneSms(value: unknown): PhoneSms[] {
+  const sms = record(value)
+  return sms === null ? [] : [{
+    from: text(sms, "from"), number: text(sms, "number"), contact: text(sms, "contact") || null, text: text(sms, "text"),
+    at: text(sms, "at"), unread: sms["unread"] === true,
+  }]
+}
+
+function phoneNotification(value: unknown): PhoneNotification | null {
+  const note = record(value)
+  if (note === null || !text(note, "key")) return null
+  return {
+    key: text(note, "key"), app: text(note, "app"), package: text(note, "package"), title: text(note, "title"),
+    text: text(note, "text"), at: text(note, "at"), can_reply: note["can_reply"] === true, category: text(note, "category") || null,
+    messages: list(note["messages"]).flatMap((entry) => {
+      const message = record(entry)
+      return message === null ? [] : [{ from: text(message, "from"), text: text(message, "text"), at: text(message, "at") }]
+    }),
+  }
+}
+
 function eventOf(data: string): AppEvent | null {
   const message = record(JSON.parse(data))
   if (message === null) return null
   if (message["type"] === "visit" && typeof message["url"] === "string" && typeof message["title"] === "string") {
     return { type: "visit", url: message["url"], title: message["title"] }
   }
+  if (message["type"] === "search" && typeof message["query"] === "string") return { type: "search", query: message["query"] }
+  if (message["type"] === "chat") {
+    return { type: "chat", channel: text(message, "channel"), user: text(message, "user"), assistant: text(message, "assistant") }
+  }
+  const notification = message["type"] === "notification" ? phoneNotification(message["notification"]) : null
+  if (notification !== null) return { type: "notification", notification }
   const activity = record(message["activity"])
   if (
     message["type"] === "phone" &&
@@ -83,6 +131,8 @@ function eventOf(data: string): AppEvent | null {
         until: activity["until"],
         apps: apps.flatMap(phoneApp),
         actions: actions.flatMap(phoneAction),
+        calls: list(activity["calls"]).flatMap(phoneCall),
+        sms: list(activity["sms"]).flatMap(phoneSms),
       },
     }
   }
