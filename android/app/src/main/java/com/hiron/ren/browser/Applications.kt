@@ -16,18 +16,18 @@ import java.io.File
 import java.io.IOException
 
 /** An app OpenCode built for the ren account: a web app at its https [location], or an Android app whose APK ren serves. */
-data class RenApplication(val id: String, val name: String, val android: Boolean, val location: String, val icon: String)
+public data class RenApplication(val id: String, val name: String, val android: Boolean, val location: String, val icon: String)
 
 /**
  * The ren account's Applications (ren's `GET /context/applications`, which the Context Agent's `register_application`
  * fills): Home lists them; a web app opens in a tab, an Android app's APK downloads and Android's installer opens on it.
  */
-class Applications(private val context: Context, private val http: OkHttpClient, private val token: () -> String) {
+public class Applications(private val context: Context, private val http: OkHttpClient, private val token: () -> String) {
     private val _list = MutableStateFlow<List<RenApplication>>(emptyList())
-    val list: StateFlow<List<RenApplication>> = _list.asStateFlow()
+    public val list: StateFlow<List<RenApplication>> = _list.asStateFlow()
 
     /** The signed-in ren account's id, as the pages report it; blank when signed out. */
-    var userId: String = ""
+    public var userId: String = ""
         set(value) {
             if (value != field) _list.value = emptyList()
             field = value
@@ -38,7 +38,7 @@ class Applications(private val context: Context, private val http: OkHttpClient,
         .header("X-Ren-Token", token())
         .build()
 
-    suspend fun refresh() {
+    public suspend fun refresh() {
         if (userId.isBlank()) return
         val user = userId
         val listed = withContext(Dispatchers.IO) {
@@ -53,7 +53,7 @@ class Applications(private val context: Context, private val http: OkHttpClient,
     }
 
     /** Downloads [app]'s APK and hands it to Android's installer; the error's message when it can't. */
-    suspend fun install(app: RenApplication): String? = withContext(Dispatchers.IO) {
+    public suspend fun install(app: RenApplication): String? = withContext(Dispatchers.IO) {
         val apk = File(context.cacheDir, "apps/${app.id}.apk")
         try {
             http.newCall(request("/${app.id}/apk")).execute().use { response ->
@@ -73,12 +73,12 @@ class Applications(private val context: Context, private val http: OkHttpClient,
         null
     }
 
-    companion object {
+    public companion object {
         /** ren desktop's backend on the workspace VM, which the app's pages call too (`VITE_API_BASE_URL`). */
-        const val API = "https://rivet.ron-ai.dev"
+        public const val API: String = "https://rivet.ron-ai.dev"
         private const val APK = "application/vnd.android.package-archive"
 
-        fun parse(json: String): List<RenApplication> {
+        public fun parse(json: String): List<RenApplication> {
             val items = JSONObject(json).optJSONArray("applications") ?: return emptyList()
             return (0 until items.length()).mapNotNull { index ->
                 val item = items.optJSONObject(index) ?: return@mapNotNull null

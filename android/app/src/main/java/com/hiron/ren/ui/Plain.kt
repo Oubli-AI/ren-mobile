@@ -4,7 +4,7 @@ import android.telephony.PhoneNumberUtils
 import java.util.Locale
 
 /** Plain words for tool ids, log kinds and phone numbers, so nothing on screen reads like a system code. */
-object Plain {
+public object Plain {
     /** Tool id to (what Ren wants to do, what Ren did). */
     private val TOOLS = mapOf(
         "sms_send" to ("Send a text" to "Sent a text"),
@@ -38,7 +38,7 @@ object Plain {
     private val NANP = Regex("""^\+1(\d{3})(\d{3})(\d{4})$""")
 
     /** A phone number grouped the way people write it ("+1 801-555-0123"); anything else is returned as-is. */
-    fun phone(value: String): String {
+    public fun phone(value: String): String {
         val v = value.trim()
         if (!BARE_NUMBER.matches(v)) return value
         NANP.matchEntire(v)?.let { val (area, office, line) = it.destructured; return "+1 $area-$office-$line" }
@@ -46,20 +46,20 @@ object Plain {
     }
 
     /** [text] with every international number in it grouped by [phone]. */
-    fun numbers(text: String): String = NUMBER.replace(text) { phone(it.value) }
+    public fun numbers(text: String): String = NUMBER.replace(text) { phone(it.value) }
 
     /** What Ren tried with a tool: "Send a text". */
-    fun action(tool: String): String = TOOLS[tool]?.first ?: spoken(tool)
+    public fun action(tool: String): String = TOOLS[tool]?.first ?: spoken(tool)
 
     /** The activity log's line for a tool: "Sent a text". */
-    fun done(tool: String): String = TOOLS[tool]?.second ?: spoken(tool)
+    public fun done(tool: String): String = TOOLS[tool]?.second ?: spoken(tool)
 
     /**
      * A log entry's text in plain words; anything that isn't a tool id passes through unchanged.
      * `sms_send` and `sms_send: done` read "Sent a text"; any other result reads after what Ren tried ("Send a
      * text · …"), so a failure never reads as done.
      */
-    fun log(kind: String, text: String): String {
+    public fun log(kind: String, text: String): String {
         TOOL_LINE.matchEntire(text)?.let { m ->
             val id = m.groupValues[1]
             if (id in TOOLS) {
@@ -71,7 +71,7 @@ object Plain {
     }
 
     /** A log kind as a short word in sentence case, and its tone. */
-    fun kind(kind: String): Pair<String, Tone> = KINDS[kind] ?: (spoken(kind) to Tone.Neutral)
+    public fun kind(kind: String): Pair<String, Tone> = KINDS[kind] ?: (spoken(kind) to Tone.Neutral)
 
     private fun spoken(id: String): String = id.replace('_', ' ').replaceFirstChar { it.uppercase() }
 }

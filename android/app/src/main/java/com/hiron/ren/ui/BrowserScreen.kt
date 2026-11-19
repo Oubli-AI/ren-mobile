@@ -101,13 +101,13 @@ import com.hiron.ren.browser.BrowserTab
 import com.hiron.ren.browser.DownloadRequest
 import com.hiron.ren.core.RenRuntime
 
-const val ADDRESS_TAG = "address"
-const val ASK_REN_TAG = "ask-ren"
-const val TABS_TAG = "tabs"
-const val MORE_TAG = "more"
+public const val ADDRESS_TAG: String = "address"
+public const val ASK_REN_TAG: String = "ask-ren"
+public const val TABS_TAG: String = "tabs"
+public const val MORE_TAG: String = "more"
 
 /** The other screens the browser's menu opens. */
-enum class Page { Activity, Settings }
+public enum class Page { Activity, Settings }
 
 /**
  * The browser: the toolbar with the address bar and Ask Ren, the active tab (Ren's home page or a web page), and the
@@ -115,7 +115,7 @@ enum class Page { Activity, Settings }
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun BrowserScreen(runtime: RenRuntime, waiting: Int, onAskRen: () -> Unit, onOpen: (Page) -> Unit) {
+public fun BrowserScreen(runtime: RenRuntime, waiting: Int, onAskRen: () -> Unit, onOpen: (Page) -> Unit) {
     val p = LocalPalette.current
     val browser = runtime.browser
     val state by browser.state.collectAsStateWithLifecycle()
@@ -154,7 +154,7 @@ fun BrowserScreen(runtime: RenRuntime, waiting: Int, onAskRen: () -> Unit, onOpe
         MenuSheet(
             tab,
             onDismiss = { menu = false },
-            onNewTab = { browser.open() },
+            onNewTab = { val _ = browser.open() },
             onReload = { if (tab.loading) browser.stop() else browser.reload() },
             onOpen = onOpen,
         )
@@ -261,7 +261,7 @@ private fun AddressPill(tab: BrowserTab, onEdit: () -> Unit, modifier: Modifier 
     }
 }
 
-const val ADDRESS_HINT = "Search or type an address"
+public const val ADDRESS_HINT: String = "Search or type an address"
 
 /** The address being edited: the exact address, selected, with the keyboard's Go. */
 @Composable
@@ -367,7 +367,7 @@ private fun TabsSheet(browser: Browser, tabs: List<BrowserTab>, active: String?,
         Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp)) {
             Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Eyebrow("Open tabs", Modifier.weight(1f))
-                Keycap("New tab", { browser.open(); onDismiss() }, icon = Icons.Outlined.Add)
+                Keycap("New tab", { val _ = browser.open(); onDismiss() }, icon = Icons.Outlined.Add)
             }
             LazyColumn(Modifier.fillMaxWidth().heightIn(max = 420.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 items(tabs, key = { it.id }) { tab ->

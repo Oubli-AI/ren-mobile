@@ -88,12 +88,18 @@ android {
 }
 
 kotlin {
+    explicitApi()
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
         allWarningsAsErrors.set(true)
         extraWarnings.set(true)
         progressiveMode.set(true)
-        freeCompilerArgs.add("-Xjsr305=strict")
+        freeCompilerArgs.addAll(
+            "-Xjsr305=strict",
+            "-Xjspecify-annotations=strict",
+            "-Xreturn-value-checker=full",
+            "-Xconsistent-data-class-copy-visibility",
+        )
     }
 }
 

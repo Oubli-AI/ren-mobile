@@ -15,9 +15,9 @@ import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 /** Reminders the user (through Ren) sets on the phone, delivered by WorkManager even after a reboot. */
-class Reminders(private val context: Context, private val store: ReminderStore) {
+public class Reminders(private val context: Context, private val store: ReminderStore) {
 
-    fun create(text: String, at: String): ToolResult {
+    public fun create(text: String, at: String): ToolResult {
         val due = Times.parse(at) ?: return ToolResult.error("Can't read the time \"$at\"; use ISO-8601 like 2026-10-27T09:00.")
         val now = System.currentTimeMillis()
         if (due < now - 60_000) return ToolResult.error("That time (${Times.format(due)}) has already passed.")
@@ -35,30 +35,30 @@ class Reminders(private val context: Context, private val store: ReminderStore) 
         return ToolResult.ok(JSONObject().put("id", id).put("text", text).put("at", Times.format(due)))
     }
 
-    fun list(): ToolResult = ToolResult.ok(JSONObject().put("reminders", store.all()))
+    public fun list(): ToolResult = ToolResult.ok(JSONObject().put("reminders", store.all()))
 
-    fun cancel(id: String): ToolResult {
+    public fun cancel(id: String): ToolResult {
         if (!store.remove(id)) return ToolResult.error("No reminder with id $id.")
         WorkManager.getInstance(context).cancelUniqueWork(work(id))
         return ToolResult.ok(JSONObject().put("cancelled", id))
     }
 
-    companion object {
-        const val TAG = "ren-reminder"
-        fun work(id: String) = "reminder-$id"
+    public companion object {
+        public const val TAG: String = "ren-reminder"
+        public fun work(id: String): String = "reminder-$id"
     }
 }
 
 /** Pending reminders, persisted as one JSON file. */
-class ReminderStore(private val file: File) {
+public class ReminderStore(private val file: File) {
     @Synchronized
-    fun put(id: String, text: String, at: Long) = save(load().put(id, JSONObject().put("text", text).put("at", at)))
+    public fun put(id: String, text: String, at: Long): Unit = save(load().put(id, JSONObject().put("text", text).put("at", at)))
 
     @Synchronized
-    fun get(id: String): JSONObject? = load().optJSONObject(id)
+    public fun get(id: String): JSONObject? = load().optJSONObject(id)
 
     @Synchronized
-    fun remove(id: String): Boolean {
+    public fun remove(id: String): Boolean {
         val all = load()
         if (!all.has(id)) return false
         all.remove(id)
@@ -67,7 +67,7 @@ class ReminderStore(private val file: File) {
     }
 
     @Synchronized
-    fun all(): JSONArray {
+    public fun all(): JSONArray {
         val all = load()
         val rows = all.keys().asSequence().map { id ->
             val r = all.getJSONObject(id)
@@ -89,19 +89,19 @@ class ReminderStore(private val file: File) {
     }
 }
 
-class ReminderWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
+public class ReminderWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         val id = inputData.getString(ID) ?: return Result.success()
         val store = ReminderStore(File(applicationContext.filesDir, ReminderStoreFile))
         val reminder = store.get(id) ?: return Result.success()
         Notifications.reminder(applicationContext, id, reminder.optString("text"))
-        store.remove(id)
+        val _ = store.remove(id)
         return Result.success()
     }
 
-    companion object {
-        const val ID = "id"
+    public companion object {
+        public const val ID: String = "id"
     }
 }
 
-const val ReminderStoreFile = "reminders.json"
+public const val ReminderStoreFile: String = "reminders.json"

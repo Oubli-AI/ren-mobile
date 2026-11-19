@@ -42,8 +42,8 @@ import okhttp3.OkHttpClient
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 
-class RenApp : Application() {
-    lateinit var runtime: RenRuntime
+public class RenApp : Application() {
+    public lateinit var runtime: RenRuntime
         private set
 
     override fun onCreate() {
@@ -54,22 +54,22 @@ class RenApp : Application() {
     }
 }
 
-val Context.ren: RenRuntime get() = (applicationContext as RenApp).runtime
+public val Context.ren: RenRuntime get() = (applicationContext as RenApp).runtime
 
 /**
  * The rendered [state], the robot's command stream, the phone tools, the agents ([agent], ElevenLabs or Strands) and the
  * approvals they ask for with `request_approval`.
  */
-class RenRuntime(private val app: Context) {
-    val settings = Settings(app)
+public class RenRuntime(private val app: Context) {
+    public val settings: Settings = Settings(app)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val lock = Any()
 
     private val _state = MutableStateFlow(RenState())
-    val state: StateFlow<RenState> = _state.asStateFlow()
+    public val state: StateFlow<RenState> = _state.asStateFlow()
 
     private val _robot = MutableSharedFlow<RobotCommand>(extraBufferCapacity = 256)
-    val robot: SharedFlow<RobotCommand> = _robot.asSharedFlow()
+    public val robot: SharedFlow<RobotCommand> = _robot.asSharedFlow()
 
     @Volatile
     private var shown = false
@@ -78,7 +78,7 @@ class RenRuntime(private val app: Context) {
      * Whether Ren's screen is in front of the user (lets device tools open apps directly). Coming to the front
      * clears the approval notifications, since the sheet shows those approvals.
      */
-    var visible: Boolean
+    public var visible: Boolean
         get() = shown
         set(value) {
             val appeared = value && !shown
@@ -86,8 +86,8 @@ class RenRuntime(private val app: Context) {
             if (appeared) Notifications.clearApprovals(app, state.value.approvals.map { it.id })
         }
 
-    val reminders = Reminders(app, ReminderStore(File(app.filesDir, ReminderStoreFile)))
-    val tools = DeviceTools(app, reminders) { visible }
+    public val reminders: Reminders = Reminders(app, ReminderStore(File(app.filesDir, ReminderStoreFile)))
+    public val tools: DeviceTools = DeviceTools(app, reminders) { visible }
 
     /** Approvals the agents are waiting on, by request id. */
     private val pending = ConcurrentHashMap<String, CompletableDeferred<ApprovalAnswer>>()
@@ -95,26 +95,26 @@ class RenRuntime(private val app: Context) {
     private val http = OkHttpClient()
 
     /** Brave Search for the agents' search tools, with the keys in Settings. */
-    val search = BraveSearch(http, settings::braveSearchKey, settings::braveAnswersKey)
+    public val search: BraveSearch = BraveSearch(http, settings::braveSearchKey, settings::braveAnswersKey)
 
     /** [search] for the agents' search tools, which they get only while `braveSearchTools` is on ([BuildConfig.BRAVE_SEARCH_TOOLS]). */
     private val braveSearch: (suspend (SearchQuery) -> Result<SearchResults>)? = if (BuildConfig.BRAVE_SEARCH_TOOLS) search::search else null
 
     /** The browser's tabs. */
-    val favorites = Favorites({ settings.favorites }, { settings.favorites = it })
-    val browser = Browser(app, BrowserStore({ settings.browserTabs }, { settings.browserTabs = it }), favorites) { settings.geminiToken }
+    public val favorites: Favorites = Favorites({ settings.favorites }, { settings.favorites = it })
+    public val browser: Browser = Browser(app, BrowserStore({ settings.browserTabs }, { settings.browserTabs = it }), favorites) { settings.geminiToken }
 
     /** Which apps the user used, for the Context Agent. */
-    val appUsage = AppUsage(app)
+    public val appUsage: AppUsage = AppUsage(app)
 
     /**
      * ren desktop's Context widget and Context Agent, on the ren account the pages are signed in to: it hears the
      * browser's pages, the apps the user used and what Ren did on the phone.
      */
-    val contextWidget = ContextWidget(app, { settings.geminiToken }, ::phoneActivity, { settings.phoneReportedAt }, { settings.phoneReportedAt = it })
+    public val contextWidget: ContextWidget = ContextWidget(app, { settings.geminiToken }, ::phoneActivity, { settings.phoneReportedAt }, { settings.phoneReportedAt = it })
 
     /** The apps OpenCode built for the ren account, on Home. */
-    val applications = Applications(app, http) { settings.geminiToken }
+    public val applications: Applications = Applications(app, http) { settings.geminiToken }
 
     init {
         browser.visited = contextWidget::visit
@@ -132,41 +132,41 @@ class RenRuntime(private val app: Context) {
         state.value.log.filter { it.at in since until until && it.kind in PHONE_ACTIONS }.map { PhoneAction(Plain.log(it.kind, it.text), it.at) }
 
     /** Result thumbnails and images, cached in memory only. */
-    val images = ImageLoader(http)
+    public val images: ImageLoader = ImageLoader(http)
 
     private val elevenLabs = RenAgent(app, settings, tools::run, ::approve, ::update, { _robot.tryEmit(it) }, scope, braveSearch)
     /** Gemini, NVIDIA NIM, Mistral and Telnyx in Strands on the workspace VM. */
-    val strands = StrandsAgent(app, settings, http, ::update, { _robot.tryEmit(it) }, scope)
+    public val strands: StrandsAgent = StrandsAgent(app, settings, http, ::update, { _robot.tryEmit(it) }, scope)
 
     /** The agents for the provider chosen in Settings. */
-    val agent: Assistant
+    public val agent: Assistant
         get() = when (settings.provider) {
             Provider.ElevenLabs -> elevenLabs
             Provider.Gemini, Provider.Nim, Provider.Mistral, Provider.Telnyx, Provider.Xai -> strands
         }
 
     /** Switches provider; the conversation ends, and the next one starts with [provider]. */
-    fun choose(provider: Provider) {
+    public fun choose(provider: Provider) {
         if (provider == settings.provider) return
         newChat()
         settings.provider = provider
     }
 
     /** Switches the text model (null: the provider's default) and its reasoning; the next conversation uses them. */
-    fun chooseModel(provider: Provider, model: String?) {
+    public fun chooseModel(provider: Provider, model: String?) {
         if (model == settings.textModel(provider)) return
         if (provider == settings.provider) agent.stop()
         settings.setTextModel(provider, model)
     }
 
-    fun chooseEffort(provider: Provider, effort: String) {
+    public fun chooseEffort(provider: Provider, effort: String) {
         if (effort == settings.effort(provider)) return
         if (provider == settings.provider) agent.stop()
         settings.setEffort(provider, effort)
     }
 
     /** The phone tools, approvals, searches and the browser's tools as an MCP server, served through Ren's hub ([hub]). */
-    val phoneServer = PhoneMcpServer(
+    public val phoneServer: PhoneMcpServer = PhoneMcpServer(
         BuildConfig.VERSION_NAME,
         browser,
         level = { settings.searchLevel },
@@ -176,17 +176,17 @@ class RenRuntime(private val app: Context) {
     )
 
     /** The phone's link to Ren's hub, where it serves [phoneServer] and reaches ren desktop. */
-    val hub = HubLink(scope, { settings.hubUrl }, { settings.geminiToken }, BuildConfig.VERSION_NAME) { phoneServer.build() }
+    public val hub: HubLink = HubLink(scope, { settings.hubUrl }, { settings.geminiToken }, BuildConfig.VERSION_NAME) { phoneServer.build() }
 
     init {
         RenCallScreening.onIncoming = { number -> note("call", "Incoming call from ${number.ifBlank { "unknown number" }}") }
     }
 
     /** Sends [text] to the text agent; returns the id of the user's message. */
-    fun ask(text: String): String = agent.sendText(text)
+    public fun ask(text: String): String = agent.sendText(text)
 
     /** Answers a waiting approval; "Always allow" grants its action to every session from now on. */
-    fun answer(id: String, answer: ApprovalAnswer) {
+    public fun answer(id: String, answer: ApprovalAnswer) {
         val request = state.value.approvals.firstOrNull { it.id == id } ?: return
         if (answer.approved && answer.remember) settings.grant(request.action, true)
         pending[id]?.complete(answer)
@@ -197,7 +197,7 @@ class RenRuntime(private val app: Context) {
      * Shows [request] on the approval sheet (and as a notification while Ren is in the background) and waits for
      * the user. When the agent stops waiting first, the request leaves the sheet.
      */
-    suspend fun approve(request: ApprovalRequest): ApprovalAnswer {
+    public suspend fun approve(request: ApprovalRequest): ApprovalAnswer {
         val answer = CompletableDeferred<ApprovalAnswer>()
         pending[request.id] = answer
         var answered = false
@@ -218,16 +218,16 @@ class RenRuntime(private val app: Context) {
     }
 
     /** Ends the conversation: its session stops and the chat clears, back to Ren on its stage. */
-    fun newChat() {
+    public fun newChat() {
         agent.stop()
         strands.newConversation()
         update { it.copy(messages = emptyList(), activity = Activity.Idle, lastError = null) }
     }
 
-    fun listening(on: Boolean) = update { it.copy(activity = if (on) Activity.Listening else Activity.Idle) }
+    public fun listening(on: Boolean): Unit = update { it.copy(activity = if (on) Activity.Listening else Activity.Idle) }
 
     /** Replays the robot's full state (after the page loads). */
-    fun robotSnapshot(): List<RobotCommand> = RobotDirector.diff(null, state.value)
+    public fun robotSnapshot(): List<RobotCommand> = RobotDirector.diff(null, state.value)
 
     private fun note(kind: String, text: String) = update { RenStore.note(it, now(), kind, text) }
 

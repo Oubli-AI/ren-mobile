@@ -24,9 +24,9 @@ import org.json.JSONObject
 import java.util.UUID
 
 /** SMS, contacts, the call log and placing calls. */
-class Messaging(private val context: Context) {
+public class Messaging(private val context: Context) {
 
-    suspend fun send(to: String, body: String): ToolResult {
+    public suspend fun send(to: String, body: String): ToolResult {
         val number = to.trim()
         if (Phones.digits(number).length < 3) return ToolResult.error("\"$to\" is not a phone number. Look the contact up first.")
         val sms = if (Build.VERSION.SDK_INT >= 31) {
@@ -62,7 +62,7 @@ class Messaging(private val context: Context) {
         }
     }
 
-    suspend fun list(contact: String?, limit: Int): ToolResult = withContext(Dispatchers.IO) {
+    public suspend fun list(contact: String?, limit: Int): ToolResult = withContext(Dispatchers.IO) {
         val want = contact?.let { Phones.digits(it).takeLast(7) }?.takeIf { it.length >= 4 }
         val nameFilter = contact?.takeIf { want == null }?.lowercase()
         val rows = JSONArray()
@@ -91,7 +91,7 @@ class Messaging(private val context: Context) {
         ToolResult.ok(JSONObject().put("messages", rows).put("count", rows.length()))
     }
 
-    suspend fun contacts(query: String, limit: Int): ToolResult = withContext(Dispatchers.IO) {
+    public suspend fun contacts(query: String, limit: Int): ToolResult = withContext(Dispatchers.IO) {
         val byId = LinkedHashMap<Long, JSONObject>()
         context.contentResolver.query(
             Uri.withAppendedPath(ContactsContract.CommonDataKinds.Phone.CONTENT_FILTER_URI, Uri.encode(query)),
@@ -134,7 +134,7 @@ class Messaging(private val context: Context) {
         ToolResult.ok(JSONObject().put("contacts", JSONArray(byId.values.take(limit))))
     }
 
-    suspend fun recentCalls(limit: Int): ToolResult = withContext(Dispatchers.IO) {
+    public suspend fun recentCalls(limit: Int): ToolResult = withContext(Dispatchers.IO) {
         val rows = JSONArray()
         context.contentResolver.query(
             CallLog.Calls.CONTENT_URI,
@@ -155,7 +155,7 @@ class Messaging(private val context: Context) {
         ToolResult.ok(JSONObject().put("calls", rows))
     }
 
-    fun call(number: String): ToolResult {
+    public fun call(number: String): ToolResult {
         if (Phones.digits(number).length < 3) return ToolResult.error("\"$number\" is not a phone number.")
         val telecom = context.getSystemService(TelecomManager::class.java)
             ?: return ToolResult.error("This phone cannot place calls.")
@@ -195,11 +195,11 @@ class Messaging(private val context: Context) {
         else -> "error $code"
     }
 
-    companion object {
+    public companion object {
         private const val SEND_TIMEOUT_MS = 60_000L
     }
 }
 
-object Phones {
-    fun digits(value: String): String = value.filter { it.isDigit() }
+public object Phones {
+    public fun digits(value: String): String = value.filter { it.isDigit() }
 }

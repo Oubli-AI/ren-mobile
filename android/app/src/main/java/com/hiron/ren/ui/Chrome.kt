@@ -65,7 +65,7 @@ private const val BRAND = "Ren"
  * key that closes the screen back to the browser.
  */
 @Composable
-fun HudHeader(state: RenState, unit: String, rule: Boolean = true, onClose: (() -> Unit)? = null) {
+public fun HudHeader(state: RenState, unit: String, rule: Boolean = true, onClose: (() -> Unit)? = null) {
     val p = LocalPalette.current
     val status = status(state, p)
     // At large text sizes the screen's name gives the status line its room rather than being cut short.
@@ -115,7 +115,7 @@ private const val LOGOTYPE_HEIGHT_EM = 0.554f
 
 /** A status pill: a dot and words that settle softly when they change. */
 @Composable
-fun Capsule(text: String, color: Color, modifier: Modifier = Modifier) {
+public fun Capsule(text: String, color: Color, modifier: Modifier = Modifier) {
     val p = LocalPalette.current
     val pill = RoundedCornerShape(50)
     Row(

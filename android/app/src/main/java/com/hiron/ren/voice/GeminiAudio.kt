@@ -20,7 +20,7 @@ import kotlin.math.sqrt
  * PCM at 24 kHz played as it arrives, the formats the Live API takes and sends. The voice-communication source and
  * usage turn on the phone's echo cancellation, so Ren doesn't hear itself.
  */
-class GeminiAudio(private val scope: CoroutineScope) {
+public class GeminiAudio(private val scope: CoroutineScope) {
     private var record: AudioRecord? = null
     private var track: AudioTrack? = null
     private var reading: Job? = null
@@ -32,7 +32,7 @@ class GeminiAudio(private val scope: CoroutineScope) {
      * from 0 to 1 as it plays, for the stage.
      */
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)
-    fun start(send: (ByteArray) -> Unit, loudness: (Float) -> Unit) {
+    public fun start(send: (ByteArray) -> Unit, loudness: (Float) -> Unit) {
         val size = maxOf(AudioRecord.getMinBufferSize(IN_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT), CHUNK)
         val mic = AudioRecord(MediaRecorder.AudioSource.VOICE_COMMUNICATION, IN_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, size * 2)
         val speaker = AudioTrack.Builder()
@@ -62,12 +62,12 @@ class GeminiAudio(private val scope: CoroutineScope) {
     }
 
     /** Plays [pcm] after what is already queued. */
-    fun play(pcm: ByteArray) {
+    public fun play(pcm: ByteArray) {
         queued.trySend(pcm)
     }
 
     /** Drops what hasn't played yet, for a barge-in. */
-    fun clear() {
+    public fun clear() {
         while (queued.tryReceive().isSuccess) continue
         val speaker = track ?: return
         speaker.pause()
@@ -75,25 +75,25 @@ class GeminiAudio(private val scope: CoroutineScope) {
         speaker.play()
     }
 
-    fun stop() {
+    public fun stop() {
         queued.close()
         reading?.cancel()
         reading = null
         writing?.cancel()
         writing = null
-        record?.run { runCatching { stop() }; release() }
+        record?.run { val _ = runCatching { stop() }; release() }
         record = null
-        track?.run { runCatching { stop() }; release() }
+        track?.run { val _ = runCatching { stop() }; release() }
         track = null
     }
 
-    companion object {
-        const val IN_RATE = 16_000
-        const val OUT_RATE = 24_000
+    public companion object {
+        public const val IN_RATE: Int = 16_000
+        public const val OUT_RATE: Int = 24_000
         private const val CHUNK = IN_RATE / 10 * 2
 
         /** The root mean square of 16-bit little-endian samples, from 0 to 1. */
-        fun level(pcm: ByteArray): Float {
+        public fun level(pcm: ByteArray): Float {
             val samples = pcm.size / 2
             if (samples == 0) return 0f
             var sum = 0.0

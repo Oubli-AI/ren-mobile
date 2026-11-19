@@ -11,9 +11,9 @@ import org.json.JSONObject
 import java.util.TimeZone
 
 /** The phone's calendars through [CalendarContract]. */
-class CalendarTool(private val context: Context) {
+public class CalendarTool(private val context: Context) {
 
-    suspend fun list(days: Int, query: String?): ToolResult = withContext(Dispatchers.IO) {
+    public suspend fun list(days: Int, query: String?): ToolResult = withContext(Dispatchers.IO) {
         val start = System.currentTimeMillis() - HOUR
         val end = start + days.coerceIn(1, 90) * DAY
         val uri = CalendarContract.Instances.CONTENT_URI.buildUpon().also {
@@ -54,7 +54,7 @@ class CalendarTool(private val context: Context) {
         ToolResult.ok(JSONObject().put("events", rows))
     }
 
-    suspend fun create(title: String, start: String, end: String?, location: String?, description: String?): ToolResult =
+    public suspend fun create(title: String, start: String, end: String?, location: String?, description: String?): ToolResult =
         withContext(Dispatchers.IO) {
             val begin = Times.parse(start) ?: return@withContext ToolResult.error("Can't read start time \"$start\"; use ISO-8601.")
             val finish = end?.let { Times.parse(it) ?: return@withContext ToolResult.error("Can't read end time \"$end\".") }
@@ -90,7 +90,7 @@ class CalendarTool(private val context: Context) {
         "${CalendarContract.Calendars.IS_PRIMARY} DESC",
     )?.use { c -> if (c.moveToFirst()) c.getLong(0) else null }
 
-    companion object {
+    public companion object {
         private const val HOUR = 3_600_000L
         private const val DAY = 24 * HOUR
     }

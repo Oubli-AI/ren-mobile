@@ -3,7 +3,7 @@ package com.hiron.ren.browser
 import android.net.Uri
 
 /** How hard a search works, as ren's search offers it (its `SEARCH_LEVELS`); [wire] is the level's name. */
-enum class SearchLevel(val wire: String, val label: String) {
+public enum class SearchLevel(public val wire: String, public val label: String) {
     Fast("fast", "Fast"),
     Balanced("low", "Balanced"),
     Deep("medium", "Deep"),
@@ -11,10 +11,10 @@ enum class SearchLevel(val wire: String, val label: String) {
     Max("xhigh", "Max"),
     ;
 
-    companion object {
-        val Default = Balanced
+    public companion object {
+        public val Default: SearchLevel = Balanced
 
-        fun of(wire: String?): SearchLevel? = entries.firstOrNull { it.wire == wire }
+        public fun of(wire: String?): SearchLevel? = entries.firstOrNull { it.wire == wire }
     }
 }
 
@@ -22,7 +22,7 @@ enum class SearchLevel(val wire: String, val label: String) {
  * ren desktop's destinations after Home, as its sidebar lists them (`DESTINATIONS` in `navigation/destinations.ts`);
  * each is Ren's page at [address].
  */
-enum class Destination {
+public enum class Destination {
     Discover,
     Research,
     Execute,
@@ -32,11 +32,11 @@ enum class Destination {
     Build,
     ;
 
-    val id = name.lowercase()
-    val address = "ren://$id"
+    public val id: String = name.lowercase()
+    public val address: String = "ren://$id"
 
-    companion object {
-        fun of(url: String): Destination? = entries.firstOrNull { it.address == url }
+    public companion object {
+        public fun of(url: String): Destination? = entries.firstOrNull { it.address == url }
     }
 }
 
@@ -44,8 +44,8 @@ enum class Destination {
  * What the address bar does with what was typed, the way ren desktop's does (its `UrlBar.tsx` and
  * `navigable-url.ts`): an address loads, anything else is a search, and Ren's own pages are `ren://` addresses.
  */
-object Addresses {
-    const val HOME = "ren://home"
+public object Addresses {
+    public const val HOME: String = "ren://home"
     private const val SEARCH = "ren://search"
 
     private val HAS_SCHEME = Regex("^[a-z][a-z\\d+.-]*://", RegexOption.IGNORE_CASE)
@@ -60,7 +60,7 @@ object Addresses {
      * The URL to load for an address typed without a scheme: `http://` for localhost and IP literals, `https://` for
      * everything else. An address that already names a scheme comes back unchanged.
      */
-    fun toNavigableUrl(input: String): String {
+    public fun toNavigableUrl(input: String): String {
         val address = input.trim()
         if (address.isEmpty() || HAS_SCHEME.containsMatchIn(address) || SCHEME_WITHOUT_SLASHES.containsMatchIn(address)) return address
         // A scheme-relative address (`//example.com/a`) only lacks the scheme itself.
@@ -69,22 +69,22 @@ object Addresses {
     }
 
     /** Whether what was typed is an address rather than a search phrase. */
-    fun looksLikeUrl(value: String): Boolean = when {
+    public fun looksLikeUrl(value: String): Boolean = when {
         NAMED_SCHEME.containsMatchIn(value) -> true
         LOCALHOST_ADDRESS.matches(value) -> true
         IP_ADDRESS.matches(value) -> true
         else -> value.contains('.') && !WHITESPACE.containsMatchIn(value)
     }
 
-    fun searchUrl(query: String, level: SearchLevel): String = "$SEARCH?q=${Uri.encode(query)}&level=${level.wire}"
+    public fun searchUrl(query: String, level: SearchLevel): String = "$SEARCH?q=${Uri.encode(query)}&level=${level.wire}"
 
     /** The query of a `ren://search` address; null for any other address. */
-    fun searchQuery(url: String): String? = if (url.startsWith(SEARCH)) Uri.parse(url).getQueryParameter("q").orEmpty() else null
+    public fun searchQuery(url: String): String? = if (url.startsWith(SEARCH)) Uri.parse(url).getQueryParameter("q").orEmpty() else null
 
-    fun searchLevel(url: String): SearchLevel? = if (url.startsWith(SEARCH)) SearchLevel.of(Uri.parse(url).getQueryParameter("level")) else null
+    public fun searchLevel(url: String): SearchLevel? = if (url.startsWith(SEARCH)) SearchLevel.of(Uri.parse(url).getQueryParameter("level")) else null
 
     /** Where typed text goes: an address as typed (made loadable), or the search page for a phrase. */
-    fun resolve(typed: String, level: SearchLevel): String {
+    public fun resolve(typed: String, level: SearchLevel): String {
         val text = typed.trim()
         return when {
             text.isEmpty() -> ""
@@ -98,7 +98,7 @@ object Addresses {
      * What the address bar shows at rest: the page's identity rather than its plumbing. A search reads as its query
      * and an https page as its host and path; focus shows the exact address.
      */
-    fun resting(url: String): String {
+    public fun resting(url: String): String {
         val query = searchQuery(url)
         if (!query.isNullOrEmpty()) return query
         if (url == HOME) return ""
@@ -112,5 +112,5 @@ object Addresses {
     }
 
     /** Whether the page came over TLS or is one of Ren's own. */
-    fun secure(url: String): Boolean = url.startsWith("https://") || url.startsWith("ren://")
+    public fun secure(url: String): Boolean = url.startsWith("https://") || url.startsWith("ren://")
 }

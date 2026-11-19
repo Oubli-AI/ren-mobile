@@ -23,7 +23,7 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 /** A kind of Brave search the agents' search tools run; [wire] is its name. */
-enum class SearchKind(val wire: String, val label: String, val noun: String) {
+public enum class SearchKind(public val wire: String, public val label: String, public val noun: String) {
     Web("web", "Web", "web"),
     News("news", "News", "news"),
     Images("images", "Images", "image"),
@@ -33,30 +33,30 @@ enum class SearchKind(val wire: String, val label: String, val noun: String) {
     Answers("answers", "Answer", "answer"),
     ;
 
-    companion object {
-        fun of(wire: String?): SearchKind? = entries.firstOrNull { it.wire == wire }
+    public companion object {
+        public fun of(wire: String?): SearchKind? = entries.firstOrNull { it.wire == wire }
     }
 }
 
 /** Brave's recency filter. */
-enum class Freshness(val wire: String) {
+public enum class Freshness(public val wire: String) {
     Day("pd"), Week("pw"), Month("pm"), Year("py");
 
-    companion object {
-        fun of(wire: String?): Freshness? = entries.firstOrNull { it.wire == wire }
+    public companion object {
+        public fun of(wire: String?): Freshness? = entries.firstOrNull { it.wire == wire }
     }
 }
 
-data class LatLng(val lat: Double, val lng: Double)
+public data class LatLng(val lat: Double, val lng: Double)
 
 /** One result; every kind has a title and the page it came from. */
-sealed interface SearchItem {
-    val title: String
-    val url: String
+public sealed interface SearchItem {
+    public val title: String
+    public val url: String
 }
 
 /** A web page, a news article ([breaking]) or a page's extracted text ([snippets], from `context`). */
-data class WebItem(
+public data class WebItem(
     override val title: String,
     override val url: String,
     val description: String?,
@@ -68,7 +68,7 @@ data class WebItem(
     val snippets: List<String> = emptyList(),
 ) : SearchItem
 
-data class ImageItem(
+public data class ImageItem(
     override val title: String,
     /** The page the image is on. */
     override val url: String,
@@ -80,7 +80,7 @@ data class ImageItem(
     val source: String?,
 ) : SearchItem
 
-data class VideoItem(
+public data class VideoItem(
     override val title: String,
     override val url: String,
     val description: String?,
@@ -94,11 +94,11 @@ data class VideoItem(
     val youtubeId: String?,
 ) : SearchItem
 
-data class Hours(val opens: String, val closes: String)
+public data class Hours(val opens: String, val closes: String)
 
-data class Distance(val value: Double, val units: String)
+public data class Distance(val value: Double, val units: String)
 
-data class PlaceItem(
+public data class PlaceItem(
     val id: String?,
     override val title: String,
     override val url: String,
@@ -118,10 +118,10 @@ data class PlaceItem(
 ) : SearchItem
 
 /** A source Brave's answer cites; the answer marks it as `[number]`. */
-data class Citation(val number: Int, val url: String, val snippet: String?)
+public data class Citation(val number: Int, val url: String, val snippet: String?)
 
 /** One search's results; [altered] is the query Brave actually ran when it corrected it. */
-data class SearchResults(
+public data class SearchResults(
     val kind: SearchKind,
     val query: String,
     val altered: String?,
@@ -132,15 +132,15 @@ data class SearchResults(
 )
 
 /** Why a search gave no results, in words for the user and the agent. */
-sealed class SearchError(override val message: String) : Exception(message) {
-    class Busy(val retryAfter: Int?) : SearchError("Search is busy. Try again in a moment.")
-    data object NotSetUp : SearchError("Search isn't set up yet: add the Brave key in Settings.")
-    data object Offline : SearchError("Ren can't reach Brave Search right now. Check your connection.")
-    class Failed(message: String) : SearchError(message)
+public sealed class SearchError(override val message: String) : Exception(message) {
+    public class Busy(public val retryAfter: Int?) : SearchError("Search is busy. Try again in a moment.")
+    public data object NotSetUp : SearchError("Search isn't set up yet: add the Brave key in Settings.")
+    public data object Offline : SearchError("Ren can't reach Brave Search right now. Check your connection.")
+    public class Failed(message: String) : SearchError(message)
 }
 
 /** What to search for; [count], [freshness], [location] and [maxTokens] fall back to Brave's defaults here. */
-data class SearchQuery(
+public data class SearchQuery(
     val kind: SearchKind,
     val q: String,
     val count: Int? = null,
@@ -156,11 +156,11 @@ data class SearchQuery(
  * Upstream facts come from Brave's API reference (https://api-dashboard.search.brave.com/llms.txt): the base URL and
  * `X-Subscription-Token` header, the parameters and their ranges, and the response fields.
  */
-class BraveSearch(http: OkHttpClient, private val searchKey: () -> String, private val answersKey: () -> String) {
+public class BraveSearch(http: OkHttpClient, private val searchKey: () -> String, private val answersKey: () -> String) {
     private val searching = http.newBuilder().callTimeout(SEARCH_TIMEOUT_S, TimeUnit.SECONDS).build()
     private val answering = http.newBuilder().callTimeout(ANSWERS_TIMEOUT_S, TimeUnit.SECONDS).build()
 
-    suspend fun search(query: SearchQuery): Result<SearchResults> {
+    public suspend fun search(query: SearchQuery): Result<SearchResults> {
         if (query.q.trim().length > QUERY_LIMIT) return Result.failure(SearchError.Failed("Keep the search under $QUERY_LIMIT characters."))
         val answers = query.kind == SearchKind.Answers
         val key = (if (answers) answersKey() else searchKey()).trim()
@@ -212,13 +212,13 @@ class BraveSearch(http: OkHttpClient, private val searchKey: () -> String, priva
             .post(body.toString().toRequestBody("application/json".toMediaType())).build()
     }
 
-    companion object {
-        const val BRAVE_API = "https://api.search.brave.com/res"
+    public companion object {
+        public const val BRAVE_API: String = "https://api.search.brave.com/res"
 
         /** Seconds for one whole Brave call; the ElevenLabs agents cut a client tool at 20 s. */
-        const val SEARCH_TIMEOUT_S = 10L
-        const val ANSWERS_TIMEOUT_S = 12L
-        const val QUERY_LIMIT = 400
+        public const val SEARCH_TIMEOUT_S: Long = 10L
+        public const val ANSWERS_TIMEOUT_S: Long = 12L
+        public const val QUERY_LIMIT: Int = 400
 
         private const val UNANSWERED = "Brave Search didn't answer properly."
 
@@ -337,7 +337,7 @@ internal object BraveCodec {
             val number = count(raw.opt("number"))
             val url = text(raw.opt("url"))
             if (number == null || url == null) return@replace ""
-            citations.getOrPut(number) { Citation(number, url, text(raw.opt("snippet"))?.take(CITATION_CHARS)) }
+            val _ = citations.getOrPut(number) { Citation(number, url, text(raw.opt("snippet"))?.take(CITATION_CHARS)) }
             "[$number]"
         }
         return text(swapped) to citations.values.sortedBy { it.number }

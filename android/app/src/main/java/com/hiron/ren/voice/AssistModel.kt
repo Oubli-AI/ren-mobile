@@ -11,7 +11,7 @@ import com.hiron.ren.ui.AssistUi
  * What the assistant overlay knows that [RenState] does not: the microphone, the phone's lock, and which
  * request is this overlay's own.
  */
-data class AssistLocal(
+public data class AssistLocal(
     val listening: Boolean = false,
     /** The words heard so far. */
     val partial: String = "",
@@ -30,13 +30,13 @@ data class AssistLocal(
 )
 
 /** The overlay's pure logic: what the recognizer reports, and what the panel shows for it and for Ren's state. */
-object AssistModel {
-    const val DIDNT_CATCH = "I didn't catch that. Tap the mic and try again."
-    const val NO_RECOGNIZER = "This phone has no speech recognizer Ren can use. Type instead."
-    const val MIC_NOTE = "Ren needs the microphone to hear you here. Allow it once in the app, or type instead."
-    const val LOCKED_NOTE = "Unlock your phone to talk to Ren. It can read and send your messages, so it waits until the phone is yours."
+public object AssistModel {
+    public const val DIDNT_CATCH: String = "I didn't catch that. Tap the mic and try again."
+    public const val NO_RECOGNIZER: String = "This phone has no speech recognizer Ren can use. Type instead."
+    public const val MIC_NOTE: String = "Ren needs the microphone to hear you here. Allow it once in the app, or type instead."
+    public const val LOCKED_NOTE: String = "Unlock your phone to talk to Ren. It can read and send your messages, so it waits until the phone is yours."
 
-    fun ui(local: AssistLocal, state: RenState): AssistUi {
+    public fun ui(local: AssistLocal, state: RenState): AssistUi {
         val base = AssistUi(AssistPhase.Ready, typing = local.typing, status = "READY")
         return when {
             local.locked -> AssistUi(AssistPhase.Locked, status = "LOCKED", note = LOCKED_NOTE)
@@ -73,15 +73,15 @@ object AssistModel {
     }
 
     /** Keeps the last words heard when a partial result comes back empty. */
-    fun partial(local: AssistLocal, results: List<String>?): AssistLocal =
+    public fun partial(local: AssistLocal, results: List<String>?): AssistLocal =
         results?.firstOrNull { it.isNotBlank() }?.let { local.copy(partial = it.trim()) } ?: local
 
     /** The request to send: the final result, or the last partial one if the recognizer ended without one. */
-    fun said(local: AssistLocal, results: List<String>?): String =
+    public fun said(local: AssistLocal, results: List<String>?): String =
         results?.firstOrNull { it.isNotBlank() }?.trim() ?: local.partial.trim()
 
     /** What the overlay shows after a [SpeechRecognizer] error code. */
-    fun misheard(local: AssistLocal, error: Int): AssistLocal {
+    public fun misheard(local: AssistLocal, error: Int): AssistLocal {
         val after = AssistLocal(typing = local.typing)
         return when (error) {
             SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> after.copy(needsMic = true)
@@ -95,5 +95,5 @@ object AssistModel {
     }
 
     /** Maps the recognizer's RMS dB (about -2 in silence to 10 when loud) to 0..1. */
-    fun level(rmsDb: Float): Float = ((rmsDb + 2f) / 12f).coerceIn(0f, 1f)
+    public fun level(rmsDb: Float): Float = ((rmsDb + 2f) / 12f).coerceIn(0f, 1f)
 }

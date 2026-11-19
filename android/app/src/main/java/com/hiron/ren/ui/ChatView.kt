@@ -51,12 +51,12 @@ import org.json.JSONObject
 import java.net.URI
 import kotlin.math.roundToInt
 
-const val CHAT_TAG = "chat"
+public const val CHAT_TAG: String = "chat"
 
 /** The agent panel's chat page in `assets/ren/web/panel/` (android/web/src/panel) and what it is sent (its `model.ts`). */
-object ChatPage {
-    const val ORIGIN = "https://appassets.androidplatform.net"
-    const val PAGE = "$ORIGIN/assets/ren/web/panel/index.html"
+public object ChatPage {
+    public const val ORIGIN: String = "https://appassets.androidplatform.net"
+    public const val PAGE: String = "$ORIGIN/assets/ren/web/panel/index.html"
 
     /** The image and video results a step shows: two rows of the page's grid. */
     private const val PICTURES = 6
@@ -65,11 +65,11 @@ object ChatPage {
     private val BUSY = setOf(Activity.Thinking, Activity.Searching, Activity.Working, Activity.Texting, Activity.Emailing, Activity.Waiting)
 
     /** The user's message is in and nothing of Ren's reply has arrived yet, or only its reasoning, still streaming. */
-    fun working(state: RenState): Boolean = state.activity in BUSY &&
+    public fun working(state: RenState): Boolean = state.activity in BUSY &&
         state.messages.lastOrNull()?.let { it.fromUser || (it.parts.isEmpty() && it.reasoning?.streaming == true) } == true
 
     /** `window.renChat.show`'s argument. */
-    fun payload(state: RenState): String = JSONObject()
+    public fun payload(state: RenState): String = JSONObject()
         .put("messages", JSONArray(state.messages.map(::message)))
         .put("working", working(state))
         .put("error", state.lastError ?: JSONObject.NULL)
@@ -165,7 +165,7 @@ object ChatPage {
         ?: "geo:0,0?q=${Uri.encode(place.address ?: place.title)}"
 
     /** The image result [n] (from 1) of the step [step]. */
-    fun image(state: RenState, step: String, n: Int): ImageItem? = state.messages.asSequence()
+    public fun image(state: RenState, step: String, n: Int): ImageItem? = state.messages.asSequence()
         .flatMap { it.parts }
         .filterIsInstance<ToolStep>()
         .firstOrNull { it.id == step }
@@ -178,7 +178,7 @@ object ChatPage {
  * Links open outside Ren; an image result opens full size here.
  */
 @Composable
-fun ChatView(state: RenState, modifier: Modifier = Modifier) {
+public fun ChatView(state: RenState, modifier: Modifier = Modifier) {
     val latest by rememberUpdatedState(state)
     val zoom = (LocalDensity.current.fontScale * 100).roundToInt()
     val background = LocalPalette.current.bg.toArgb()
@@ -239,7 +239,7 @@ private class ChatHost(context: Context, background: Int, private val onImage: (
                 loader.shouldInterceptRequest(request.url)
 
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
-                openExternally(view.context, request.url.toString())
+                val _ = openExternally(view.context, request.url.toString())
                 return true
             }
 

@@ -31,10 +31,10 @@ import java.io.IOException
 import java.util.UUID
 
 /** One model in a provider's live catalogue on the workspace VM. */
-data class TextModel(val id: String, val ownedBy: String)
+public data class TextModel(val id: String, val ownedBy: String)
 
 /** A provider's live models and the model the VM runs when none is chosen. */
-data class Catalogue(val models: List<TextModel>, val default: String)
+public data class Catalogue(val models: List<TextModel>, val default: String)
 
 /**
  * Ren's Strands agents on the workspace VM (`deploy/vm/gemini/app.py`), with the text model on Gemini, NVIDIA NIM,
@@ -43,7 +43,7 @@ data class Catalogue(val models: List<TextModel>, val default: String)
  * provider, text model and reasoning level, and the agents reach the phone tools, `request_approval` and the searches
  * through the phone's MCP server. The chat is built from Strands' events ([GeminiEvents]).
  */
-class StrandsAgent(
+public class StrandsAgent(
     private val context: Context,
     private val settings: Settings,
     private val http: OkHttpClient,
@@ -102,15 +102,15 @@ class StrandsAgent(
     }
 
     /** The next session starts a new chat on the VM instead of resuming this one. */
-    fun newConversation() {
+    public fun newConversation() {
         conversation = UUID.randomUUID().toString()
     }
 
-    override fun hasMicrophone() =
+    override fun hasMicrophone(): Boolean =
         ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
 
     /** The [provider]'s live models, as the VM lists them from the provider itself. */
-    suspend fun models(provider: Provider): Catalogue {
+    public suspend fun models(provider: Provider): Catalogue {
         val json = get(SERVICE.toHttpUrl().newBuilder().addPathSegment("models").addQueryParameter("provider", provider.strands).build())
         val models = json.getJSONArray("models")
         return Catalogue(
@@ -120,7 +120,7 @@ class StrandsAgent(
     }
 
     /** The reasoning levels [model] accepts, lowest first; empty when it has none to choose from. */
-    suspend fun efforts(provider: Provider, model: String): List<String> {
+    public suspend fun efforts(provider: Provider, model: String): List<String> {
         val url = SERVICE.toHttpUrl().newBuilder().addPathSegment("efforts")
             .addQueryParameter("provider", provider.strands).addQueryParameter("model", model).build()
         val efforts = get(url).getJSONArray("efforts")
@@ -233,12 +233,12 @@ class StrandsAgent(
     private fun failed(error: String) =
         update { RenStore.note(it.copy(lastError = error, activity = Activity.Failed), System.currentTimeMillis(), "error", error) }
 
-    companion object {
+    public companion object {
         /** The Strands service on the workspace VM, behind Caddy's bearer token. */
-        const val SERVICE = "https://rivet.ron-ai.dev/gemini"
-        const val ENDED_BY_WORKSPACE = "The agents on the workspace ended the conversation: "
+        public const val SERVICE: String = "https://rivet.ron-ai.dev/gemini"
+        public const val ENDED_BY_WORKSPACE: String = "The agents on the workspace ended the conversation: "
         private const val NORMAL_CLOSE = 1000
-        const val COULD_NOT_REACH = "Couldn't reach the agents on the workspace. Check your connection and try again."
+        public const val COULD_NOT_REACH: String = "Couldn't reach the agents on the workspace. Check your connection and try again."
         private const val NORMAL_CLOSURE = 1000
     }
 }

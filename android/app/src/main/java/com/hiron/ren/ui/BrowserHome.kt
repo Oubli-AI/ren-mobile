@@ -100,10 +100,10 @@ import com.hiron.ren.browser.SearchLevel
 import com.hiron.ren.core.RenRuntime
 import kotlinx.coroutines.launch
 
-const val HOME_SEARCH_TAG = "home-search"
-const val HOME_SEARCH_HINT = "Ask me anything. I dare you."
-const val HOME_DISCOVER_TAG = "home-discover"
-const val HOME_ADD_FAVORITE_TAG = "home-add-favorite"
+public const val HOME_SEARCH_TAG: String = "home-search"
+public const val HOME_SEARCH_HINT: String = "Ask me anything. I dare you."
+public const val HOME_DISCOVER_TAG: String = "home-discover"
+public const val HOME_ADD_FAVORITE_TAG: String = "home-add-favorite"
 
 /**
  * Ren's home page, the page a new tab opens on: where to go (Search, here, and ren desktop's destinations), the logotype over a spray

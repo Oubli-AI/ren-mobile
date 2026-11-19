@@ -47,28 +47,46 @@ function record(value: unknown): Record<string, unknown> | null {
 
 function phoneApp(value: unknown): PhoneApp[] {
   const app = record(value)
-  return app !== null && typeof app.name === "string" && typeof app.minutes === "number" ? [{ name: app.name, minutes: app.minutes }] : []
+  return app !== null && typeof app["name"] === "string" && typeof app["minutes"] === "number"
+    ? [{ name: app["name"], minutes: app["minutes"] }]
+    : []
 }
 
 function phoneAction(value: unknown): PhoneAction[] {
   const action = record(value)
-  return action !== null && typeof action.text === "string" && typeof action.at === "number" ? [{ text: action.text, at: action.at }] : []
+  return action !== null && typeof action["text"] === "string" && typeof action["at"] === "number"
+    ? [{ text: action["text"], at: action["at"] }]
+    : []
 }
 
 function eventOf(data: string): AppEvent | null {
   const message = record(JSON.parse(data))
   if (message === null) return null
-  if (message.type === "visit" && typeof message.url === "string" && typeof message.title === "string") {
-    return { type: "visit", url: message.url, title: message.title }
+  if (message["type"] === "visit" && typeof message["url"] === "string" && typeof message["title"] === "string") {
+    return { type: "visit", url: message["url"], title: message["title"] }
   }
-  const activity = record(message.activity)
-  if (message.type === "phone" && activity !== null && typeof activity.since === "number" && typeof activity.until === "number"
-    && Array.isArray(activity.apps) && Array.isArray(activity.actions)) {
-    const apps: unknown[] = activity.apps
-    const actions: unknown[] = activity.actions
-    return { type: "phone", activity: { since: activity.since, until: activity.until, apps: apps.flatMap(phoneApp), actions: actions.flatMap(phoneAction) } }
+  const activity = record(message["activity"])
+  if (
+    message["type"] === "phone" &&
+    activity !== null &&
+    typeof activity["since"] === "number" &&
+    typeof activity["until"] === "number" &&
+    Array.isArray(activity["apps"]) &&
+    Array.isArray(activity["actions"])
+  ) {
+    const apps: unknown[] = activity["apps"]
+    const actions: unknown[] = activity["actions"]
+    return {
+      type: "phone",
+      activity: {
+        since: activity["since"],
+        until: activity["until"],
+        apps: apps.flatMap(phoneApp),
+        actions: actions.flatMap(phoneAction),
+      },
+    }
   }
-  if (message.type === "close" || message.type === "sign-out") return { type: message.type }
+  if (message["type"] === "close" || message["type"] === "sign-out") return { type: message["type"] }
   return null
 }
 

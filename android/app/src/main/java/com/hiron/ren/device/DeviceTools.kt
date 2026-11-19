@@ -10,7 +10,7 @@ import org.json.JSONObject
  * The phone tools the ElevenLabs agents call as client tools, by their tool names. Every tool answers a
  * [ToolResult]; a missing permission is an error that tells the agent what the user has to grant, never a crash.
  */
-class DeviceTools(
+public class DeviceTools(
     private val context: Context,
     private val reminders: Reminders,
     private val isVisible: () -> Boolean,
@@ -60,9 +60,9 @@ class DeviceTools(
         },
     )
 
-    val names: Set<String> get() = tools.keys
+    public val names: Set<String> get() = tools.keys
 
-    suspend fun run(tool: String, input: JSONObject): ToolResult {
+    public suspend fun run(tool: String, input: JSONObject): ToolResult {
         val entry = tools[tool] ?: return ToolResult.error("This phone has no tool named $tool. Update the Ren app.")
         val missing = entry.permissions.filter {
             ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED
@@ -85,7 +85,7 @@ class DeviceTools(
     private class Tool(val permissions: List<String> = emptyList(), val run: suspend (JSONObject) -> ToolResult)
 }
 
-class MissingInput(field: String) : IllegalArgumentException("Missing required input \"$field\".")
+public class MissingInput(field: String) : IllegalArgumentException("Missing required input \"$field\".")
 
 internal fun JSONObject.req(key: String): String =
     optString(key).takeIf { has(key) && !isNull(key) && it.isNotBlank() } ?: throw MissingInput(key)

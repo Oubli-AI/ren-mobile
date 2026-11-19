@@ -3,9 +3,9 @@ package com.hiron.ren.core
 import org.json.JSONObject
 
 /** One call into the robot page's `window.ren` API. */
-data class RobotCommand(val method: String, val args: List<Any>) {
+public data class RobotCommand(val method: String, val args: List<Any>) {
     /** JavaScript that performs the call; arguments are JSON-encoded, never spliced as code. */
-    fun script(): String {
+    public fun script(): String {
         val encoded = args.joinToString(",") { arg ->
             when (arg) {
                 is String -> JSONObject.quote(arg)
@@ -18,15 +18,15 @@ data class RobotCommand(val method: String, val args: List<Any>) {
 }
 
 /** Whose turn it is in an ElevenLabs voice session, for the stage's voice layer; [None] when no voice session runs. */
-enum class VoiceTurn { Listening, Speaking, None }
+public enum class VoiceTurn { Listening, Speaking, None }
 
 /** Turns state changes into robot commands, so the robot mirrors what Ren is doing. */
-object RobotDirector {
-    fun diff(before: RenState?, after: RenState): List<RobotCommand> =
+public object RobotDirector {
+    public fun diff(before: RenState?, after: RenState): List<RobotCommand> =
         if (before == null || stance(before) != stance(after)) listOf(RobotCommand("state", listOf(stance(after)))) else emptyList()
 
     /** Tells the stage whose turn it is in a voice session (`window.ren.voice`). */
-    fun voice(turn: VoiceTurn): RobotCommand {
+    public fun voice(turn: VoiceTurn): RobotCommand {
         val wire = when (turn) {
             VoiceTurn.Listening -> "listening"
             VoiceTurn.Speaking -> "speaking"
@@ -36,7 +36,7 @@ object RobotDirector {
     }
 
     /** Passes the agent's audio level, 0..1, as the ElevenLabs SDK reports it (`window.ren.level`). */
-    fun level(level: Float): RobotCommand = RobotCommand("level", listOf(level))
+    public fun level(level: Float): RobotCommand = RobotCommand("level", listOf(level))
 
     /** What the robot is doing: the activity's move. */
     private fun stance(state: RenState): String = when (state.activity) {

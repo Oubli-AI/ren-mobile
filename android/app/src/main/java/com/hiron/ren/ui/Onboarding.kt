@@ -111,7 +111,7 @@ import com.hiron.ren.device.ScreenOperator
  * One group on the access step: what Ren uses, why, and the Android permissions behind it. [screen] marks
  * Ren's accessibility service, which Android turns on in its own settings rather than by a permission prompt.
  */
-data class AccessGroup(
+public data class AccessGroup(
     val name: String,
     val why: String,
     val icon: ImageVector,
@@ -120,7 +120,7 @@ data class AccessGroup(
     val screen: Boolean = false,
 )
 
-val ACCESS_GROUPS = listOf(
+public val ACCESS_GROUPS: List<AccessGroup> = listOf(
     AccessGroup(
         "Screen context", "Reads the screen when you ask, so Ren can help in any app.",
         Icons.Outlined.ScreenSearchDesktop, Tone.Info, emptyList(), screen = true,
@@ -156,7 +156,7 @@ private val HEADLINE_MIN = 28.sp
  * stage is hoisted so the robot page is never rebuilt between steps.
  */
 @Composable
-fun Onboarding(runtime: RenRuntime, onFinish: () -> Unit) {
+public fun Onboarding(runtime: RenRuntime, onFinish: () -> Unit) {
     val p = LocalPalette.current
     var step by rememberSaveable { mutableIntStateOf(1) }
     BackHandler(enabled = step > 1) { step-- }

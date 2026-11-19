@@ -7,7 +7,7 @@ import android.telecom.CallScreeningService
  * Sees each incoming call (with the call-screening role) and tells the runtime, which logs it. Ren never blocks
  * or silences a call on its own; the call always rings through.
  */
-class RenCallScreening : CallScreeningService() {
+public class RenCallScreening : CallScreeningService() {
     override fun onScreenCall(details: Call.Details) {
         if (details.callDirection == Call.Details.DIRECTION_INCOMING) {
             onIncoming?.invoke(details.handle?.schemeSpecificPart.orEmpty())
@@ -15,8 +15,8 @@ class RenCallScreening : CallScreeningService() {
         respondToCall(details, CallResponse.Builder().build())
     }
 
-    companion object {
+    public companion object {
         @Volatile
-        var onIncoming: ((String) -> Unit)? = null
+        public var onIncoming: ((String) -> Unit)? = null
     }
 }

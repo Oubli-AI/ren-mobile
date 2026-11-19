@@ -79,10 +79,10 @@ import androidx.compose.ui.unit.sp
 import kotlin.math.pow
 
 /** The status colours a component can take. */
-enum class Tone { Accent, Info, Green, Amber, Red, Neutral }
+public enum class Tone { Accent, Info, Green, Amber, Red, Neutral }
 
 @Composable
-fun Tone.color(): Color {
+public fun Tone.color(): Color {
     val p = LocalPalette.current
     return when (this) {
         Tone.Accent -> p.accent
@@ -107,7 +107,7 @@ internal fun Modifier.ring(color: Color, shape: Shape, show: Boolean, gap: Dp = 
  * still in secondary ink.
  */
 @Composable
-fun ShimmerText(text: String, style: TextStyle, modifier: Modifier = Modifier) {
+public fun ShimmerText(text: String, style: TextStyle, modifier: Modifier = Modifier) {
     val p = LocalPalette.current
     if (rememberReduceMotion()) {
         Text(text, modifier, style = style, color = p.ink2, maxLines = 1)
@@ -191,7 +191,7 @@ internal fun TagPlate(text: String, color: Color, modifier: Modifier = Modifier,
 
 /** A status tag: a dot in the tone's colour and a short label. [outline] gives it a quieter, secondary label. */
 @Composable
-fun StatusTag(text: String, tone: Tone, modifier: Modifier = Modifier, outline: Boolean = false) {
+public fun StatusTag(text: String, tone: Tone, modifier: Modifier = Modifier, outline: Boolean = false) {
     TagPlate(text, tone.color(), modifier, outline = outline)
 }
 
@@ -200,7 +200,7 @@ fun StatusTag(text: String, tone: Tone, modifier: Modifier = Modifier, outline: 
  * with a dot in its colour.
  */
 @Composable
-fun Eyebrow(text: String, modifier: Modifier = Modifier, tone: Tone = Tone.Accent, dot: Boolean = true) {
+public fun Eyebrow(text: String, modifier: Modifier = Modifier, tone: Tone = Tone.Accent, dot: Boolean = true) {
     val p = LocalPalette.current
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         if (dot && tone == Tone.Accent) {
@@ -219,7 +219,7 @@ fun Eyebrow(text: String, modifier: Modifier = Modifier, tone: Tone = Tone.Accen
  * border; [onClick] makes it pressable (its fill and border darken while pressed).
  */
 @Composable
-fun RenCard(
+public fun RenCard(
     modifier: Modifier = Modifier,
     selected: Boolean = false,
     onClick: (() -> Unit)? = null,
@@ -249,7 +249,7 @@ fun RenCard(
  * other tones stay ink. [selected] fills the well with a volt wash.
  */
 @Composable
-fun IconWell(
+public fun IconWell(
     icon: ImageVector,
     modifier: Modifier = Modifier,
     tone: Tone = Tone.Neutral,
@@ -275,7 +275,7 @@ fun IconWell(
 
 /** A quiet note on a faint wash, led by a small icon in its tone. */
 @Composable
-fun InfoStrip(text: String, modifier: Modifier = Modifier, icon: ImageVector = Icons.Outlined.Info, tone: Tone = Tone.Neutral) {
+public fun InfoStrip(text: String, modifier: Modifier = Modifier, icon: ImageVector = Icons.Outlined.Info, tone: Tone = Tone.Neutral) {
     val p = LocalPalette.current
     val shape = RoundedCornerShape(Radius.control)
     Row(
@@ -290,7 +290,7 @@ fun InfoStrip(text: String, modifier: Modifier = Modifier, icon: ImageVector = I
 
 /** The trust line at the foot of a screen: a small icon and a quiet line of text, centred together as one group. */
 @Composable
-fun TrustFooter(lines: String, modifier: Modifier = Modifier, icon: ImageVector = Icons.Outlined.VerifiedUser, tone: Tone = Tone.Neutral) {
+public fun TrustFooter(lines: String, modifier: Modifier = Modifier, icon: ImageVector = Icons.Outlined.VerifiedUser, tone: Tone = Tone.Neutral) {
     val p = LocalPalette.current
     Row(
         modifier.fillMaxWidth().padding(vertical = 8.dp),
@@ -304,7 +304,7 @@ fun TrustFooter(lines: String, modifier: Modifier = Modifier, icon: ImageVector 
 }
 
 /** Entrance: fade in and rise 8dp, delayed by [index] steps; runs once for the composable's lifetime. */
-fun Modifier.enter(index: Int): Modifier = composed {
+public fun Modifier.enter(index: Int): Modifier = composed {
     val reduce = rememberReduceMotion()
     val t = remember { Animatable(if (reduce) 1f else 0f) }
     LaunchedEffect(Unit) {

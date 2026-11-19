@@ -20,14 +20,14 @@ import com.hiron.ren.core.ApprovalRequest
  * Ren's notification channels and the notifications it posts. Each kind is one group whose summary exists only
  * while the group has two or more notifications.
  */
-object Notifications {
-    const val APPROVALS = "ren.approvals"
-    const val REMINDERS = "ren.reminders"
-    const val ACTIONS = "ren.actions"
-    const val SERVER = "ren.server"
-    const val APPROVAL_SUMMARY_ID = 999
-    const val ACTION_SUMMARY_ID = 998
-    const val REMINDER_SUMMARY_ID = 997
+public object Notifications {
+    public const val APPROVALS: String = "ren.approvals"
+    public const val REMINDERS: String = "ren.reminders"
+    public const val ACTIONS: String = "ren.actions"
+    public const val SERVER: String = "ren.server"
+    public const val APPROVAL_SUMMARY_ID: Int = 999
+    public const val ACTION_SUMMARY_ID: Int = 998
+    public const val REMINDER_SUMMARY_ID: Int = 997
     private val APPROVAL_IDS = 1000..4999
     private val ACTION_IDS = 5000..8999
     private val REMINDER_IDS = 9000..9999
@@ -36,19 +36,19 @@ object Notifications {
     internal val CHILD_ID_RANGES: List<IntRange> = listOf(APPROVAL_IDS, ACTION_IDS, REMINDER_IDS)
 
     /** A group of notifications and its summary. */
-    enum class Group(val key: String, val summaryId: Int, val channel: String) {
+    public enum class Group(public val key: String, public val summaryId: Int, public val channel: String) {
         Approvals("ren.group.approvals", APPROVAL_SUMMARY_ID, APPROVALS),
         Reminders("ren.group.reminders", REMINDER_SUMMARY_ID, REMINDERS),
         Actions("ren.group.actions", ACTION_SUMMARY_ID, ACTIONS);
 
-        fun title(count: Int): String = when (this) {
+        public fun title(count: Int): String = when (this) {
             Approvals -> "$count things need your OK"
             Reminders -> "$count reminders"
             Actions -> "$count things ready to open"
         }
     }
 
-    fun createChannels(context: Context) {
+    public fun createChannels(context: Context) {
         val manager = context.getSystemService(NotificationManager::class.java) ?: return
         manager.createNotificationChannels(
             listOf(
@@ -67,7 +67,7 @@ object Notifications {
     }
 
     /** An approval waiting while Ren is in the background: tapping it opens the app, where the sheet asks. */
-    fun approval(context: Context, request: ApprovalRequest) = post(
+    public fun approval(context: Context, request: ApprovalRequest): Unit = post(
         context, approvalId(request.id),
         NotificationCompat.Builder(context, APPROVALS)
             .setSmallIcon(R.drawable.ic_ren)
@@ -83,18 +83,18 @@ object Notifications {
         Group.Approvals,
     )
 
-    fun clearApproval(context: Context, id: String) = clearApprovals(context, listOf(id))
+    public fun clearApproval(context: Context, id: String): Unit = clearApprovals(context, listOf(id))
 
-    fun clearApprovals(context: Context, ids: Collection<String>) {
+    public fun clearApprovals(context: Context, ids: Collection<String>) {
         if (ids.isEmpty()) return
         val manager = NotificationManagerCompat.from(context)
         ids.forEach { manager.cancel(approvalId(it)) }
         refresh(context, Group.Approvals)
     }
 
-    fun approvalId(id: String): Int = slot(APPROVAL_IDS, id)
+    public fun approvalId(id: String): Int = slot(APPROVAL_IDS, id)
 
-    fun reminder(context: Context, id: String, text: String) = post(
+    public fun reminder(context: Context, id: String, text: String): Unit = post(
         context, slot(REMINDER_IDS, id),
         NotificationCompat.Builder(context, REMINDERS)
             .setSmallIcon(R.drawable.ic_ren)
@@ -109,7 +109,7 @@ object Notifications {
         Group.Reminders,
     )
 
-    fun action(context: Context, title: String, text: String, intent: Intent) {
+    public fun action(context: Context, title: String, text: String, intent: Intent) {
         val id = slot(ACTION_IDS, title + text)
         post(
             context, id,
@@ -125,7 +125,7 @@ object Notifications {
     }
 
     /** The link to Ren's hub, while Remote tools is on: attached, or what it is waiting for. */
-    fun hub(context: Context, state: HubState): Notification = NotificationCompat.Builder(context, SERVER)
+    public fun hub(context: Context, state: HubState): Notification = NotificationCompat.Builder(context, SERVER)
         .setSmallIcon(R.drawable.ic_ren)
         .setColor(context.getColor(R.color.ren_accent))
         .setContentTitle("Ren remote tools")
@@ -136,7 +136,7 @@ object Notifications {
         .build()
 
     /** Replaces notification [id] with [notification]. */
-    fun update(context: Context, id: Int, notification: Notification) {
+    public fun update(context: Context, id: Int, notification: Notification) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED &&
             android.os.Build.VERSION.SDK_INT >= 33
         ) {
@@ -146,7 +146,7 @@ object Notifications {
     }
 
     /** Posts, updates or cancels [group]'s summary: it exists only while the group has two or more notifications. */
-    fun refresh(context: Context, group: Group) {
+    public fun refresh(context: Context, group: Group) {
         val manager = NotificationManagerCompat.from(context)
         val children = runCatching { manager.activeNotifications }.getOrDefault(emptyList())
             .filter { it.notification.group == group.key && it.id != group.summaryId }
@@ -167,7 +167,7 @@ object Notifications {
             .setOnlyAlertOnce(true)
             .setContentIntent(openApp(context))
             .setAutoCancel(true)
-        notify(context, group.summaryId, builder)
+        val _ = notify(context, group.summaryId, builder)
     }
 
     private fun slot(ids: IntRange, key: String): Int = ids.first + key.hashCode().mod(ids.last - ids.first + 1)
@@ -194,7 +194,7 @@ object Notifications {
     }
 
     /** Where the hub link stands, in plain words. */
-    fun hubStatus(state: HubState): String = when (state) {
+    public fun hubStatus(state: HubState): String = when (state) {
         HubState.Off -> "Off"
         HubState.Connecting -> "Connecting to Ren's hub"
         HubState.Attached -> "Connected: Ren's agents and ren desktop can use this phone"

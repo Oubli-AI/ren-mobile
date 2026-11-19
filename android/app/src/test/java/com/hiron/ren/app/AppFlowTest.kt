@@ -236,7 +236,7 @@ class AppFlowTest {
 
         compose.onNodeWithText("Retry").performClick()
         compose.onNodeWithText(CRASHING).assertDoesNotExist()
-        robot("Retry")
+        val _ = robot("Retry")
     }
 
     @Test

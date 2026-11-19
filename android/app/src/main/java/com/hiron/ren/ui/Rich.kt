@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.em
  * links) becomes styling instead of stray symbols, links read in volt, and citation markers like `[2]` become
  * small volt superscript figures. Anything unfinished mid-stream stays as typed until it closes.
  */
-object Rich {
+public object Rich {
     private val INLINE = Regex(
         listOf(
             """\[([^\]\n]+)]\((https?://[^)\s]+)\)""", // [label](url)
@@ -39,9 +39,9 @@ object Rich {
     )
 
     /** The same text with the markup removed, for places that can't style it (widgets, notifications). */
-    fun plain(text: String): String = format(text, DarkPalette).text
+    public fun plain(text: String): String = format(text, DarkPalette).text
 
-    fun format(text: String, p: Palette): AnnotatedString = buildAnnotatedString {
+    public fun format(text: String, p: Palette): AnnotatedString = buildAnnotatedString {
         text.lines().forEachIndexed { i, raw ->
             if (i > 0) append('\n')
             var line = raw

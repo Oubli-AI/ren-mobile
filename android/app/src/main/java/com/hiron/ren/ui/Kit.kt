@@ -73,7 +73,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /** How a key reads: a secondary key, or the one primary action in volt. */
-enum class KeyTone { Plain, Accent }
+public enum class KeyTone { Plain, Accent }
 
 private val KeyShape = RoundedCornerShape(Radius.control)
 
@@ -82,7 +82,7 @@ private val KeyShape = RoundedCornerShape(Radius.control)
  * quiet note after the label.
  */
 @Composable
-fun Keycap(
+public fun Keycap(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -101,7 +101,7 @@ fun Keycap(
 
 /** A square key holding one icon: the viewer's actions, the toolbar's keys. [ring] draws a thin ring around it. */
 @Composable
-fun IconKey(
+public fun IconKey(
     icon: ImageVector,
     description: String,
     onClick: () -> Unit,
@@ -120,7 +120,7 @@ fun IconKey(
 
 /** A latching pill, an ink fill while it is on; [height] and [radius] match it to the keys beside it. */
 @Composable
-fun SysKey(
+public fun SysKey(
     text: String,
     on: Boolean,
     onToggle: (Boolean) -> Unit,
@@ -185,7 +185,7 @@ private fun KeyBody(
 }
 
 @Composable
-fun Rule(modifier: Modifier = Modifier, color: Color = LocalPalette.current.rule) {
+public fun Rule(modifier: Modifier = Modifier, color: Color = LocalPalette.current.rule) {
     Box(modifier.fillMaxWidth().height(1.dp).background(color))
 }
 
@@ -194,7 +194,7 @@ fun Rule(modifier: Modifier = Modifier, color: Color = LocalPalette.current.rule
  * below. With motion reduced it changes in place.
  */
 @Composable
-fun Odometer(text: String, style: TextStyle, color: Color, modifier: Modifier = Modifier, overflow: TextOverflow = TextOverflow.Clip) {
+public fun Odometer(text: String, style: TextStyle, color: Color, modifier: Modifier = Modifier, overflow: TextOverflow = TextOverflow.Clip) {
     val reduce = rememberReduceMotion()
     AnimatedContent(
         targetState = text,
@@ -213,7 +213,7 @@ fun Odometer(text: String, style: TextStyle, color: Color, modifier: Modifier = 
 
 /** An input: a field fill and a hairline at rest; focused, a volt border, a soft volt ring and a volt caret. [label] sits above. */
 @Composable
-fun RecessedField(
+public fun RecessedField(
     value: String,
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier,
@@ -262,7 +262,7 @@ fun RecessedField(
 
 /** A label/value row: a quiet label and its value. [mono] sets the value in JetBrains Mono, for codes, addresses and ids. */
 @Composable
-fun Readout(label: String, value: String, modifier: Modifier = Modifier, valueColor: Color? = null, mono: Boolean = false) {
+public fun Readout(label: String, value: String, modifier: Modifier = Modifier, valueColor: Color? = null, mono: Boolean = false) {
     val p = LocalPalette.current
     Row(modifier.fillMaxWidth().heightIn(min = 24.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(label, style = Type.body, color = p.ink2, modifier = Modifier.padding(end = 16.dp))

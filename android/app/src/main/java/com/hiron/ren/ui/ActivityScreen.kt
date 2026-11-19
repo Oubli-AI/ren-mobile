@@ -66,7 +66,7 @@ private val TraceText = Type.body.copy(fontSize = 14.sp, lineHeight = 20.sp)
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun ActivityScreen(runtime: RenRuntime, state: RenState) {
+public fun ActivityScreen(runtime: RenRuntime, state: RenState) {
     val p = LocalPalette.current
     val gutter = gutter()
     var reminders by remember { mutableStateOf(JSONArray()) }
@@ -80,7 +80,7 @@ fun ActivityScreen(runtime: RenRuntime, state: RenState) {
         if (reminders.length() > 0) {
             item(key = "reminders") {
                 Reminders(reminders, Modifier.padding(start = gutter, end = gutter, top = 24.dp).enter(0)) { id ->
-                    runtime.reminders.cancel(id)
+                    val _ = runtime.reminders.cancel(id)
                     reminders = (runtime.reminders.list().data as? JSONObject)?.optJSONArray("reminders") ?: JSONArray()
                 }
             }

@@ -15,7 +15,7 @@ import org.json.JSONObject
  * Reads the phone's notifications and replies to them through their own reply actions, which is how Ren
  * answers texts in any messaging app (SMS, WhatsApp, Signal, ...) without holding that app's account.
  */
-class RenNotificationListener : NotificationListenerService() {
+public class RenNotificationListener : NotificationListenerService() {
 
     override fun onListenerConnected() {
         instance = this
@@ -30,13 +30,13 @@ class RenNotificationListener : NotificationListenerService() {
         super.onDestroy()
     }
 
-    companion object {
+    public companion object {
         @Volatile
         private var instance: RenNotificationListener? = null
 
-        val connected: Boolean get() = instance != null
+        public val connected: Boolean get() = instance != null
 
-        fun list(context: Context, app: String?): ToolResult {
+        public fun list(context: Context, app: String?): ToolResult {
             val listener = instance ?: return notConnected()
             val needle = app?.lowercase()
             val rows = JSONArray()
@@ -53,7 +53,7 @@ class RenNotificationListener : NotificationListenerService() {
             return ToolResult.ok(JSONObject().put("notifications", rows))
         }
 
-        fun reply(context: Context, key: String, text: String): ToolResult {
+        public fun reply(context: Context, key: String, text: String): ToolResult {
             val listener = instance ?: return notConnected()
             val sbn = listener.activeNotifications.orEmpty().firstOrNull { it.key == key }
                 ?: return ToolResult.error("That notification is gone (read or dismissed). List notifications again.")
