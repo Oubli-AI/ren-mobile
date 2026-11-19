@@ -208,6 +208,11 @@ private fun RenAppUi(runtime: RenRuntime, listenRequests: Int, focusRequests: In
     LaunchedEffect(focusRequests, homeRequests) {
         if (focusRequests > 0 || homeRequests > 0) panel = true
     }
+    // What a page opened with Ask Ren waits in the composer as cards: the panel opens on it.
+    val opens by runtime.opens.collectAsStateWithLifecycle()
+    LaunchedEffect(opens) {
+        if (opens > 0) panel = true
+    }
     // An opened link shows its tab: the panel and any page over the browser close.
     LaunchedEffect(linkRequests) {
         if (linkRequests > 0) {

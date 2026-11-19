@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react"
+import { parseAttachmentBlock, type PromptAttachment } from "@/lib/prompt-attachments"
 
 /* The chat as the app sends it (ui/ChatView.kt, `ChatPage.payload`), and what the page tells the app back. */
 export type ToolState = "running" | "done" | "failed"
@@ -76,4 +77,22 @@ export function useChat(): ChatModel {
 
 export function tell(intent: Intent) {
   window.RenChat?.postMessage(JSON.stringify(intent))
+}
+
+/** Every attachment block ren's `attachmentBlock` writes, wherever it sits in a message (a closing tag inside one is escaped). */
+const BLOCKS = /<attachment(?:\s+[a-z]+="[^"]*")*>\n[\s\S]*?\n<\/attachment>/g
+
+/**
+ * A user message as the composer sent it (core/PromptAttachments.kt): what the user typed, then one block per pasted
+ * or opened attachment. The bubble shows the typed text and the attachments as ren's cards.
+ */
+export function splitAttachments(text: string): { text: string; attachments: PromptAttachment[] } {
+  const attachments: PromptAttachment[] = []
+  const typed = text.replace(BLOCKS, (block) => {
+    const attachment = parseAttachmentBlock(block)
+    if (attachment === null) return block
+    attachments.push(attachment)
+    return ""
+  })
+  return { text: typed.trim(), attachments }
 }

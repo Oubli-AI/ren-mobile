@@ -49,11 +49,18 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CalendarToday
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.FormatQuote
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
+import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
@@ -62,8 +69,10 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.hiron.ren.device.ScreenOperator
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -81,7 +90,11 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.Clipboard
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.NativeClipboard
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -96,6 +109,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -105,6 +119,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.hiron.ren.core.Activity
 import com.hiron.ren.core.ChatMessage
+import com.hiron.ren.core.PromptAttachment
+import com.hiron.ren.core.PromptAttachments
 import com.hiron.ren.core.RenRuntime
 import com.hiron.ren.core.RenState
 import kotlinx.coroutines.delay
@@ -195,12 +211,16 @@ public fun HomeScreen(
         } else {
             state.lastError?.let { ErrorNote(it, Modifier.padding(horizontal = gutter(), vertical = 8.dp)) }
         }
+        val attachments by runtime.attachments.collectAsStateWithLifecycle()
         Dock(
             quick = !chatting && !keyboard,
             voice = voice,
             listening = state.activity == Activity.Listening,
             focusRequests = focusRequests,
-            onSend = { val _ = runtime.ask(it) },
+            attachments = attachments,
+            onPaste = runtime::attachPaste,
+            onRemove = runtime::detach,
+            onSend = { val _ = runtime.send(it) },
             onListen = onListen,
         )
     }
@@ -340,6 +360,7 @@ private fun Banner(text: String, key: String, onClick: () -> Unit) {
 }
 
 public const val COMPOSER_TAG: String = "composer"
+public const val ATTACHMENTS_TAG: String = "attachments"
 
 /** A quick request: a soft outline pill in Inter, its touch area kept at 48dp. */
 @Composable
@@ -408,13 +429,83 @@ private fun ComposerField(
     )
 }
 
-/** The dock: the quick requests when [quick], then the composer with its talk or send key. */
+/**
+ * Hands what the field would paste to [onPaste] instead, so a paste (the toolbar's Paste or Ctrl+V) becomes a card.
+ * The field reads the clipboard through [LocalClipboard] only when it pastes, so an empty clip pastes as usual.
+ */
+@Composable
+private fun PasteAsAttachment(onPaste: (String) -> Unit, content: @Composable () -> Unit) {
+    val clipboard = LocalClipboard.current
+    val latest by rememberUpdatedState(onPaste)
+    val pasting = remember(clipboard) {
+        object : Clipboard {
+            override suspend fun getClipEntry(): ClipEntry? {
+                val entry = clipboard.getClipEntry() ?: return null
+                val text = entry.clipData.takeIf { it.itemCount > 0 }?.getItemAt(0)?.text?.toString()
+                if (text.isNullOrBlank()) return entry
+                latest(text)
+                return null
+            }
+
+            override suspend fun setClipEntry(clipEntry: ClipEntry?) = clipboard.setClipEntry(clipEntry)
+
+            override val nativeClipboard: NativeClipboard get() = clipboard.nativeClipboard
+        }
+    }
+    CompositionLocalProvider(LocalClipboard provides pasting, content = content)
+}
+
+/** ren desktop's attachment card: a paste's volt tile or the kind's icon, the title, its meta line, and remove. */
+@Composable
+private fun AttachmentCard(item: PromptAttachment, onRemove: () -> Unit) {
+    val p = LocalPalette.current
+    val shape = RoundedCornerShape(14.dp)
+    val tile = RoundedCornerShape(10.dp)
+    Row(
+        Modifier.widthIn(max = 272.dp).clip(shape).background(p.card).border(1.dp, p.lineHi, shape).padding(start = 6.dp, top = 6.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        val pasted = item.kind == PromptAttachments.PASTED
+        Box(
+            Modifier.size(32.dp).clip(tile).then(
+                if (pasted) Modifier.background(Brush.linearGradient(listOf(Color(0xFF8D98FE), Color(0xFF5543FF), Color(0xFF3429A7))))
+                else Modifier.background(p.cardHi).border(1.dp, p.line, tile),
+            ),
+            contentAlignment = Alignment.Center,
+        ) {
+            val icon = when (item.kind) {
+                PromptAttachments.PASTED -> Icons.Outlined.FormatQuote
+                "tab" -> Icons.Outlined.Public
+                "conversation" -> Icons.Outlined.ChatBubbleOutline
+                "event" -> Icons.Outlined.CalendarToday
+                else -> Icons.Outlined.Description
+            }
+            Icon(icon, null, Modifier.size(16.dp), tint = if (pasted) Color.White else p.ink2)
+        }
+        Column(Modifier.weight(1f, fill = false).padding(start = 10.dp)) {
+            Text(item.title, style = Type.labelLg.copy(fontWeight = FontWeight.SemiBold), color = p.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(item.meta, style = Type.labelSm, color = p.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        Box(
+            Modifier.minimumInteractiveComponentSize().clickable(role = Role.Button, onClickLabel = "Remove ${item.title}", onClick = onRemove),
+            contentAlignment = Alignment.Center,
+        ) { Icon(Icons.Outlined.Close, "Remove ${item.title}", Modifier.size(16.dp), tint = p.muted) }
+    }
+}
+
+/**
+ * The dock: the quick requests when [quick], the composer's attachment cards (a paste, what Ask Ren opened), then the
+ * composer with its talk or send key. A paste becomes a card, as in ren desktop's composer.
+ */
 @Composable
 private fun Dock(
     quick: Boolean,
     voice: Boolean,
     listening: Boolean,
     focusRequests: Int,
+    attachments: List<PromptAttachment>,
+    onPaste: (String) -> Unit,
+    onRemove: (String) -> Unit,
     onSend: (String) -> Unit,
     onListen: () -> Unit,
 ) {
@@ -429,7 +520,7 @@ private fun Dock(
             ime?.show()
         }
     }
-    val sendable = text.isNotBlank()
+    val sendable = text.isNotBlank() || attachments.isNotEmpty()
     val send = {
         if (sendable) {
             onSend(text.trim())
@@ -442,14 +533,19 @@ private fun Dock(
                 items(Quick.entries, key = { it.name }) { q -> QuickPill(q.label, { onSend(q.prompt) }) }
             }
         }
+        if (attachments.isNotEmpty()) {
+            ChipRail(Modifier.padding(top = 10.dp).testTag(ATTACHMENTS_TAG), start = gutter) {
+                items(attachments, key = { it.id }) { item -> AttachmentCard(item, onRemove = { onRemove(item.id) }) }
+            }
+        }
         Row(Modifier.fillMaxWidth().padding(start = gutter, end = gutter - 4.dp, top = 10.dp, bottom = 14.dp), verticalAlignment = Alignment.Bottom) {
-            ComposerField(
+            PasteAsAttachment(onPaste) { ComposerField(
                 text, { text = it },
                 placeholder = "Ask Ren anything",
                 onSend = { send() },
                 modifier = Modifier.weight(1f),
                 fieldModifier = Modifier.focusRequester(focus).testTag(COMPOSER_TAG),
-            )
+            ) }
             Spacer(Modifier.width(10.dp))
             // A field-high slot: the talk key's ring spills past it without changing the row's height.
             Box(Modifier.size(width = 56.dp, height = 52.dp), contentAlignment = Alignment.Center) {
