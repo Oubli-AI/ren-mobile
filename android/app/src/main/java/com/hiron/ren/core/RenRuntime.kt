@@ -148,11 +148,54 @@ public class RenRuntime(private val app: Context) {
         scope.launch(Dispatchers.IO) { publicSuffixList.prefetch().await() }
         browser.visited = contextWidget::visit
         browser.accountReported = contextWidget::accountChanged
+        contextWidget.asked = ::opened
         scope.launch {
             contextWidget.account.collect {
                 applications.userId = if (it.signedIn) it.userId else ""
                 applications.refresh()
             }
+        }
+    }
+
+    private val _attachments = MutableStateFlow<List<PromptAttachment>>(emptyList())
+
+    /** The composer's attachment cards: pastes, and what a page opened with Ask Ren. They go with the next message. */
+    public val attachments: StateFlow<List<PromptAttachment>> = _attachments.asStateFlow()
+
+    private val _opens = MutableStateFlow(0)
+
+    /** Counts what pages opened in Ren with Ask Ren; each one opens the agent panel. */
+    public val opens: StateFlow<Int> = _opens.asStateFlow()
+
+    /** Adds cards to the composer, at most [PromptAttachments.MAX] in all. */
+    public fun attach(items: List<PromptAttachment>) {
+        _attachments.value = (_attachments.value + items.filter { item -> _attachments.value.none { it.id == item.id } }).take(PromptAttachments.MAX)
+    }
+
+    /** A paste in the composer becomes a card, named from its text. */
+    public fun attachPaste(text: String) {
+        if (text.isBlank()) return
+        attach(listOf(PromptAttachments.pasted(text, _attachments.value.map { it.title })))
+    }
+
+    /** Takes a card out of the composer. */
+    public fun detach(id: String) {
+        _attachments.value = _attachments.value.filterNot { it.id == id }
+    }
+
+    /** Sends [typed] with the composer's cards, which leave the composer; returns the id of the user's message. */
+    public fun send(typed: String): String {
+        val sent = _attachments.value
+        _attachments.value = emptyList()
+        return ask(PromptAttachments.message(typed, sent))
+    }
+
+    /** Ask Ren from the Context widget: [items] land in the composer, and [text], when there is any, is sent with them. */
+    private fun opened(text: String, items: List<PromptAttachment>) {
+        attach(items)
+        _opens.value++
+        if (text.isNotBlank()) {
+            val _ = send(text)
         }
     }
 

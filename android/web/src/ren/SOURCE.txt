@@ -9,7 +9,10 @@ pull 24: the six levels, the report as a Document, Print to PDF, HTML and Word),
 the editor (NotionEditor.tsx, TableMenu.tsx, blocks/RenTable.ts) and the Documents toolbar from 1bc8efc (main, pull 28:
 tables with resizable columns, a table bar and header colours, Embed tabs in the Insert menu), and the Context widget's
 lib/context-api.ts, stores/contextAgentStore.ts and interests/ContextAgents.tsx from beaa580 (main, pull 29: app
-recommendations the Context Agent builds with OpenCode).
+recommendations the Context Agent builds with OpenCode), and the composer's attachments (lib/prompt-attachments.ts,
+agent-panel/AgentPanel.tsx, PromptAttachments.tsx, useComposerAttachments.ts, context/AgentUiContext.tsx,
+interests/ContextTray.tsx, shared/ContextMenu.tsx, layouts/AuthPageLayout.tsx) from 4517d4d (main, pull 30: every
+paste, an Ask Ren selection and opened context as attachment cards).
 
   pages/SearchResultsPage.tsx                               ren's search results
   pages/HomePage.tsx, OnboardingPage.tsx, SignInPage.tsx    Discover and the destinations, the interview, sign-in
