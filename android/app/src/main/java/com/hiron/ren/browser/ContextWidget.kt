@@ -21,17 +21,17 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /** The ren account the app's pages are signed in to, as they report it (ren desktop's auth and interview stores). */
-data class RenAccount(val signedIn: Boolean = false, val email: String = "", val surveyComplete: Boolean = false, val userId: String = "") {
+public data class RenAccount(val signedIn: Boolean = false, val email: String = "", val surveyComplete: Boolean = false, val userId: String = "") {
     /** ren desktop's Context widget is there for a signed-in account that finished the interview. */
     val contextReady: Boolean get() = signedIn && surveyComplete
 
-    companion object {
-        fun parse(json: JSONObject) = RenAccount(json.optBoolean("signedIn"), json.optString("email"), json.optBoolean("surveyComplete"), json.optString("userId"))
+    public companion object {
+        public fun parse(json: JSONObject): RenAccount = RenAccount(json.optBoolean("signedIn"), json.optString("email"), json.optBoolean("surveyComplete"), json.optString("userId"))
     }
 }
 
 /** What the Context widget's page shows, and so how much of the screen its view takes. */
-enum class ContextLayout {
+public enum class ContextLayout {
     None,
     Orb,
 
@@ -40,16 +40,16 @@ enum class ContextLayout {
     Panel,
     ;
 
-    companion object {
-        fun of(wire: String): ContextLayout = entries.firstOrNull { it.name.equals(wire, ignoreCase = true) } ?: None
+    public companion object {
+        public fun of(wire: String): ContextLayout = entries.firstOrNull { it.name.equals(wire, ignoreCase = true) } ?: None
     }
 }
 
 /** An app the user had on screen, and for how many whole minutes, between two reports. */
-data class AppUse(val name: String, val minutes: Int)
+public data class AppUse(val name: String, val minutes: Int)
 
 /** What Ren did on the phone (the activity log), with when. */
-data class PhoneAction(val text: String, val at: Long)
+public data class PhoneAction(val text: String, val at: Long)
 
 /**
  * ren desktop's Context widget on the phone: one WebView on the bundled context page, which runs ren desktop's widget
@@ -58,7 +58,7 @@ data class PhoneAction(val text: String, val at: Long)
  * what the user did on the phone since the last report ([PhoneActivity] from [activity]); the page answers with the
  * [account] it is signed in to and the [layout] it needs.
  */
-class ContextWidget(
+public class ContextWidget(
     private val context: Context,
     private val token: () -> String,
     private val activity: (since: Long, until: Long) -> Pair<List<AppUse>, List<PhoneAction>>,
@@ -67,10 +67,10 @@ class ContextWidget(
     private val now: () -> Long = System::currentTimeMillis,
 ) {
     private val _account = MutableStateFlow(RenAccount())
-    val account: StateFlow<RenAccount> = _account.asStateFlow()
+    public val account: StateFlow<RenAccount> = _account.asStateFlow()
 
     private val _layout = MutableStateFlow(ContextLayout.None)
-    val layout: StateFlow<ContextLayout> = _layout.asStateFlow()
+    public val layout: StateFlow<ContextLayout> = _layout.asStateFlow()
 
     private var page: JavaScriptReplyProxy? = null
     private val visits = ArrayDeque<JSONObject>()
@@ -82,13 +82,13 @@ class ContextWidget(
     private var view: WebView? = null
 
     /** The widget's view, made on first use; null on a WebView without the message listener, where the page can't talk. */
-    fun view(): WebView? {
+    public fun view(): WebView? {
         if (!WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) return null
         return view ?: create().also { view = it }
     }
 
     /** A page the phone's browser finished loading; the page's store keeps the public web ones, as ren desktop's does. */
-    fun visit(url: String, title: String) {
+    public fun visit(url: String, title: String) {
         if (!url.startsWith("https://") && !url.startsWith("http://")) return
         val event = JSONObject().put("type", "visit").put("url", url).put("title", title)
         val proxy = page
@@ -99,15 +99,15 @@ class ContextWidget(
     }
 
     /** The app came to the front: what the user did on the phone since the last report goes to the Context Agent. */
-    fun resumed() = report()
+    public fun resumed(): Unit = report()
 
     /** Closes the open panel (Back). */
-    fun close() {
+    public fun close() {
         page?.postMessage(JSONObject().put("type", "close").toString())
     }
 
     /** Signs the ren account out of the app's pages (Settings › Account). */
-    fun signOut() {
+    public fun signOut() {
         page?.postMessage(JSONObject().put("type", "sign-out").toString())
     }
 
@@ -115,7 +115,7 @@ class ContextWidget(
      * Another of the app's pages reported the account (ren's sign-in and interview run on the destinations page). The
      * widget's page reads them when it loads, so a change loads it again.
      */
-    fun accountChanged(account: RenAccount) {
+    public fun accountChanged(account: RenAccount) {
         if (account == _account.value) return
         _account.value = account
         page = null
@@ -195,12 +195,12 @@ class ContextWidget(
         loadUrl(PAGE)
     }
 
-    companion object {
+    public companion object {
         private const val ORIGIN_HOST = "appassets.androidplatform.net"
         private const val PAGE = "https://$ORIGIN_HOST/assets/ren/web/context/index.html"
 
         /** ren desktop sends browsing once the oldest unsent page has waited three minutes (`browsingDue`); the phone's report keeps the same pace. */
-        const val REPORT_EVERY_MS = 3 * 60_000L
+        public const val REPORT_EVERY_MS: Long = 3 * 60_000L
 
         /** ren desktop's browsing queue holds 40 pages (`recordVisit`). */
         private const val VISITS_KEPT = 40

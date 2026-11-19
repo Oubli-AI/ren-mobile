@@ -9,6 +9,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
@@ -19,6 +20,7 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -29,7 +31,7 @@ import com.hiron.ren.R
  * ink and paper neutrals with one electric colour, volt blurple, used for primary actions, focus, selection, the
  * active state and agent activity. Surfaces are flat behind 1dp hairlines; only layers that float cast a shadow.
  */
-data class Palette(
+public data class Palette(
     /** Paper: the page and content background (`surface-0` / `surface-900`). */
     val bg: Color,
     /** Chrome: the browser frame behind the toolbar, the tab strip and the bottom bar (`--ron-chrome`). */
@@ -91,7 +93,7 @@ data class Palette(
     val dark: Boolean,
 )
 
-val LightPalette = Palette(
+public val LightPalette: Palette = Palette(
     bg = Color(0xFFFFFFFF), chrome = Color(0xFFF1F2F6), raised = Color(0xFFFFFFFF), key = Color(0xFFF3F3F7),
     keyHi = Color(0xFFE6E7ED), tile = Color(0xFFF3F3F7), high = Color(0xFFFFFFFF), ink = Color(0xFF0B0C17), ink2 = Color(0xFF4A4C58),
     muted = Color(0xFF72747E), rule = Color(0xFFE6E7ED),
@@ -104,7 +106,7 @@ val LightPalette = Palette(
 )
 
 /** Dark is black and charcoal with no hue: volt is the only colour. */
-val DarkPalette = Palette(
+public val DarkPalette: Palette = Palette(
     bg = Color(0xFF0C0C0C), chrome = Color(0xFF070707), raised = Color(0xFF141414), key = Color(0xFF1E1E1E),
     keyHi = Color(0xFF2C2C2C), tile = Color(0xFF1E1E1E), high = Color(0xFF2C2C2C), ink = Color(0xFFF5F5F5), ink2 = Color(0xFFBDBDBD),
     muted = Color(0xFF919191), rule = Color(0xFF1E1E1E),
@@ -116,7 +118,7 @@ val DarkPalette = Palette(
     dark = true,
 )
 
-val LocalPalette = staticCompositionLocalOf { LightPalette }
+public val LocalPalette: ProvidableCompositionLocal<Palette> = staticCompositionLocalOf { LightPalette }
 
 @OptIn(ExperimentalTextApi::class)
 private fun bricolage(weight: Int, width: Float, opticalSize: Float) = Font(
@@ -132,17 +134,17 @@ private fun jetBrainsMono(weight: Int) =
     Font(R.font.jetbrains_mono, FontWeight(weight), variationSettings = FontVariation.Settings(FontVariation.weight(weight)))
 
 /** Bricolage Grotesque: headings, heavy and tight, at the optical size of the sizes they are set in. */
-val Display = FontFamily(bricolage(700, 100f, 24f), bricolage(800, 100f, 24f))
+public val Display: FontFamily = FontFamily(bricolage(700, 100f, 24f), bricolage(800, 100f, 24f))
 /** The poster cut of the display face (`.ren-display`): 800 at 86% width, for heroes. */
-val Poster = FontFamily(bricolage(800, 86f, 40f))
+public val Poster: FontFamily = FontFamily(bricolage(800, 86f, 40f))
 /** The logotype's cut of the display face (ren desktop's docs/brand.md § Logo): 800 at 92% width, opsz 96. */
-val Logo = FontFamily(bricolage(800, 92f, 96f))
+public val Logo: FontFamily = FontFamily(bricolage(800, 92f, 96f))
 /** The logo's volt (`blurple-600`, the tile of RenMark), the same in Light and Dark. */
-val LogoVolt = Color(0xFF5543FF)
+public val LogoVolt: Color = Color(0xFF5543FF)
 /** Inter: every piece of interface text. */
-val Sans = FontFamily(inter(400), inter(500), inter(600))
+public val Sans: FontFamily = FontFamily(inter(400), inter(500), inter(600))
 /** JetBrains Mono: code, numbers in data and tag labels. */
-val Mono = FontFamily(jetBrainsMono(400), jetBrainsMono(500), jetBrainsMono(600))
+public val Mono: FontFamily = FontFamily(jetBrainsMono(400), jetBrainsMono(500), jetBrainsMono(600))
 
 /** Inter's features as ren sets them: open digits, a single-storey a off, rounded quotes. */
 private const val INTER = "cv02, cv03, cv04, cv11, ss03"
@@ -155,62 +157,62 @@ private fun sans(weight: FontWeight, size: Float, line: Float, tracking: Float =
  * The type scale. One display heading per view, in sentence case; interface text is Inter at 13 to 14sp with 12sp for
  * secondary lines; mono is for code, figures and tag labels, the one uppercase style.
  */
-object Type {
+public object Type {
     /** A hero line in the poster cut. */
-    val greeting = TextStyle(fontFamily = Poster, fontWeight = FontWeight.ExtraBold, fontSize = 40.sp, lineHeight = 38.sp, letterSpacing = (-0.045).em)
-    val stat = TextStyle(fontFamily = Display, fontWeight = FontWeight.Bold, fontSize = 36.sp, lineHeight = 38.sp, letterSpacing = (-0.03).em, fontFeatureSettings = "tnum")
-    val headline = TextStyle(fontFamily = Display, fontWeight = FontWeight.Bold, fontSize = 22.sp, lineHeight = 26.sp, letterSpacing = (-0.02).em)
-    val title = sans(FontWeight.SemiBold, 15f, 20f, -0.01f)
-    val bodyLg = sans(FontWeight.Normal, 16f, 24f)
-    val body = sans(FontWeight.Normal, 14f, 21f)
-    val key = sans(FontWeight.SemiBold, 14f, 20f)
-    val labelLg = sans(FontWeight.Medium, 13f, 16f)
-    val labelMd = sans(FontWeight.Medium, 12f, 16f)
-    val labelSm = sans(FontWeight.Medium, 11f, 14f)
-    val tele = TextStyle(fontFamily = Mono, fontWeight = FontWeight.Medium, fontSize = 12.sp, lineHeight = 14.sp, fontFeatureSettings = "tnum")
-    val mono = TextStyle(fontFamily = Mono, fontWeight = FontWeight.Normal, fontSize = 12.sp, lineHeight = 17.sp)
+    public val greeting: TextStyle = TextStyle(fontFamily = Poster, fontWeight = FontWeight.ExtraBold, fontSize = 40.sp, lineHeight = 38.sp, letterSpacing = (-0.045).em)
+    public val stat: TextStyle = TextStyle(fontFamily = Display, fontWeight = FontWeight.Bold, fontSize = 36.sp, lineHeight = 38.sp, letterSpacing = (-0.03).em, fontFeatureSettings = "tnum")
+    public val headline: TextStyle = TextStyle(fontFamily = Display, fontWeight = FontWeight.Bold, fontSize = 22.sp, lineHeight = 26.sp, letterSpacing = (-0.02).em)
+    public val title: TextStyle = sans(FontWeight.SemiBold, 15f, 20f, -0.01f)
+    public val bodyLg: TextStyle = sans(FontWeight.Normal, 16f, 24f)
+    public val body: TextStyle = sans(FontWeight.Normal, 14f, 21f)
+    public val key: TextStyle = sans(FontWeight.SemiBold, 14f, 20f)
+    public val labelLg: TextStyle = sans(FontWeight.Medium, 13f, 16f)
+    public val labelMd: TextStyle = sans(FontWeight.Medium, 12f, 16f)
+    public val labelSm: TextStyle = sans(FontWeight.Medium, 11f, 14f)
+    public val tele: TextStyle = TextStyle(fontFamily = Mono, fontWeight = FontWeight.Medium, fontSize = 12.sp, lineHeight = 14.sp, fontFeatureSettings = "tnum")
+    public val mono: TextStyle = TextStyle(fontFamily = Mono, fontWeight = FontWeight.Normal, fontSize = 12.sp, lineHeight = 17.sp)
 
     /** Onboarding step headlines (`display-sm`). */
-    val step = TextStyle(fontFamily = Display, fontWeight = FontWeight.Bold, fontSize = 30.sp, lineHeight = 33.sp, letterSpacing = (-0.025).em)
+    public val step: TextStyle = TextStyle(fontFamily = Display, fontWeight = FontWeight.Bold, fontSize = 30.sp, lineHeight = 33.sp, letterSpacing = (-0.025).em)
     /** Buttons (`.btn`). */
-    val button = sans(FontWeight.SemiBold, 14f, 20f)
+    public val button: TextStyle = sans(FontWeight.SemiBold, 14f, 20f)
     /** Secondary keys and text links. */
-    val monoKey = sans(FontWeight.Medium, 13f, 16f)
+    public val monoKey: TextStyle = sans(FontWeight.Medium, 13f, 16f)
     /** Tag labels (`.tag-label`): mono capitals, small and widely tracked. */
-    val eyebrow = TextStyle(fontFamily = Mono, fontWeight = FontWeight.Medium, fontSize = 10.sp, lineHeight = 12.sp, letterSpacing = 0.14.em)
+    public val eyebrow: TextStyle = TextStyle(fontFamily = Mono, fontWeight = FontWeight.Medium, fontSize = 10.sp, lineHeight = 12.sp, letterSpacing = 0.14.em)
     /** Status tags. */
-    val tag = sans(FontWeight.Medium, 11f, 14f)
-    val cardTitle = sans(FontWeight.SemiBold, 14f, 19f)
-    val cardBody = sans(FontWeight.Normal, 13f, 19f)
+    public val tag: TextStyle = sans(FontWeight.Medium, 11f, 14f)
+    public val cardTitle: TextStyle = sans(FontWeight.SemiBold, 14f, 19f)
+    public val cardBody: TextStyle = sans(FontWeight.Normal, 13f, 19f)
     /** Pills (`.pill`). */
-    val chip = sans(FontWeight.Medium, 13f, 18f)
+    public val chip: TextStyle = sans(FontWeight.Medium, 13f, 18f)
     /** Quoted text inside a card: the line to read, the message Ren will send. */
-    val quote = TextStyle(fontFamily = Display, fontWeight = FontWeight.Bold, fontSize = 20.sp, lineHeight = 26.sp, letterSpacing = (-0.02).em)
+    public val quote: TextStyle = TextStyle(fontFamily = Display, fontWeight = FontWeight.Bold, fontSize = 20.sp, lineHeight = 26.sp, letterSpacing = (-0.02).em)
 }
 
 /** The corner radii: controls, cards, then panels and sheets; chips and segmented controls are full pills. */
-object Radius {
-    val control = 10.dp
-    val card = 12.dp
-    val panel = 20.dp
+public object Radius {
+    public val control: Dp = 10.dp
+    public val card: Dp = 12.dp
+    public val panel: Dp = 20.dp
 }
 
 /** Durations (ms) and easings shared by every animated component: quick, and nothing pulses for decoration. */
-object Motion {
-    const val QUICK = 150
-    const val BASE = 220
-    const val SLOW = 400
+public object Motion {
+    public const val QUICK: Int = 150
+    public const val BASE: Int = 220
+    public const val SLOW: Int = 400
     /** Per-item entrance delay. */
-    const val STAGGER = 50
+    public const val STAGGER: Int = 50
     /** `ease-out-expo`. */
-    val Emphasized = CubicBezierEasing(0.19f, 1f, 0.22f, 1f)
+    public val Emphasized: CubicBezierEasing = CubicBezierEasing(0.19f, 1f, 0.22f, 1f)
     /** `ease-smooth`. */
-    val Standard = CubicBezierEasing(0.16f, 1f, 0.3f, 1f)
+    public val Standard: CubicBezierEasing = CubicBezierEasing(0.16f, 1f, 0.3f, 1f)
 }
 
 /** True when the system has animations off; entrances then land at once. */
 @Composable
-fun rememberReduceMotion(): Boolean {
+public fun rememberReduceMotion(): Boolean {
     val context = LocalContext.current
     return remember(context) {
         AndroidSettings.Global.getFloat(context.contentResolver, AndroidSettings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
@@ -219,7 +221,7 @@ fun rememberReduceMotion(): Boolean {
 
 /** Ren's theme: Light or Dark, following the system unless [dark] says otherwise. */
 @Composable
-fun RenTheme(dark: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
+public fun RenTheme(dark: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
     val p = if (dark) DarkPalette else LightPalette
     val scheme = (if (dark) darkColorScheme() else lightColorScheme()).copy(
         primary = p.accent, onPrimary = p.accentInk, primaryContainer = p.accentSoft, onPrimaryContainer = p.ink,

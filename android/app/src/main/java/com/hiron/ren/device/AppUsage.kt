@@ -13,15 +13,15 @@ import com.hiron.ren.browser.AppUse
  * Which apps the user had on screen and for how long, from Android's usage access (Settings › What Ren can use › App
  * usage): the foreground spans in [UsageStatsManager]'s events. Ren itself and the home screen are left out.
  */
-class AppUsage(private val context: Context) {
+public class AppUsage(private val context: Context) {
     /** Whether the user gave Ren usage access. */
-    fun allowed(): Boolean {
+    public fun allowed(): Boolean {
         val ops = context.getSystemService(AppOpsManager::class.java) ?: return false
         return ops.checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), context.packageName) == AppOpsManager.MODE_ALLOWED
     }
 
     /** The apps used between [since] and [until], longest first, each for at least a minute; empty without access. */
-    fun between(since: Long, until: Long): List<AppUse> {
+    public fun between(since: Long, until: Long): List<AppUse> {
         if (!allowed()) return emptyList()
         val manager = context.getSystemService(UsageStatsManager::class.java) ?: return emptyList()
         val skip = setOfNotNull(context.packageName, home())

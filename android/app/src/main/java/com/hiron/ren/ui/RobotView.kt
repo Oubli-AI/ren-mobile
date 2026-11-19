@@ -58,7 +58,7 @@ internal const val MAX_ROBOT_CRASHES = 3
 private const val START_TIMEOUT_MS = 4_000L
 
 /** How the page frames Ren; [wire] is the `window.ren.focus` mode it sends. */
-enum class RobotFocus(val wire: String) {
+public enum class RobotFocus(public val wire: String) {
     /** A full-height stage (Home with a conversation). */
     Stage("stage"),
 
@@ -74,7 +74,7 @@ enum class RobotFocus(val wire: String) {
  * A renderer that dies brings a fresh page, up to [MAX_ROBOT_CRASHES] times; a page that fails says why, with Retry.
  */
 @Composable
-fun RobotView(runtime: RenRuntime, modifier: Modifier = Modifier, focus: RobotFocus = RobotFocus.Stage) {
+public fun RobotView(runtime: RenRuntime, modifier: Modifier = Modifier, focus: RobotFocus = RobotFocus.Stage) {
     val context = LocalContext.current
     val dark = LocalPalette.current.dark
     var generation by remember { mutableIntStateOf(0) }

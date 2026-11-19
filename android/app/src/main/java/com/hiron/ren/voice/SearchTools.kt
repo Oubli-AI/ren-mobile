@@ -19,18 +19,18 @@ import org.json.JSONObject
  * The agents' seven search tools as client tools: each searches Brave from the phone ([search]), puts its results on
  * the tool's step in the chat, and tells the agent what is shown.
  */
-object SearchTools {
-    val NAMES = mapOf(
+public object SearchTools {
+    public val NAMES: Map<String, SearchKind> = mapOf(
         "web_search" to SearchKind.Web, "news_search" to SearchKind.News, "image_search" to SearchKind.Images,
         "video_search" to SearchKind.Videos, "place_search" to SearchKind.Places, "answers" to SearchKind.Answers,
         "llm_context" to SearchKind.Context,
     )
 
     /** The tool definitions say "1-20, default 10". */
-    const val DEFAULT_COUNT = 10
-    const val MAX_COUNT = 20
+    public const val DEFAULT_COUNT: Int = 10
+    public const val MAX_COUNT: Int = 20
 
-    fun build(
+    public fun build(
         search: suspend (SearchQuery) -> Result<SearchResults>,
         update: ((RenState) -> RenState) -> Unit,
     ): Map<String, ClientTool> = NAMES.keys.associateWith { name ->
@@ -46,7 +46,7 @@ object SearchTools {
      * One call of the search tool [name]: searches, puts the results on the tool's step in the chat, and answers what
      * the agent is told about them; a failure carries what to tell the agent.
      */
-    suspend fun call(
+    public suspend fun call(
         name: String,
         parameters: Map<String, Any>,
         search: suspend (SearchQuery) -> Result<SearchResults>,
@@ -87,11 +87,11 @@ object SearchTools {
 }
 
 /** What a search tool tells the agent about the results on screen, numbered in order, in at most [LIMIT] characters. */
-object SearchSummary {
-    const val LIMIT = 8_000
+public object SearchSummary {
+    public const val LIMIT: Int = 8_000
     private const val NOTE = "The user sees these results in the chat. Refer to them by name; don't read links aloud."
 
-    fun forAgent(results: SearchResults): String {
+    public fun forAgent(results: SearchResults): String {
         if (results.kind == SearchKind.Answers) {
             val citations = results.citations.map { JSONObject().put("n", it.number).put("url", it.url).maybe("snippet", it.snippet?.take(200)) }
             return fit(citations) {

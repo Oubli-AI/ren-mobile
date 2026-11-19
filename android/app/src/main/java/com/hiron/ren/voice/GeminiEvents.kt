@@ -20,10 +20,10 @@ import java.util.UUID
  * messages as `interrupts`). Voice: Strands' bidi events, whose transcripts are what the user and Ren said, plus
  * the same tool result `message`. It makes the same chat changes as [ChatEvents].
  */
-object GeminiEvents {
+public object GeminiEvents {
     /** The tools that run on the phone, which the chat shows as the phone's own. */
     /** A turn the model's provider failed (`{"error": …}`, its own words after this). */
-    const val TURN_FAILED = "The agent couldn't answer: "
+    public const val TURN_FAILED: String = "The agent couldn't answer: "
 
     private val PHONE = AgentTools.NAMES.toSet() + AgentTools.REQUEST_APPROVAL + SearchTools.NAMES.keys
 
@@ -31,7 +31,7 @@ object GeminiEvents {
     private const val JOURNAL = "journal"
 
     /** [state] after [event]; events the chat doesn't show leave it unchanged. */
-    fun apply(state: RenState, event: JSONObject, now: Long = System.currentTimeMillis()): RenState = when {
+    public fun apply(state: RenState, event: JSONObject, now: Long = System.currentTimeMillis()): RenState = when {
         event.has("type") -> bidi(state, event)
         event.has("reasoning") -> thought(state, event.optString("reasoning"), now)
         event.has("data") -> streamed(settled(state, now), event.optString("data"))

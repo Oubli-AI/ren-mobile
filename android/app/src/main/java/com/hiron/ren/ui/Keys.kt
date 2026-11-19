@@ -74,7 +74,7 @@ private fun pressable(enabled: Boolean, role: Role, onClick: () -> Unit): Pair<M
 
 /** Key and link text, rendered exactly as written, in sentence case. Screen readers and tests get [text] as written. */
 @Composable
-fun CapsText(
+public fun CapsText(
     text: String,
     style: TextStyle,
     color: Color,
@@ -91,7 +91,7 @@ fun CapsText(
 
 /** The full-width primary call to action: solid volt. Pressed, it darkens and lands; disabled, it is a quiet fill with muted ink. */
 @Composable
-fun PrimaryKey(
+public fun PrimaryKey(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -130,7 +130,7 @@ fun PrimaryKey(
 
 /** The secondary key under or beside a primary one: a neutral fill that darkens while pressed. */
 @Composable
-fun SecondaryKey(
+public fun SecondaryKey(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -159,7 +159,7 @@ fun SecondaryKey(
 
 /** A text link in ink, with an optional [leading] icon. */
 @Composable
-fun TextKey(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, leading: ImageVector? = null) {
+public fun TextKey(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, leading: ImageVector? = null) {
     val p = LocalPalette.current
     val (press, pressed) = pressable(true, Role.Button, onClick)
     Row(
@@ -177,7 +177,7 @@ fun TextKey(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, le
 
 /** A pill filter chip: an ink fill when selected, a quiet fill otherwise. */
 @Composable
-fun FilterChip(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+public fun FilterChip(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val p = LocalPalette.current
     val haptics = LocalHapticFeedback.current
     val pill = RoundedCornerShape(50)
@@ -197,7 +197,7 @@ fun FilterChip(text: String, selected: Boolean, onClick: () -> Unit, modifier: M
 
 /** A horizontal rail that bleeds off the right edge. */
 @Composable
-fun ChipRail(modifier: Modifier = Modifier, start: Dp = 20.dp, content: LazyListScope.() -> Unit) {
+public fun ChipRail(modifier: Modifier = Modifier, start: Dp = 20.dp, content: LazyListScope.() -> Unit) {
     LazyRow(
         modifier.fillMaxWidth(),
         contentPadding = PaddingValues(start = start, end = 0.dp),
@@ -240,13 +240,13 @@ private fun Toggle(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?, modi
 
 /** Ren's switch: a volt track when on, a quiet one when off, with a paper thumb. A null [onCheckedChange] shows the state only. */
 @Composable
-fun RenToggle(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?, modifier: Modifier = Modifier, enabled: Boolean = true) {
+public fun RenToggle(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?, modifier: Modifier = Modifier, enabled: Boolean = true) {
     Toggle(checked, onCheckedChange, modifier, enabled, 36.dp, 20.dp, 16.dp)
 }
 
 /** A radio mark for radio cards: a faint ring, volt and filled when chosen. */
 @Composable
-fun RadioDot(selected: Boolean, modifier: Modifier = Modifier) {
+public fun RadioDot(selected: Boolean, modifier: Modifier = Modifier) {
     val p = LocalPalette.current
     val dot by animateDpAsState(if (selected) 8.dp else 0.dp, tween(Motion.BASE, easing = Motion.Emphasized), label = "radio")
     Box(modifier.size(20.dp).clip(CircleShape).border(1.5.dp, if (selected) p.accent else p.dot, CircleShape), contentAlignment = Alignment.Center) {
@@ -256,7 +256,7 @@ fun RadioDot(selected: Boolean, modifier: Modifier = Modifier) {
 
 /** The round volt send key; pressed, it darkens. */
 @Composable
-fun SendKey(onClick: () -> Unit, modifier: Modifier = Modifier, description: String = "Send") {
+public fun SendKey(onClick: () -> Unit, modifier: Modifier = Modifier, description: String = "Send") {
     val p = LocalPalette.current
     val (press, pressed) = pressable(true, Role.Button, onClick)
     Box(

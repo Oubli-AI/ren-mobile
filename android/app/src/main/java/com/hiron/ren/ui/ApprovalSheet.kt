@@ -73,7 +73,7 @@ private val Headline = Type.step.copy(fontSize = 30.sp, lineHeight = 35.sp)
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ApprovalSheet(request: ApprovalRequest, onAnswer: (String, ApprovalAnswer) -> Unit, onDismiss: () -> Unit) {
+public fun ApprovalSheet(request: ApprovalRequest, onAnswer: (String, ApprovalAnswer) -> Unit, onDismiss: () -> Unit) {
     val p = LocalPalette.current
     val context = LocalContext.current
     var always by remember(request.id) { mutableStateOf(false) }

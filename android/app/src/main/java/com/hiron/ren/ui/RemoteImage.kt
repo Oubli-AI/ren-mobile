@@ -13,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.BrokenImage
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
@@ -31,16 +32,16 @@ import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 /** Fetches result images. Only `https` images load. */
-interface Images {
+public interface Images {
     /** [url] decoded for about [widthPx] pixels across, or null when it can't be had. */
-    suspend fun bitmap(url: String, widthPx: Int): ImageBitmap?
+    public suspend fun bitmap(url: String, widthPx: Int): ImageBitmap?
 
     /** Saves [url] to [to]; false when it can't be had. */
-    suspend fun download(url: String, to: File): Boolean
+    public suspend fun download(url: String, to: File): Boolean
 }
 
 /** [Images] over OkHttp, decoded with BitmapFactory at a sample size for the width, cached in memory (1/8 of the heap). */
-class ImageLoader(http: OkHttpClient) : Images {
+public class ImageLoader(http: OkHttpClient) : Images {
     private val http = http.newBuilder().readTimeout(20, TimeUnit.SECONDS).callTimeout(20, TimeUnit.SECONDS).build()
     private val cache = object : LruCache<String, Bitmap>((Runtime.getRuntime().maxMemory() / 1024 / 8).toInt()) {
         override fun sizeOf(key: String, value: Bitmap) = value.byteCount / 1024
@@ -87,11 +88,11 @@ class ImageLoader(http: OkHttpClient) : Images {
 private const val UNBOUNDED_WIDTH_PX = 1080
 
 /** The app's [Images]; screens without one show the placeholders. */
-val LocalImages = staticCompositionLocalOf<Images?> { null }
+public val LocalImages: ProvidableCompositionLocal<Images?> = staticCompositionLocalOf<Images?> { null }
 
 /** A result image: a quiet tile while it loads, a faint broken-image glyph when it can't. */
 @Composable
-fun RemoteImage(
+public fun RemoteImage(
     url: String?,
     description: String?,
     modifier: Modifier = Modifier,

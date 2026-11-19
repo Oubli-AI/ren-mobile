@@ -47,7 +47,7 @@ import java.util.UUID
  * as dynamic variables; the agents call the phone tools, `request_approval` and, with a [search], the search tools
  * ([SearchTools]) as client tools. The chat is built from the session's server messages ([ChatEvents]).
  */
-class RenAgent(
+public class RenAgent(
     private val context: Context,
     private val settings: Settings,
     private val run: suspend (String, JSONObject) -> ToolResult,
@@ -140,7 +140,7 @@ class RenAgent(
     }
 
     private fun end(ending: ConversationSession) {
-        scope.launch(Dispatchers.Main) { runCatching { ending.endSession() } }
+        scope.launch(Dispatchers.Main) { val _ = runCatching { ending.endSession() } }
     }
 
     private fun config(mode: AgentMode, gen: Int, connected: CompletableDeferred<Unit>): ConversationConfig {
@@ -242,7 +242,7 @@ class RenAgent(
         words.lastOrNull()?.let { delay((it.seconds * 1000).toLong()) }
     }
 
-    override fun hasMicrophone() =
+    override fun hasMicrophone(): Boolean =
         ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
 
     /** Adds the user's typed message to the conversation; returns its id. */
@@ -267,31 +267,31 @@ class RenAgent(
     private fun failed(error: String) =
         update { RenStore.note(it.copy(lastError = error, activity = Activity.Failed), System.currentTimeMillis(), "error", error) }
 
-    companion object {
+    public companion object {
         /** Ren's public ElevenLabs agents. */
-        val AGENTS = mapOf(
+        public val AGENTS: Map<AgentMode, String> = mapOf(
             AgentMode.Voice to "agent_2901m620nzwrev2r7ekqpydcxe25",
             AgentMode.Text to "agent_9601m623qa72ffs9cyy3ezc0p6tb",
         )
 
-        const val NEEDS_MICROPHONE = "Ren needs the microphone to talk. Tap the mic to allow it."
-        const val COULD_NOT_START = "Couldn't reach the ElevenLabs agent. Check your connection and try again."
-        const val ENDED_BY_ELEVENLABS = "ElevenLabs ended the conversation: "
+        public const val NEEDS_MICROPHONE: String = "Ren needs the microphone to talk. Tap the mic to allow it."
+        public const val COULD_NOT_START: String = "Couldn't reach the ElevenLabs agent. Check your connection and try again."
+        public const val ENDED_BY_ELEVENLABS: String = "ElevenLabs ended the conversation: "
     }
 }
 
 /** The phone tools and `request_approval` as ElevenLabs client tools. */
-object AgentTools {
+public object AgentTools {
     /** Every phone tool the agents call, by its client tool name. */
-    val NAMES = listOf(
+    public val NAMES: List<String> = listOf(
         "sms_send", "sms_list", "contacts_search", "calls_recent", "phone_call", "calendar_list", "calendar_create",
         "notifications_list", "notification_reply", "reminder_create", "reminders_list", "reminder_cancel", "email_draft",
         "apps_list", "app_open", "device_status", "screen_read", "screen_act",
     )
 
-    const val REQUEST_APPROVAL = "request_approval"
+    public const val REQUEST_APPROVAL: String = "request_approval"
 
-    fun build(run: suspend (String, JSONObject) -> ToolResult): Map<String, ClientTool> = NAMES.associateWith { name ->
+    public fun build(run: suspend (String, JSONObject) -> ToolResult): Map<String, ClientTool> = NAMES.associateWith { name ->
         object : ClientTool {
             override suspend fun execute(parameters: Map<String, Any>): ClientToolResult = try {
                 result(run(name, json(parameters)))
@@ -307,7 +307,7 @@ object AgentTools {
      * `request_approval(action_type, details)`: shows the user the approval and answers
      * `{"approved": …, "remember_decision": …}`.
      */
-    fun approval(approve: suspend (ApprovalRequest) -> ApprovalAnswer): ClientTool = object : ClientTool {
+    public fun approval(approve: suspend (ApprovalRequest) -> ApprovalAnswer): ClientTool = object : ClientTool {
         override suspend fun execute(parameters: Map<String, Any>): ClientToolResult = askApproval(parameters["action_type"] as? String, parameters["details"] as? String, approve).fold(
             onSuccess = { ClientToolResult.success(it) },
             onFailure = { ClientToolResult.failure(it.message.orEmpty()) },
@@ -315,14 +315,14 @@ object AgentTools {
     }
 
     /** One `request_approval` call: the user's answer as the agent reads it, or why the request couldn't be shown. */
-    suspend fun askApproval(type: String?, details: String?, approve: suspend (ApprovalRequest) -> ApprovalAnswer): Result<String> {
+    public suspend fun askApproval(type: String?, details: String?, approve: suspend (ApprovalRequest) -> ApprovalAnswer): Result<String> {
         val action = PermAction.of(type)
             ?: return Result.failure(IllegalArgumentException("Unknown action_type \"$type\". Use one of: ${PermAction.entries.joinToString { it.wire }}."))
         val answer = approve(ApprovalRequest(UUID.randomUUID().toString(), action, details.orEmpty()))
         return Result.success(JSONObject().put("approved", answer.approved).put("remember_decision", answer.remember).toString())
     }
 
-    fun result(result: ToolResult): ClientToolResult {
+    public fun result(result: ToolResult): ClientToolResult {
         val text = when (val data = result.data) {
             null, JSONObject.NULL -> ""
             else -> data.toString()
@@ -331,7 +331,7 @@ object AgentTools {
     }
 
     /** The SDK's parsed parameters (Gson numbers, lists and maps) as the JSON input [com.hiron.ren.device.DeviceTools] reads. */
-    fun json(parameters: Map<String, Any>): JSONObject = JSONObject().apply { parameters.forEach { (k, v) -> put(k, value(v)) } }
+    public fun json(parameters: Map<String, Any>): JSONObject = JSONObject().apply { parameters.forEach { (k, v) -> put(k, value(v)) } }
 
     private fun value(v: Any?): Any = when (v) {
         null -> JSONObject.NULL
@@ -346,14 +346,14 @@ object AgentTools {
      * The agent's text without the expressive audio tags (`[warmly]`, `[clears throat]`) its voice performs, as the
      * ElevenLabs widget shows it (convai-widget-core `stripAudioTags`); markdown links like `[docs](url)` stay.
      */
-    fun withoutAudioTags(text: String): String = AUDIO_TAG.replace(text, "").trim()
+    public fun withoutAudioTags(text: String): String = AUDIO_TAG.replace(text, "").trim()
 
     private val AUDIO_TAG = Regex("""\[[\w\s]+\](?!\()\s*""")
 
-    data class Spoken(val text: String, val startMs: Double, val seconds: Double)
+    public data class Spoken(val text: String, val startMs: Double, val seconds: Double)
 
     /** Words and their timing from an `audio_alignment` event (`chars`, `char_start_times_ms`, `char_durations_ms`). */
-    fun words(alignment: Map<String, Any>): List<Spoken> {
+    public fun words(alignment: Map<String, Any>): List<Spoken> {
         val inner = alignment["alignment"] as? Map<*, *> ?: alignment
         val chars = (inner["chars"] as? List<*>)?.map { it.toString() } ?: return emptyList()
         val starts = (inner["char_start_times_ms"] as? List<*>)?.map { (it as? Number)?.toDouble() ?: 0.0 } ?: return emptyList()

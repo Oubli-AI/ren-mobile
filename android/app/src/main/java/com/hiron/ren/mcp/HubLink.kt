@@ -33,17 +33,17 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Duration.Companion.seconds
 
 /** Where the phone stands with Ren's hub. */
-sealed interface HubState {
+public sealed interface HubState {
     /** The link is switched off. */
-    data object Off : HubState
+    public data object Off : HubState
 
-    data object Connecting : HubState
+    public data object Connecting : HubState
 
     /** The phone's tools are served through the hub. */
-    data object Attached : HubState
+    public data object Attached : HubState
 
     /** The last try failed for [reason]; another follows. */
-    data class Retrying(val reason: String) : HubState
+    public data class Retrying(val reason: String) : HubState
 }
 
 /**
@@ -54,7 +54,7 @@ sealed interface HubState {
  * It is also the phone's MCP client: [tools] and [call] reach whatever else is attached to the hub, ren desktop's
  * tools under `desktop_`.
  */
-class HubLink(
+public class HubLink(
     private val scope: CoroutineScope,
     /** The hub's WebSocket base, like `wss://rivet.ron-ai.dev/hub`. */
     private val url: () -> String,
@@ -63,7 +63,7 @@ class HubLink(
     private val server: () -> Server,
 ) {
     private val _state = MutableStateFlow<HubState>(HubState.Off)
-    val state: StateFlow<HubState> = _state.asStateFlow()
+    public val state: StateFlow<HubState> = _state.asStateFlow()
 
     private val http = HttpClient(CIO) {
         install(WebSockets)
@@ -71,12 +71,12 @@ class HubLink(
     }
     private var job: Job? = null
 
-    fun start() {
+    public fun start() {
         if (job?.isActive == true) return
         job = scope.launch(Dispatchers.IO) { keepAttached() }
     }
 
-    fun stop() {
+    public fun stop() {
         job?.cancel()
         job = null
         _state.value = HubState.Off
@@ -125,10 +125,10 @@ class HubLink(
     }
 
     /** The hub's tools as the phone sees them: its own, ren desktop's under `desktop_`, and `hub_peers`. */
-    suspend fun tools(): List<Tool> = withHub { it.listTools(ListToolsRequest()).tools }
+    public suspend fun tools(): List<Tool> = withHub { it.listTools(ListToolsRequest()).tools }
 
     /** Calls the hub's tool [name] and returns its text, or throws with what the tool said went wrong. */
-    suspend fun call(name: String, arguments: Map<String, Any?> = emptyMap()): String = withHub { hub ->
+    public suspend fun call(name: String, arguments: Map<String, Any?> = emptyMap()): String = withHub { hub ->
         val result: CallToolResult = hub.callTool(name, arguments)
         val text = result.content.filterIsInstance<TextContent>().joinToString("\n") { it.text }
         if (result.isError == true) error(text.ifBlank { "$name failed." })
@@ -143,17 +143,17 @@ class HubLink(
         try {
             use(client)
         } finally {
-            runCatching { client.close() }
+            val _ = runCatching { client.close() }
         }
     }
 
-    companion object {
+    public companion object {
         private val FIRST_RETRY = 2.seconds
         private val LAST_RETRY = 60.seconds
         private val PING_EVERY = 20.seconds
         private val PING_TIMEOUT = 10.seconds
 
         /** The hub tool that says which sides are attached. */
-        const val PEERS = "hub_peers"
+        public const val PEERS: String = "hub_peers"
     }
 }

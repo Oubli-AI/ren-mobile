@@ -34,7 +34,7 @@ import org.json.JSONObject
  * While Ren operates, a Stop button floats at the edge of every app; pressing it refuses all actions until the
  * user next speaks or types to Ren ([resume]).
  */
-class ScreenOperator : AccessibilityService() {
+public class ScreenOperator : AccessibilityService() {
 
     private var overlay: TextView? = null
     private val main = Handler(Looper.getMainLooper())
@@ -48,7 +48,7 @@ class ScreenOperator : AccessibilityService() {
         lastEventAt = SystemClock.uptimeMillis()
     }
 
-    override fun onInterrupt() = Unit
+    override fun onInterrupt(): Unit = Unit
 
     override fun onDestroy() {
         removeOverlay()
@@ -91,10 +91,10 @@ class ScreenOperator : AccessibilityService() {
     private fun removeOverlay() {
         val view = overlay ?: return
         overlay = null
-        runCatching { getSystemService(WindowManager::class.java)?.removeView(view) }
+        val _ = runCatching { getSystemService(WindowManager::class.java)?.removeView(view) }
     }
 
-    companion object {
+    public companion object {
         private const val MAX_NODES = 150
         private const val OVERLAY_MS = 120_000L
         private const val READ_WAIT_MS = 4_000L
@@ -114,10 +114,10 @@ class ScreenOperator : AccessibilityService() {
 
         private var lastNodes: List<AccessibilityNodeInfo> = emptyList()
 
-        val connected: Boolean get() = instance != null
+        public val connected: Boolean get() = instance != null
 
         /** The user spoke or typed to Ren again, which is them asking: lifts a Stop. */
-        fun resume() {
+        public fun resume() {
             stopped = false
         }
 
@@ -126,10 +126,10 @@ class ScreenOperator : AccessibilityService() {
          * included) fills a page's elements in only after the first read, so a screen with at most one element is
          * read again until it fills in or [READ_WAIT_MS] passes.
          */
-        suspend fun read(): ToolResult = withContext(Dispatchers.Main) {
+        public suspend fun read(): ToolResult = withContext(Dispatchers.Main) {
             val service = instance ?: return@withContext notConnected()
             stopped()?.let { return@withContext it }
-            service.showOverlay()
+            val _ = service.showOverlay()
             val deadline = SystemClock.uptimeMillis() + READ_WAIT_MS
             var screen = snapshot(service, deadline)
             while ((screen == null || screen.nodes.size <= 1) && SystemClock.uptimeMillis() < deadline) {
@@ -161,10 +161,10 @@ class ScreenOperator : AccessibilityService() {
             return Screen(root.packageName?.toString().orEmpty(), nodes, rows)
         }
 
-        suspend fun act(action: String, node: Int?, label: String?, text: String?): ToolResult = withContext(Dispatchers.Main) {
+        public suspend fun act(action: String, node: Int?, label: String?, text: String?): ToolResult = withContext(Dispatchers.Main) {
             val service = instance ?: return@withContext notConnected()
             stopped()?.let { return@withContext it }
-            service.showOverlay()
+            val _ = service.showOverlay()
             val result = when (action) {
                 "back" -> global(service, AccessibilityService.GLOBAL_ACTION_BACK)
                 "home" -> global(service, AccessibilityService.GLOBAL_ACTION_HOME)

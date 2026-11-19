@@ -18,7 +18,7 @@ import android.speech.SpeechRecognizer
  * recognizer becomes the phone's default, so this keeps other apps' voice input working while Ren is the
  * assistant; Android 12+ never makes it the default (`selectableAsDefault="false"`).
  */
-class RenRecognitionService : RecognitionService() {
+public class RenRecognitionService : RecognitionService() {
     private var relay: SpeechRecognizer? = null
 
     override fun onStartListening(intent: Intent, listener: Callback) {
@@ -38,7 +38,7 @@ class RenRecognitionService : RecognitionService() {
         relay?.stopListening()
     }
 
-    override fun onCancel(listener: Callback) = release()
+    override fun onCancel(listener: Callback): Unit = release()
 
     override fun onDestroy() {
         release()
@@ -95,12 +95,12 @@ class RenRecognitionService : RecognitionService() {
 }
 
 /** Picks the speech recognizer Ren listens through. Ren's own [RenRecognitionService] is never picked. */
-object Recognizers {
+public object Recognizers {
     /** A recognizer service on the phone; [preinstalled] ones ship with it. */
-    data class Candidate(val pkg: String, val cls: String, val preinstalled: Boolean = false)
+    public data class Candidate(val pkg: String, val cls: String, val preinstalled: Boolean = false)
 
     /** The phone's default recognizer unless it is Ren's own, else a preinstalled one, else any other. */
-    fun pick(own: String, default: String?, installed: List<Candidate>): Candidate? {
+    public fun pick(own: String, default: String?, installed: List<Candidate>): Candidate? {
         val others = installed.filter { it.pkg != own }
         val preferred = default?.let(::parse)
         others.firstOrNull { preferred != null && it.pkg == preferred.first && it.cls == preferred.second }?.let { return it }
@@ -108,13 +108,13 @@ object Recognizers {
     }
 
     /** Splits a flattened component name ("pkg/cls" or "pkg/.cls") into package and class. */
-    fun parse(flat: String): Pair<String, String>? {
+    public fun parse(flat: String): Pair<String, String>? {
         val pkg = flat.substringBefore('/', "").ifBlank { return null }
         val cls = flat.substringAfter('/', "").ifBlank { return null }
         return pkg to if (cls.startsWith(".")) pkg + cls else cls
     }
 
-    fun target(context: Context): Candidate? {
+    public fun target(context: Context): Candidate? {
         // Settings.Secure.VOICE_RECOGNITION_SERVICE is hidden but readable; it is what SpeechRecognizer binds by default.
         val default = runCatching { Settings.Secure.getString(context.contentResolver, "voice_recognition_service") }.getOrNull()
         val installed = context.packageManager.queryIntentServices(Intent(RecognitionService.SERVICE_INTERFACE), 0).map {

@@ -13,11 +13,11 @@ import org.json.JSONObject
 import java.time.ZoneId
 
 /** Launching apps, handing drafts to the mail app, and the phone's own status. */
-class Apps(private val context: Context, private val isVisible: () -> Boolean) {
+public class Apps(private val context: Context, private val isVisible: () -> Boolean) {
 
     private data class App(val label: String, val pkg: String)
 
-    fun list(query: String?): ToolResult {
+    public fun list(query: String?): ToolResult {
         val needle = query?.lowercase()
         val apps = launcherApps().filter { needle == null || it.label.lowercase().contains(needle) || it.pkg.contains(needle) }
         return ToolResult.ok(
@@ -25,7 +25,7 @@ class Apps(private val context: Context, private val isVisible: () -> Boolean) {
         )
     }
 
-    fun open(app: String): ToolResult {
+    public fun open(app: String): ToolResult {
         val all = launcherApps()
         val needle = app.trim().lowercase()
         val match = all.firstOrNull { it.pkg == app.trim() }
@@ -39,7 +39,7 @@ class Apps(private val context: Context, private val isVisible: () -> Boolean) {
             .let { how -> ToolResult.ok(JSONObject().put("app", match.label).put("package", match.pkg).put("opened", how)) }
     }
 
-    fun emailDraft(to: String, subject: String, body: String): ToolResult {
+    public fun emailDraft(to: String, subject: String, body: String): ToolResult {
         val uri = Uri.parse("mailto:" + Uri.encode(to.trim()).replace("%40", "@").replace("%2C", ","))
         val intent = Intent(Intent.ACTION_SENDTO, uri)
             .putExtra(Intent.EXTRA_EMAIL, to.split(',').map { it.trim() }.filter { it.isNotEmpty() }.toTypedArray())
@@ -54,7 +54,7 @@ class Apps(private val context: Context, private val isVisible: () -> Boolean) {
         )
     }
 
-    fun status(): ToolResult {
+    public fun status(): ToolResult {
         val battery = context.getSystemService(BatteryManager::class.java)
         val cm = context.getSystemService(ConnectivityManager::class.java)
         val caps = cm?.getNetworkCapabilities(cm.activeNetwork)

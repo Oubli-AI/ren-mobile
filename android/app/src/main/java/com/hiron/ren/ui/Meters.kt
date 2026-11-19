@@ -64,14 +64,14 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
-enum class TalkState { Idle, Listening }
+public enum class TalkState { Idle, Listening }
 
 /**
  * The voice key of the dock and the overlay: a volt disc with a mic. [TalkState.Listening] turns it danger red with a
  * stop mark inside a thin ring, so a live microphone is never in doubt.
  */
 @Composable
-fun TalkKey(state: TalkState, onClick: () -> Unit, description: String, modifier: Modifier = Modifier) {
+public fun TalkKey(state: TalkState, onClick: () -> Unit, description: String, modifier: Modifier = Modifier) {
     val p = LocalPalette.current
     val haptics = LocalHapticFeedback.current
     val source = remember { MutableInteractionSource() }
@@ -102,7 +102,7 @@ fun TalkKey(state: TalkState, onClick: () -> Unit, description: String, modifier
 
 /** A rounded-bar level meter in volt. [levels] run 0 to 1; louder bars are stronger. */
 @Composable
-fun LevelMeter(levels: List<Float>, modifier: Modifier = Modifier, height: Dp = 56.dp) {
+public fun LevelMeter(levels: List<Float>, modifier: Modifier = Modifier, height: Dp = 56.dp) {
     val p = LocalPalette.current
     Row(modifier.height(height), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
         levels.forEachIndexed { i, raw ->

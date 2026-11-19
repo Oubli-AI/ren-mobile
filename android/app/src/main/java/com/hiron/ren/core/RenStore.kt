@@ -3,7 +3,7 @@ package com.hiron.ren.core
 import java.util.UUID
 
 /** Everything the screens render. */
-data class RenState(
+public data class RenState(
     val messages: List<ChatMessage> = emptyList(),
     val activity: Activity = Activity.Idle,
     /** `request_approval` calls waiting for the user, oldest first. */
@@ -15,9 +15,9 @@ data class RenState(
 )
 
 /** What Ren is doing right now; drives the robot's moves. */
-enum class Activity { Idle, Listening, Thinking, Searching, Working, Texting, Emailing, Waiting, Done, Failed }
+public enum class Activity { Idle, Listening, Thinking, Searching, Working, Texting, Emailing, Waiting, Done, Failed }
 
-data class ChatMessage(
+public data class ChatMessage(
     val id: String,
     val fromUser: Boolean,
     /** The user's words, an app line, or Ren's replies in this turn joined. */
@@ -30,20 +30,20 @@ data class ChatMessage(
     val reasoning: Reasoning? = null,
 )
 
-sealed interface ChatPart {
-    val id: String
+public sealed interface ChatPart {
+    public val id: String
 }
 
 /** One response from the agent, by its `response_id`; [raw] still has the voice's audio tags. */
-data class Reply(override val id: String, val raw: String, val text: String, val streaming: Boolean = false) : ChatPart
+public data class Reply(override val id: String, val raw: String, val text: String, val streaming: Boolean = false) : ChatPart
 
-enum class ToolState { Running, Done, Failed }
+public enum class ToolState { Running, Done, Failed }
 
 /**
  * One tool call; [type] is the agent's tool type: `client` (the phone), `webhook`, `mcp` or `system`, or `strands` for the
  * Gemini agents' other tools.
  */
-data class ToolStep(
+public data class ToolStep(
     override val id: String,
     val name: String,
     val type: String,
@@ -55,38 +55,38 @@ data class ToolStep(
 ) : ChatPart
 
 /** Reasoning text and how long it took: [spentMs] for the closed segments, [openedAt] while one streams. */
-data class Reasoning(val text: String, val spentMs: Long = 0, val openedAt: Long? = null) {
+public data class Reasoning(val text: String, val spentMs: Long = 0, val openedAt: Long? = null) {
     val streaming: Boolean get() = openedAt != null
 
     /** Whole seconds spent thinking, rounded up; null while it streams. */
     val seconds: Int? get() = if (streaming) null else ((spentMs + 999) / 1000).toInt()
 }
 
-data class LogEntry(val at: Long, val kind: String, val text: String)
+public data class LogEntry(val at: Long, val kind: String, val text: String)
 
-object RenStore {
+public object RenStore {
     private const val LOG_LIMIT = 200
 
-    const val EXPIRED = "Nobody answered in time, so Ren didn't do it."
+    public const val EXPIRED: String = "Nobody answered in time, so Ren didn't do it."
 
     /** Ids of steps the phone made before the agent's event for the call arrived. */
-    const val PHONE_STEP = "phone:"
+    public const val PHONE_STEP: String = "phone:"
 
     /** The activity line for one answer. */
-    fun answer(request: ApprovalRequest, answer: ApprovalAnswer): String = when {
+    public fun answer(request: ApprovalRequest, answer: ApprovalAnswer): String = when {
         answer.approved && answer.remember -> "Always allowed: ${request.action.label}"
         answer.approved -> "Approved: ${request.details}"
         else -> "Declined: ${request.details}"
     }
 
-    fun note(state: RenState, now: Long, kind: String, text: String): RenState =
+    public fun note(state: RenState, now: Long, kind: String, text: String): RenState =
         state.copy(log = (state.log + LogEntry(now, kind, text)).takeLast(LOG_LIMIT))
 
     /**
      * The phone's own search under the tool [name] finished: its results go on the turn's latest step for that tool
      * that has none yet, or on a new step when the agent's event for the call hasn't arrived.
      */
-    fun searched(state: RenState, name: String, results: SearchResults): RenState = turn(state) { message ->
+    public fun searched(state: RenState, name: String, results: SearchResults): RenState = turn(state) { message ->
         val at = message.parts.indexOfLast { it is ToolStep && it.name == name && it.search == null }
         val parts = if (at < 0) {
             message.parts + ToolStep(PHONE_STEP + UUID.randomUUID().toString().take(12), name, "client", ToolState.Done, results)
@@ -100,7 +100,7 @@ object RenStore {
      * Changes Ren's current turn: the last message when it is one, else a new turn at the end. The turn's [ChatMessage.text]
      * follows its replies.
      */
-    fun turn(state: RenState, change: (ChatMessage) -> ChatMessage): RenState {
+    public fun turn(state: RenState, change: (ChatMessage) -> ChatMessage): RenState {
         val last = state.messages.lastOrNull()
         val current = last?.takeIf { !it.fromUser && !it.system }
         val changed = change(current ?: ChatMessage("agent:" + UUID.randomUUID().toString().take(12), false, "")).let { m ->

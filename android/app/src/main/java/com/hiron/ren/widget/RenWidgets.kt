@@ -23,49 +23,49 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /** The 4x1 bar: ask, or tap the voice key to talk. */
-class SearchWidget : AppWidgetProvider() {
-    override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) = RenWidgets.render(context, manager, ids, panel = false)
+public class SearchWidget : AppWidgetProvider() {
+    override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray): Unit = RenWidgets.render(context, manager, ids, panel = false)
 }
 
 /** The 4x2 panel: status, Ren's latest reply, the ask bar and quick keys. */
-class PanelWidget : AppWidgetProvider() {
-    override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) = RenWidgets.render(context, manager, ids, panel = true)
+public class PanelWidget : AppWidgetProvider() {
+    override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray): Unit = RenWidgets.render(context, manager, ids, panel = true)
 }
 
 /** What the widgets show. */
-data class WidgetSnapshot(val lastReply: String, val waiting: Int)
+public data class WidgetSnapshot(val lastReply: String, val waiting: Int)
 
-object RenWidgets {
-    const val ACTION_LISTEN = "com.hiron.ren.action.LISTEN"
-    const val ACTION_TYPE = "com.hiron.ren.action.TYPE"
-    const val ACTION_QUICK = "com.hiron.ren.action.QUICK"
+public object RenWidgets {
+    public const val ACTION_LISTEN: String = "com.hiron.ren.action.LISTEN"
+    public const val ACTION_TYPE: String = "com.hiron.ren.action.TYPE"
+    public const val ACTION_QUICK: String = "com.hiron.ren.action.QUICK"
 
     /** Keeps every placed widget in step with the runtime. */
-    fun follow(context: Context, runtime: RenRuntime) {
+    public fun follow(context: Context, runtime: RenRuntime) {
         val app = context.applicationContext
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
             runtime.state.map(::snapshotOf).distinctUntilChanged().collect { refresh(app) }
         }
     }
 
-    fun snapshotOf(state: RenState) = WidgetSnapshot(
+    public fun snapshotOf(state: RenState): WidgetSnapshot = WidgetSnapshot(
         lastReply = state.messages.lastOrNull { !it.fromUser && !it.system && it.text.isNotBlank() }?.text?.let(Rich::plain).orEmpty(),
         waiting = state.approvals.size,
     )
 
-    fun refresh(context: Context) {
+    public fun refresh(context: Context) {
         val manager = AppWidgetManager.getInstance(context) ?: return
         render(context, manager, manager.getAppWidgetIds(ComponentName(context, SearchWidget::class.java)), panel = false)
         render(context, manager, manager.getAppWidgetIds(ComponentName(context, PanelWidget::class.java)), panel = true)
     }
 
-    fun render(context: Context, manager: AppWidgetManager, ids: IntArray, panel: Boolean) {
+    public fun render(context: Context, manager: AppWidgetManager, ids: IntArray, panel: Boolean) {
         if (ids.isEmpty()) return
         val views = views(context, snapshotOf(context.ren.state.value), panel)
         ids.forEach { manager.updateAppWidget(it, views) }
     }
 
-    fun views(context: Context, snap: WidgetSnapshot, panel: Boolean): RemoteViews {
+    public fun views(context: Context, snap: WidgetSnapshot, panel: Boolean): RemoteViews {
         val views = RemoteViews(context.packageName, if (panel) R.layout.widget_panel else R.layout.widget_search)
         val (colour, label) = when {
             snap.waiting > 0 -> R.color.ren_amber to "${snap.waiting} waiting"

@@ -20,12 +20,12 @@ import java.util.UUID
  * the user's spoken words, Ren's replies as they stream, its reasoning summary, and every tool call with its state
  * and, for the searches, what was found. The event shapes are the ElevenLabs client events, as both agents send them.
  */
-object ChatEvents {
+public object ChatEvents {
     /** The search tools, by their tool name; webhooks send Brave's response as the full result. */
     private val SEARCHES = SearchTools.NAMES
 
     /** [state] after the server message [event]; messages the chat doesn't show leave it unchanged. */
-    fun apply(state: RenState, event: JSONObject, now: Long, voice: Boolean): RenState = when (event.optString("type")) {
+    public fun apply(state: RenState, event: JSONObject, now: Long, voice: Boolean): RenState = when (event.optString("type")) {
         "user_transcript" -> heard(state, event.optJSONObject("user_transcription_event"), voice)
         "agent_chat_response_part" -> part(state, event.optJSONObject("text_response_part") ?: return state)
         "agent_response" -> response(state, event.optJSONObject("agent_response_event") ?: return state)

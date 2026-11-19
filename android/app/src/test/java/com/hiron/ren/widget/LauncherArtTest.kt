@@ -80,7 +80,7 @@ class LauncherArtTest {
             icon.foreground.draw(c)
             canvas.drawBitmap(layer, (px(16f) + i * (size + px(8f))).toFloat(), px(16f).toFloat(), null)
         }
-        save(sheet, "icon-launcher")
+        val _ = save(sheet, "icon-launcher")
     }
 
     /** The icon at the sizes it must read at: 48 px and 192 px, full colour and themed, with the 48 px one enlarged. */
@@ -102,7 +102,7 @@ class LauncherArtTest {
             canvas.drawBitmap(adaptive(icon, 192, theme), (gap + 48 + gap).toFloat(), top.toFloat(), null)
             canvas.drawBitmap(Bitmap.createScaledBitmap(small, 48 * zoom, 48 * zoom, false), (gap + 48 + gap + 192 + gap).toFloat(), top.toFloat(), null)
         }
-        save(sheet, "icon-sizes")
+        val _ = save(sheet, "icon-sizes")
     }
 
     /**
@@ -124,7 +124,7 @@ class LauncherArtTest {
         canvas.drawColor(context.getColor(R.color.ren_accent_tile))
         context.getDrawable(R.drawable.ic_launcher_foreground)!!.apply { setBounds(left, top, left + icon, top + icon) }.draw(canvas)
         canvas.restore()
-        save(sheet, "splash")
+        val _ = save(sheet, "splash")
     }
 
     /**
@@ -159,7 +159,7 @@ class LauncherArtTest {
             canvas.drawBitmap(Bitmap.createScaledBitmap(icon(s, 0xFFFFFFFF.toInt(), 0xFF000000.toInt()), s * zoom, s * zoom, false), x.toFloat(), (stripH * 2 + gap).toFloat(), null)
             x += s * zoom + gap
         }
-        save(sheet, "icon-notification")
+        val _ = save(sheet, "icon-notification")
     }
 
     /** The long-press shortcuts and the marks the widgets and the app draw, at their sizes, on paper. */
@@ -178,7 +178,7 @@ class LauncherArtTest {
             d.setBounds(x, gap, x + s, gap + s)
             d.draw(canvas)
         }
-        save(sheet, "icon-shortcuts")
+        val _ = save(sheet, "icon-shortcuts")
     }
 
     /** Ren's notifications each carry the Ren icon and volt. */
@@ -249,7 +249,7 @@ class LauncherArtTest {
     @Test
     fun theSmallestSizesStillFitAndSayTheStatusPlainly() {
         val snap = WidgetSnapshot("", 0)
-        render(RenWidgets.views(context, snap, panel = false), 250f, 64f, "widget-search-narrow")
+        val _ = render(RenWidgets.views(context, snap, panel = false), 250f, 64f, "widget-search-narrow")
         val panel = render(RenWidgets.views(context, snap, panel = true), 250f, 200f, "widget-panel-narrow")
         assertEquals("Ready", panel.findViewById<TextView>(R.id.status_text).text.toString())
         assertEquals(context.getString(R.string.widget_waiting), panel.findViewById<TextView>(R.id.last).text.toString())
@@ -275,7 +275,7 @@ class LauncherArtTest {
         wallpaper(canvas, bitmap.width, bitmap.height)
         canvas.translate(pad.toFloat(), pad.toFloat())
         host.draw(canvas)
-        save(bitmap, name)
+        val _ = save(bitmap, name)
         return root
     }
 }

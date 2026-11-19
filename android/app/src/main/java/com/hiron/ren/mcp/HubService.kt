@@ -21,7 +21,7 @@ import kotlinx.coroutines.launch
  * process also starts in the background for its accessibility service and notification listener, and starting this
  * there would crash it before either connects.
  */
-class HubService : LifecycleService() {
+public class HubService : LifecycleService() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
         ServiceCompat.startForeground(this, NOTIFICATION_ID, Notifications.hub(this, ren.hub.state.value), ServiceInfo.FOREGROUND_SERVICE_TYPE_MANIFEST)
@@ -42,17 +42,17 @@ class HubService : LifecycleService() {
     }
 
     /** Brings the link back after a reboot (BOOT_COMPLETED) or an update of Ren (MY_PACKAGE_REPLACED). */
-    class Starter : BroadcastReceiver() {
+    public class Starter : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             start(context)
         }
     }
 
-    companion object {
-        const val NOTIFICATION_ID = 996
+    public companion object {
+        public const val NOTIFICATION_ID: Int = 996
 
         /** Starts the link if Remote tools is on. */
-        fun start(context: Context) {
+        public fun start(context: Context) {
             if (context.ren.settings.hubEnabled) ContextCompat.startForegroundService(context, Intent(context, HubService::class.java))
         }
     }

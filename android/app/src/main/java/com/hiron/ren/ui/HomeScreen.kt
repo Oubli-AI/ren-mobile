@@ -112,19 +112,19 @@ import java.util.Calendar
 import java.util.Date
 
 /** One-tap requests on the dock, the widget and the launcher shortcuts: the things people ask Ren for most. */
-enum class Quick(val label: String, val tag: String, val prompt: String) {
+public enum class Quick(public val label: String, public val tag: String, public val prompt: String) {
     CatchUp("Catch me up", "ALL", "Catch me up: unread texts, missed calls, messages callers left, and anything waiting on me."),
     MyDay("My day", "CAL", "What's on my calendar today?"),
     Texts("Texts", "SMS", "Read my unread texts and suggest replies."),
     Calls("Calls", "TEL", "Did anyone call or leave a message? Tell me what they wanted."),
     ;
 
-    companion object {
-        fun of(key: String?): Quick? = entries.firstOrNull { it.name.equals(key, ignoreCase = true) }
+    public companion object {
+        public fun of(key: String?): Quick? = entries.firstOrNull { it.name.equals(key, ignoreCase = true) }
     }
 }
 
-const val STAGE_HINT = "Drag to look · tap to say hi"
+public const val STAGE_HINT: String = "Drag to look · tap to say hi"
 
 /** The page's side margins: 20dp, and 16dp on phones under 360dp wide. */
 @Composable
@@ -140,7 +140,7 @@ private fun gutter(): Dp {
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun HomeScreen(
+public fun HomeScreen(
     runtime: RenRuntime,
     state: RenState,
     onListen: () -> Unit,
@@ -200,7 +200,7 @@ fun HomeScreen(
             voice = voice,
             listening = state.activity == Activity.Listening,
             focusRequests = focusRequests,
-            onSend = { runtime.ask(it) },
+            onSend = { val _ = runtime.ask(it) },
             onListen = onListen,
         )
     }
@@ -209,7 +209,7 @@ fun HomeScreen(
 /** How tall Ren's stage opens over a conversation. */
 private val STAGE_FOLD = 240.dp
 
-const val SHOW_REN = "Show Ren"
+public const val SHOW_REN: String = "Show Ren"
 
 /** The bar over a conversation: it opens and folds Ren's stage, and starts a new chat when [onNewChat] is set. */
 @Composable
@@ -254,7 +254,7 @@ private fun DotLine(text: String, color: Color, modifier: Modifier = Modifier) {
     }
 }
 
-const val STAGE_TAG = "stage"
+public const val STAGE_TAG: String = "stage"
 
 @Composable
 private fun BoxScope.StageGreeting(visible: Boolean, state: RenState, voice: Boolean) {
@@ -339,7 +339,7 @@ private fun Banner(text: String, key: String, onClick: () -> Unit) {
     }
 }
 
-const val COMPOSER_TAG = "composer"
+public const val COMPOSER_TAG: String = "composer"
 
 /** A quick request: a soft outline pill in Inter, its touch area kept at 48dp. */
 @Composable

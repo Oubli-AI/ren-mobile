@@ -20,7 +20,7 @@ import org.json.JSONObject
  * tools drive [browser].
  * [version] is the app's version name, reported in `initialize`.
  */
-class PhoneMcpServer(
+public class PhoneMcpServer(
     private val version: String,
     private val browser: Browser,
     private val level: () -> SearchLevel,
@@ -28,7 +28,7 @@ class PhoneMcpServer(
     private val search: (suspend (String, JSONObject) -> Result<String>)?,
     private val run: suspend (String, JSONObject) -> ToolResult,
 ) {
-    fun build(): Server {
+    public fun build(): Server {
         val server = Server(
             serverInfo = Implementation(name = "ren-phone", version = version, title = "Ren phone"),
             options = ServerOptions(capabilities = ServerCapabilities(tools = ServerCapabilities.Tools(listChanged = false))),
@@ -41,7 +41,7 @@ class PhoneMcpServer(
         return server
     }
 
-    companion object {
+    public companion object {
         /** The MCP arguments as the JSON object [com.hiron.ren.device.DeviceTools] reads; both sides are plain JSON. */
         internal fun input(request: CallToolRequest): JSONObject = request.arguments?.let { JSONObject(it.toString()) } ?: JSONObject()
 
@@ -59,6 +59,6 @@ class PhoneMcpServer(
             result.fold({ CallToolResult.success(it) }, { CallToolResult.error(it.message ?: "The action failed on the phone.") })
 
         /** The arguments as the map the client tools' handlers read, the way the ElevenLabs SDK hands them over. */
-        fun parameters(input: JSONObject): Map<String, Any> = input.keys().asSequence().associateWith { input.get(it) }
+        public fun parameters(input: JSONObject): Map<String, Any> = input.keys().asSequence().associateWith { input.get(it) }
     }
 }

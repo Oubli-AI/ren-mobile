@@ -82,10 +82,10 @@ import androidx.compose.ui.unit.sp
 import java.util.Locale
 
 /** What the assistant overlay is doing; it picks the status dot, the reply card's tone and the keys. */
-enum class AssistPhase { Ready, Listening, Working, Replying, Done, Waiting, Failed, NeedsMic, Locked }
+public enum class AssistPhase { Ready, Listening, Working, Replying, Done, Waiting, Failed, NeedsMic, Locked }
 
 /** Everything the assistant overlay draws, as plain values, so it renders the same with or without a voice session. */
-data class AssistUi(
+public data class AssistUi(
     val phase: AssistPhase,
     /** What the user is saying (live while listening), or what they asked. */
     val heard: String = "",
@@ -103,9 +103,9 @@ data class AssistUi(
     val level: Float = 0f,
 )
 
-const val ASSIST_SCRIM_TAG = "assist-scrim"
-const val ASSIST_PANEL_TAG = "assist-panel"
-const val ASSIST_FIELD_TAG = "assist-field"
+public const val ASSIST_SCRIM_TAG: String = "assist-scrim"
+public const val ASSIST_PANEL_TAG: String = "assist-panel"
+public const val ASSIST_FIELD_TAG: String = "assist-field"
 
 /** How many recent microphone levels the meter shows when the panel is wide enough for all of them. */
 private const val METER_BARS = 24
@@ -124,7 +124,7 @@ private const val CARET = "caret"
  * closes it.
  */
 @Composable
-fun AssistOverlay(
+public fun AssistOverlay(
     ui: AssistUi,
     modifier: Modifier = Modifier,
     onMic: () -> Unit = {},

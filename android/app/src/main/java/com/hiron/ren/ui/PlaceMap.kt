@@ -40,18 +40,18 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /** One numbered pin. */
-data class MapPin(val n: Int, val at: LatLng, val title: String)
+public data class MapPin(val n: Int, val at: LatLng, val title: String)
 
 /** The map page in `assets/map/` and what it is sent. */
-object MapPage {
-    const val ORIGIN = "https://appassets.androidplatform.net"
-    const val PAGE = "$ORIGIN/assets/map/index.html"
+public object MapPage {
+    public const val ORIGIN: String = "https://appassets.androidplatform.net"
+    public const val PAGE: String = "$ORIGIN/assets/map/index.html"
 
     /** OpenFreeMap's public instance serves the style, tiles, fonts and sprites; nothing else loads from the network. */
-    const val TILES = "https://tiles.openfreemap.org/"
+    public const val TILES: String = "https://tiles.openfreemap.org/"
 
     /** `window.renMap.show`'s argument; the page swaps each pin to MapLibre's `[lng, lat]`. */
-    fun payload(pins: List<MapPin>, interactive: Boolean, selected: Int?): String = JSONObject()
+    public fun payload(pins: List<MapPin>, interactive: Boolean, selected: Int?): String = JSONObject()
         .put("places", JSONArray(pins.map { JSONObject().put("n", it.n).put("lat", it.at.lat).put("lng", it.at.lng).put("title", it.title) }))
         .put("interactive", interactive)
         .put("selected", selected ?: JSONObject.NULL)
@@ -64,7 +64,7 @@ object MapPage {
  * fights a scrolling list; [onSelect] hears a tapped pin.
  */
 @Composable
-fun PlaceMap(pins: List<MapPin>, interactive: Boolean, selected: Int?, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
+public fun PlaceMap(pins: List<MapPin>, interactive: Boolean, selected: Int?, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
     val payload = MapPage.payload(pins, interactive, selected)
     val select by rememberUpdatedState(onSelect)
     Box(modifier) {
@@ -155,7 +155,7 @@ private class MapHost(context: Context, private val onSelect: (Int) -> Unit) {
             }
 
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
-                openExternally(view.context, request.url.toString())
+                val _ = openExternally(view.context, request.url.toString())
                 return true
             }
 

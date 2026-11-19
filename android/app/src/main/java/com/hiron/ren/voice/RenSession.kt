@@ -44,14 +44,14 @@ import kotlinx.coroutines.flow.update
  * reply from `ren.state`. A session window is not an activity, so the session owns the lifecycle, saved state and
  * view-model store that Compose looks up from the view tree.
  */
-class RenSession(context: Context) :
+public class RenSession(context: Context) :
     VoiceInteractionSession(context), LifecycleOwner, SavedStateRegistryOwner, ViewModelStoreOwner {
 
     private val registry = LifecycleRegistry(this)
     private val saved = SavedStateRegistryController.create(this)
     override val lifecycle: Lifecycle get() = registry
     override val savedStateRegistry: SavedStateRegistry get() = saved.savedStateRegistry
-    override val viewModelStore = ViewModelStore()
+    override val viewModelStore: ViewModelStore = ViewModelStore()
 
     private val runtime get() = context.ren
     private val local = MutableStateFlow(AssistLocal())

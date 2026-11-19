@@ -74,7 +74,7 @@ import com.hiron.ren.voice.AgentMode
 import com.hiron.ren.voice.RenVoiceService
 import com.hiron.ren.widget.RenWidgets
 
-class MainActivity : FragmentActivity() {
+public class MainActivity : FragmentActivity() {
     private var listenRequests by mutableIntStateOf(0)
     private var focusRequests by mutableIntStateOf(0)
     private var homeRequests by mutableIntStateOf(0)
@@ -131,20 +131,20 @@ class MainActivity : FragmentActivity() {
             RenWidgets.ACTION_TYPE -> focusRequests++
             RenVoiceService.ACTION_ALLOW_MIC -> micPermission.launch(Manifest.permission.RECORD_AUDIO)
             RenWidgets.ACTION_QUICK -> Quick.of(intent.data?.lastPathSegment)?.let {
-                ren.ask(it.prompt)
+                val _ = ren.ask(it.prompt)
                 homeRequests++
             }
             // A web link from another app, with Ren as the browser: it opens in a new tab, in front.
             Intent.ACTION_VIEW -> intent.data?.takeIf { it.scheme == "http" || it.scheme == "https" }?.let {
-                ren.browser.open(it.toString())
+                val _ = ren.browser.open(it.toString())
                 linkRequests++
             }
             else -> if (intent?.getBooleanExtra(LISTEN, false) == true) listenRequests++
         }
     }
 
-    companion object {
-        const val LISTEN = "listen"
+    public companion object {
+        public const val LISTEN: String = "listen"
     }
 }
 
@@ -214,7 +214,7 @@ private fun RenAppUi(runtime: RenRuntime, listenRequests: Int, focusRequests: In
             }
             page?.let { shown ->
                 SubPage(shown, runtime, state, onClose = { page = null }, onOpen = { url ->
-                    runtime.browser.open(url)
+                    val _ = runtime.browser.open(url)
                     page = null
                 })
             }
@@ -234,7 +234,7 @@ private fun RenAppUi(runtime: RenRuntime, listenRequests: Int, focusRequests: In
     }
 }
 
-const val PANEL_TAG = "agent-panel"
+public const val PANEL_TAG: String = "agent-panel"
 private const val BROWSER_TOOLS = "browser_"
 private const val BROWSING_HEIGHT = 0.5f
 

@@ -62,7 +62,7 @@ import kotlin.math.min
  * and draws over the backdrop once its page is up.
  */
 @Composable
-fun StageFrame(
+public fun StageFrame(
     modifier: Modifier = Modifier,
     framed: Boolean = true,
     hint: String? = null,
@@ -121,7 +121,7 @@ private fun DrawScope.floorRings(ink: Color) {
 
 /** The step dots, the current one a short capsule, with "Step 2 of 4" on the right. */
 @Composable
-fun StepIndicator(step: Int, total: Int, modifier: Modifier = Modifier) {
+public fun StepIndicator(step: Int, total: Int, modifier: Modifier = Modifier) {
     val p = LocalPalette.current
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -139,7 +139,7 @@ fun StepIndicator(step: Int, total: Int, modifier: Modifier = Modifier) {
 
 /** The bottom fade that holds a screen's keys over its scrolling content. */
 @Composable
-fun FadeFooter(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+public fun FadeFooter(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     val p = LocalPalette.current
     Column(
         modifier.fillMaxWidth()

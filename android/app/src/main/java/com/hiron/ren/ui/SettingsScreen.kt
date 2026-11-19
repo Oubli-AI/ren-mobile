@@ -111,7 +111,7 @@ private val RowInset = 18.dp
  * cards whose rows carry Inter labels, grey details, slim switches and hairline dividers.
  */
 @Composable
-fun SettingsScreen(runtime: RenRuntime, onOpen: (String) -> Unit = {}) {
+public fun SettingsScreen(runtime: RenRuntime, onOpen: (String) -> Unit = {}) {
     val p = LocalPalette.current
     val context = LocalContext.current
     var refresh by remember { mutableIntStateOf(0) }

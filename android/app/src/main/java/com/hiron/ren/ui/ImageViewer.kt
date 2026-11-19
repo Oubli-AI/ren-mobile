@@ -64,13 +64,13 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 /** Sharing results through the Android Sharesheet: an image as the picture itself, anything else as its link. */
-object Share {
+public object Share {
     /** Under `cacheDir`, served by the FileProvider (`res/xml/file_paths.xml`); emptied before each share. */
-    const val DIR = "shared"
+    public const val DIR: String = "shared"
 
-    fun authority(context: Context) = "${context.packageName}.files"
+    public fun authority(context: Context): String = "${context.packageName}.files"
 
-    fun image(uri: Uri, title: String): Intent {
+    public fun image(uri: Uri, title: String): Intent {
         val send = Intent(Intent.ACTION_SEND).setType("image/*")
             .putExtra(Intent.EXTRA_STREAM, uri)
             .putExtra(Intent.EXTRA_TITLE, title)
@@ -79,7 +79,7 @@ object Share {
         return Intent.createChooser(send, title)
     }
 
-    fun text(title: String, url: String): Intent {
+    public fun text(title: String, url: String): Intent {
         val send = Intent(Intent.ACTION_SEND).setType("text/plain")
             .putExtra(Intent.EXTRA_TEXT, "$title\n$url")
             .putExtra(Intent.EXTRA_TITLE, title)
@@ -87,12 +87,12 @@ object Share {
     }
 
     /** Downloads [item]'s full image and shares it; when it can't be had, shares the title and link instead. */
-    suspend fun image(context: Context, images: Images?, item: ImageItem) {
+    public suspend fun image(context: Context, images: Images?, item: ImageItem) {
         val uri = images?.let { saved(context, it, item) }
         start(context, if (uri != null) image(uri, item.title) else text(item.title, item.url))
     }
 
-    fun start(context: Context, intent: Intent) {
+    public fun start(context: Context, intent: Intent) {
         try {
             context.startActivity(if (context is Activity) intent else intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         } catch (e: ActivityNotFoundException) {
@@ -118,7 +118,7 @@ object Share {
  * primary pill). A tap on the image hides or shows the caption; Back closes it.
  */
 @Composable
-fun ImageViewer(item: ImageItem, n: Int, onDismiss: () -> Unit) {
+public fun ImageViewer(item: ImageItem, n: Int, onDismiss: () -> Unit) {
     val p = LocalPalette.current
     val context = LocalContext.current
     val images = LocalImages.current
@@ -143,7 +143,7 @@ fun ImageViewer(item: ImageItem, n: Int, onDismiss: () -> Unit) {
             )
             IconKey(Icons.Outlined.Close, "Close", onDismiss, Modifier.statusBarsPadding().padding(12.dp).align(Alignment.TopStart))
             Keycap(
-                "Open page", { openExternally(context, item.url) }, Modifier.statusBarsPadding().padding(12.dp).align(Alignment.TopEnd),
+                "Open page", { val _ = openExternally(context, item.url) }, Modifier.statusBarsPadding().padding(12.dp).align(Alignment.TopEnd),
                 icon = Icons.AutoMirrored.Outlined.OpenInNew,
             )
             AnimatedVisibility(
