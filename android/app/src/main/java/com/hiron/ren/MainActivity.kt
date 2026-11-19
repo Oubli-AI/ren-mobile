@@ -73,12 +73,19 @@ import com.hiron.ren.ui.SettingsScreen
 import com.hiron.ren.voice.AgentMode
 import com.hiron.ren.voice.RenVoiceService
 import com.hiron.ren.widget.RenWidgets
+import kotlinx.coroutines.CompletableDeferred
 
 public class MainActivity : FragmentActivity() {
     private var listenRequests by mutableIntStateOf(0)
     private var focusRequests by mutableIntStateOf(0)
     private var homeRequests by mutableIntStateOf(0)
     private var linkRequests by mutableIntStateOf(0)
+    private var pendingWebPermissions: CompletableDeferred<Map<String, Boolean>>? = null
+
+    private val webPermissions = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { results ->
+        pendingWebPermissions?.complete(results)
+        pendingWebPermissions = null
+    }
 
     // Asked for from the assistant overlay, which has no activity to show the permission dialog itself.
     private val micPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -109,15 +116,38 @@ public class MainActivity : FragmentActivity() {
         super.onStart()
         ren.visible = true
         ren.browser.visible(true)
+        ren.sitePermissions.requestOsPermissions = ::requestWebPermissions
         ren.contextWidget.resumed()
         HubService.start(this)
     }
 
     override fun onStop() {
         ren.visible = false
-        ren.browser.visible(false)
+        if (!ren.settings.backgroundMedia) ren.browser.visible(false)
+        ren.sitePermissions.requestOsPermissions = null
         if (ren.agent.mode == AgentMode.Voice) ren.agent.stop()
         super.onStop()
+    }
+
+    override fun onDestroy() {
+        pendingWebPermissions?.complete(emptyMap())
+        pendingWebPermissions = null
+        super.onDestroy()
+    }
+
+    private suspend fun requestWebPermissions(permissions: List<String>): Boolean {
+        if (permissions.isEmpty()) return true
+        pendingWebPermissions?.complete(emptyMap())
+        val deferred = CompletableDeferred<Map<String, Boolean>>()
+        pendingWebPermissions = deferred
+        return try {
+            webPermissions.launch(permissions.toTypedArray())
+            val results = deferred.await()
+            results.isNotEmpty() && results.values.all { it }
+        } catch (_: IllegalStateException) {
+            if (pendingWebPermissions === deferred) pendingWebPermissions = null
+            false
+        }
     }
 
     /**

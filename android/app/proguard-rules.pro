@@ -17,3 +17,9 @@
     public static int d(...);
     public static int v(...);
 }
+
+# Mozilla's OnDiskSitePermissionsStorage instantiates its generated RoomDatabase implementation via reflection, and R8
+# needs feature-sitepermissions kept intact with optional support-base logger warnings suppressed.
+-keep class * extends androidx.room.RoomDatabase { <init>(); }
+-keep class mozilla.components.feature.sitepermissions.** { *; }
+-dontwarn mozilla.components.support.base.**

@@ -50,7 +50,10 @@ The launcher icon, notification icon and wordmark are generated from the "ren." 
 
 These are checked on a real phone:
 
-- [ ] The browser: pages load, tabs open and close, a download saves, a search opens ren's results page.
+- [ ] The browser: pages load over Secure DNS (Cloudflare default, falling back to system DNS when DoH is unreachable),
+      Shields blocks trackers with per-site toggle, normal and private tabs open/close/reopen, site permissions prompt
+      and persist per origin, history/bookmarks/omnibox/find-in-page work, a download saves, and a search opens ren's
+      results page.
 - [ ] Settings › Remote tools attaches to Ren's hub and shows whether ren desktop is attached.
 - [ ] The robot renders in the agent panel (Ask Ren); the mouth moves while the agent speaks.
 - [ ] A typed question reaches the text agent and the answer appears; the voice disc asks for the microphone and

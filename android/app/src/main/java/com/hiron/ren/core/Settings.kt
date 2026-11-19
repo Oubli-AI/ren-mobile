@@ -1,8 +1,11 @@
 package com.hiron.ren.core
 
 import android.content.Context
-import com.hiron.ren.browser.SearchLevel
 import com.hiron.ren.BuildConfig
+import com.hiron.ren.browser.ContentBlocker
+import com.hiron.ren.browser.DnsMode
+import com.hiron.ren.browser.SearchEngine
+import com.hiron.ren.browser.SearchLevel
 import com.hiron.ren.device.CarrierStyle
 import com.hiron.ren.device.ForwardMode
 import com.hiron.ren.voice.Provider
@@ -55,6 +58,73 @@ public class Settings(context: Context) {
     public var searchLevel: SearchLevel
         get() = SearchLevel.of(prefs.getString("search_level", null)) ?: SearchLevel.Default
         set(value) = prefs.edit().putString("search_level", value.wire).apply()
+
+    /** Which search engine answers phrases typed in the address bar. */
+    internal var searchEngine: SearchEngine
+        get() = SearchEngine.of(prefs.getString("search_engine", null)) ?: SearchEngine.Default
+        set(value) = prefs.edit().putString("search_engine", value.wire).apply()
+
+    /** How hostnames are resolved for OkHttp and WebView traffic. */
+    internal var dnsMode: DnsMode
+        get() = DnsMode.of(prefs.getString("dns_mode", null)) ?: DnsMode.Default
+        set(value) = prefs.edit().putString("dns_mode", value.wire).apply()
+
+    /** Custom `https://` DNS-over-HTTPS endpoint used when [dnsMode] is [DnsMode.Custom]. */
+    internal var customDohUrl: String
+        get() = prefs.getString("custom_doh_url", "").orEmpty()
+        set(value) = prefs.edit().putString("custom_doh_url", value.trim()).apply()
+
+    /** Whether third-party ad, tracker and telemetry blocking is on across tabs. */
+    internal var shieldsEnabled: Boolean
+        get() = prefs.getBoolean("shields_enabled", true)
+        set(value) = prefs.edit().putBoolean("shields_enabled", value).apply()
+
+    /** Whether known tracking query parameters are stripped on navigation. */
+    internal var stripTrackingParams: Boolean
+        get() = prefs.getBoolean("strip_tracking_params", true)
+        set(value) = prefs.edit().putBoolean("strip_tracking_params", value).apply()
+
+    /** Normalized lowercase hostnames where Shields blocking is turned off by the user. */
+    internal var shieldsDisabledHosts: Set<String>
+        get() = prefs.getStringSet("shields_disabled_hosts", null)
+            ?.mapNotNull { host -> host.trim().lowercase().trimEnd('.').takeIf(String::isNotEmpty) }
+            ?.toSet()
+            ?: emptySet()
+        set(value) {
+            val normalized: Set<String> = value
+                .mapNotNull { host -> host.trim().lowercase().trimEnd('.').takeIf(String::isNotEmpty) }
+                .toSet()
+            prefs.edit().putStringSet("shields_disabled_hosts", HashSet(normalized)).apply()
+        }
+
+    internal fun isShieldsEnabledFor(host: String): Boolean =
+        shieldsEnabled && !ContentBlocker.isHostAllowlisted(host, shieldsDisabledHosts)
+
+    internal fun setSiteShields(host: String, enabled: Boolean) {
+        val normalized = host.trim().lowercase().trimEnd('.')
+        if (normalized.isEmpty()) return
+        shieldsDisabledHosts = if (enabled) shieldsDisabledHosts - normalized else shieldsDisabledHosts + normalized
+    }
+
+    /** Whether bare and cleartext `http://` navigations upgrade to `https://` first. */
+    internal var httpsFirst: Boolean
+        get() = prefs.getBoolean("https_first", true)
+        set(value) = prefs.edit().putBoolean("https_first", value).apply()
+
+    /** Whether WebView applies algorithmic darkening to web pages. */
+    internal var darkWebPages: Boolean
+        get() = prefs.getBoolean("dark_web_pages", false)
+        set(value) = prefs.edit().putBoolean("dark_web_pages", value).apply()
+
+    /** Whether web pages keep playing audio and media when Ren moves to the background. */
+    internal var backgroundMedia: Boolean
+        get() = prefs.getBoolean("background_media", false)
+        set(value) = prefs.edit().putBoolean("background_media", value).apply()
+
+    /** Visited web pages in the browser's persistent history, as [com.hiron.ren.browser.BrowserHistory] writes them. */
+    internal var browserHistory: String?
+        get() = prefs.getString("browser_history", null)
+        set(value) = prefs.edit().putString("browser_history", value).apply()
 
     public var braveSearchKey: String
         get() = prefs.getString("brave_search_key", null) ?: BuildConfig.DEFAULT_BRAVE_SEARCH_KEY

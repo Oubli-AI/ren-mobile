@@ -20,6 +20,8 @@ elevenlabs = "0.13.0"
 mcp = "0.16.0"
 ktor = "3.5.2"
 serialization = "1.11.0"
+browser = "1.9.0"
+mozillaComponents = "153.0.4"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
@@ -51,6 +53,11 @@ ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
 compose-ui-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4" }
 compose-ui-test-manifest = { module = "androidx.compose.ui:ui-test-manifest" }
+androidx-browser = { module = "androidx.browser:browser", version.ref = "browser" }
+okhttp-dnsoverhttps = { module = "com.squareup.okhttp3:okhttp-dnsoverhttps", version.ref = "okhttp" }
+mozilla-publicsuffixlist = { module = "org.mozilla.components:lib-publicsuffixlist", version.ref = "mozillaComponents" }
+mozilla-sitepermissions = { module = "org.mozilla.components:feature-sitepermissions", version.ref = "mozillaComponents" }
+mozilla-concept-engine = { module = "org.mozilla.components:concept-engine", version.ref = "mozillaComponents" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

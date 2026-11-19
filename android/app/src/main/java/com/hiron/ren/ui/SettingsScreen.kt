@@ -2,8 +2,6 @@ package com.hiron.ren.ui
 
 import android.Manifest
 import android.app.role.RoleManager
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -38,10 +36,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Chat
 import androidx.compose.material.icons.outlined.Call
 import androidx.compose.material.icons.outlined.Event
-import androidx.compose.material.icons.outlined.Mic
-import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Mic
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.PhoneInTalk
@@ -52,13 +50,15 @@ import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -74,6 +74,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -81,24 +82,28 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.hiron.ren.BuildConfig
-import com.hiron.ren.core.RenRuntime
-import com.hiron.ren.device.AppUsage
+import com.hiron.ren.browser.BrowserDns
+import com.hiron.ren.browser.DnsMode
+import com.hiron.ren.browser.SearchEngine
 import com.hiron.ren.core.PermAction
 import com.hiron.ren.core.PermissionGroups
+import com.hiron.ren.core.RenRuntime
+import com.hiron.ren.device.AppUsage
 import com.hiron.ren.device.CallForwarding
 import com.hiron.ren.device.CarrierStyle
-import com.hiron.ren.device.RenNotificationListener
 import com.hiron.ren.device.ForwardMode
+import com.hiron.ren.device.RenNotificationListener
 import com.hiron.ren.device.ScreenOperator
-import androidx.compose.runtime.LaunchedEffect
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.hiron.ren.mcp.HubLink
 import com.hiron.ren.mcp.HubService
 import com.hiron.ren.mcp.HubState
 import com.hiron.ren.service.Notifications
-import org.json.JSONObject
 import com.hiron.ren.voice.Provider
+import kotlinx.coroutines.launch
+import mozilla.components.concept.engine.permission.SitePermissions
+import org.json.JSONObject
 
 /** A section's display title. */
 private val SectionTitle = Type.step.copy(fontSize = 28.sp, lineHeight = 32.sp)
@@ -127,18 +132,171 @@ public fun SettingsScreen(runtime: RenRuntime, onOpen: (String) -> Unit = {}) {
     ) {
         Section(1, "ren account") { Account(runtime, onOpen) }
 
-        Section(2, "Agents") { Agents(runtime, refresh) }
+        Section(2, "Browser & privacy") { BrowserAndPrivacy(runtime, refresh) }
 
-        Section(3, "Permissions") { AgentPermissions(runtime, refresh) }
+        Section(3, "Agents") { Agents(runtime, refresh) }
 
-        Section(4, "Call answering") { CallAnswering(runtime, refresh) }
+        Section(4, "Permissions") { AgentPermissions(runtime, refresh) }
 
-        Section(5, "What Ren can use") { Permissions(context, refresh) { refresh++ } }
+        Section(5, "Call answering") { CallAnswering(runtime, refresh) }
 
-        Section(6, "Remote tools") { RemoteTools(runtime, refresh) }
+        Section(6, "What Ren can use") { Permissions(context, refresh) { refresh++ } }
 
-        Section(7, "About") { About() }
+        Section(7, "Remote tools") { RemoteTools(runtime, refresh) }
+
+        Section(8, "About") { About() }
     }
+}
+
+/** Secure DNS, Shields, search engine, page appearance, saved site permissions and clear browsing data. */
+@Composable
+private fun BrowserAndPrivacy(runtime: RenRuntime, refresh: Int) {
+    val p = LocalPalette.current
+    val s = runtime.settings
+    val scope = rememberCoroutineScope()
+    var dnsMode by remember(refresh) { mutableStateOf(s.dnsMode) }
+    var customDohUrl by remember(refresh) { mutableStateOf(s.customDohUrl) }
+    var shieldsEnabled by remember(refresh) { mutableStateOf(s.shieldsEnabled) }
+    var stripTracking by remember(refresh) { mutableStateOf(s.stripTrackingParams) }
+    var httpsFirst by remember(refresh) { mutableStateOf(s.httpsFirst) }
+    var darkWebPages by remember(refresh) { mutableStateOf(s.darkWebPages) }
+    var backgroundMedia by remember(refresh) { mutableStateOf(s.backgroundMedia) }
+    var searchEngine by remember(refresh) { mutableStateOf(s.searchEngine) }
+    var savedPermissions by remember { mutableStateOf<List<SitePermissions>>(emptyList()) }
+    var permissionsVersion by remember { mutableIntStateOf(0) }
+    var clearingData by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(refresh, permissionsVersion) {
+        savedPermissions = runtime.sitePermissions.allSaved()
+    }
+
+    val resolverEndpoint = remember(dnsMode, customDohUrl, shieldsEnabled, refresh) {
+        runtime.browserDns.activeEndpoint ?: "System DNS"
+    }
+
+    RenCard(padding = PaddingValues(0.dp)) {
+        Column(Modifier.padding(horizontal = RowInset, vertical = 18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("Secure DNS (DoH)", style = Type.labelLg, color = p.ink2)
+            Choices(DnsMode.entries.map { it to it.label }, dnsMode) { mode ->
+                dnsMode = mode
+                s.dnsMode = mode
+                runtime.applyBrowserPreferences()
+            }
+            if (dnsMode == DnsMode.Custom) {
+                RecessedField(
+                    value = customDohUrl,
+                    onValueChange = { next ->
+                        customDohUrl = next
+                        s.customDohUrl = next.trim()
+                        runtime.applyBrowserPreferences()
+                    },
+                    placeholder = "https://dns.example.com/dns-query",
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                )
+                val trimmedCustom = customDohUrl.trim()
+                when {
+                    trimmedCustom.isEmpty() -> StatusTag("Enter an https:// DoH endpoint", Tone.Amber)
+                    BrowserDns.isValidDohUrl(trimmedCustom) -> StatusTag("Valid DoH endpoint", Tone.Green)
+                    else -> StatusTag("Must be a valid https:// URL", Tone.Red)
+                }
+            }
+            Readout("Resolver", resolverEndpoint, mono = true)
+        }
+        RowRule()
+        Column(Modifier.padding(horizontal = RowInset, vertical = 18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("Search engine", style = Type.labelLg, color = p.ink2)
+            Choices(SearchEngine.entries.map { it to it.label }, searchEngine) { engine ->
+                searchEngine = engine
+                s.searchEngine = engine
+            }
+        }
+        RowRule()
+        Toggle("Block ads and trackers", shieldsEnabled, detail = "Blocks third-party ad, analytics and fingerprinting hosts.") {
+            shieldsEnabled = it
+            s.shieldsEnabled = it
+            runtime.applyBrowserPreferences()
+        }
+        RowRule()
+        Toggle("Strip tracking parameters", stripTracking, detail = "Removes utm_*, fbclid, gclid and click IDs from links.") {
+            stripTracking = it
+            s.stripTrackingParams = it
+        }
+        RowRule()
+        Toggle("HTTPS-First mode", httpsFirst, detail = "Upgrades web addresses to HTTPS when supported.") {
+            httpsFirst = it
+            s.httpsFirst = it
+        }
+        RowRule()
+        Toggle("Dark web pages", darkWebPages, detail = "Applies dark mode to web pages that support algorithmic darkening.") {
+            darkWebPages = it
+            s.darkWebPages = it
+            runtime.applyBrowserPreferences()
+        }
+        RowRule()
+        Toggle("Background audio", backgroundMedia, detail = "Keeps media playing in open tabs while Ren is in the background.") {
+            backgroundMedia = it
+            s.backgroundMedia = it
+        }
+        RowRule()
+        Column(Modifier.padding(horizontal = RowInset, vertical = 18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("Saved site permissions", style = Type.labelLg, color = p.ink2)
+            if (savedPermissions.isEmpty()) {
+                Text("No saved site permissions", style = Type.cardBody, color = p.muted)
+            } else {
+                savedPermissions.forEach { entry ->
+                    Row(
+                        Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f).padding(end = 12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(entry.origin, style = Type.mono, color = p.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            val summary = describeSitePermissions(entry)
+                            if (summary.isNotEmpty()) {
+                                Text(summary, style = Type.cardBody, color = p.ink2)
+                            }
+                        }
+                        Keycap(
+                            text = "Revoke",
+                            onClick = {
+                                scope.launch {
+                                    runtime.sitePermissions.revokeOrigin(entry.origin)
+                                    permissionsVersion++
+                                }
+                            },
+                        )
+                    }
+                }
+            }
+        }
+        RowRule()
+        Row(Modifier.padding(horizontal = RowInset, vertical = 18.dp)) {
+            Keycap("Clear browsing data…", { clearingData = true })
+        }
+    }
+
+    if (clearingData) {
+        ClearBrowsingDataSheet(
+            browser = runtime.browser,
+            onDismiss = { clearingData = false },
+            onCleared = { permissionsVersion++ },
+        )
+    }
+}
+
+private fun describeSitePermissions(entry: SitePermissions): String {
+    val parts = buildList {
+        permissionStatusLabel("Camera", entry.camera)?.let(::add)
+        permissionStatusLabel("Microphone", entry.microphone)?.let(::add)
+        permissionStatusLabel("Location", entry.location)?.let(::add)
+        permissionStatusLabel("Protected media", entry.mediaKeySystemAccess)?.let(::add)
+    }
+    return parts.joinToString(" · ")
+}
+
+private fun permissionStatusLabel(name: String, status: SitePermissions.Status): String? = when (status) {
+    SitePermissions.Status.ALLOWED -> "$name: Allowed"
+    SitePermissions.Status.BLOCKED -> "$name: Blocked"
+    SitePermissions.Status.NO_DECISION -> null
 }
 
 /** Screen gutters: 20dp, and 16dp on phones under 360dp wide. */
