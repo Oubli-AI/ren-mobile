@@ -8,8 +8,9 @@ import { Conversation, ConversationContent, ConversationScrollButton } from "@/c
 import { Message, MessageContent } from "@/components/ai-elements/message"
 import { MessageResponse } from "@/components/ai-elements/response"
 import { Tool, ToolHeader } from "@/components/ai-elements/tool"
+import { SentAttachments } from "@/components/agent-panel/PromptAttachments"
 import { cn } from "@/utils/cn"
-import { type Message as ChatMessage, type Reasoning, type Step, tell, useChat } from "./model"
+import { type Message as ChatMessage, type Reasoning, type Step, splitAttachments, tell, useChat } from "./model"
 
 export function PanelChat() {
   const chat = useChat()
@@ -38,16 +39,7 @@ export function PanelChat() {
 function Bubble({ message }: { message: ChatMessage }) {
   switch (message.from) {
     case "user":
-      return (
-        <Message from="user">
-          <MessageContent
-            variant="contained"
-            className="min-w-0 w-full group-[.is-user]:bg-surface-100 group-[.is-user]:text-ink dark:group-[.is-user]:bg-surface-800 dark:group-[.is-user]:text-ink-inverse"
-          >
-            <p className="text-body-sm leading-relaxed whitespace-pre-wrap">{message.text}</p>
-          </MessageContent>
-        </Message>
-      )
+      return <UserBubble text={message.text} />
     case "app":
       return <p className="text-center text-xs text-ink-muted dark:text-ink-inverse-muted">{message.text}</p>
     case "assistant":
@@ -70,6 +62,24 @@ function Bubble({ message }: { message: ChatMessage }) {
         </Message>
       )
   }
+}
+
+/** The user's message, as ren's `MessageBubble`: its attachments as cards above the bubble, then what they typed. */
+function UserBubble({ text }: { text: string }) {
+  const sent = useMemo(() => splitAttachments(text), [text])
+  return (
+    <Message from="user">
+      <SentAttachments attachments={sent.attachments} />
+      {sent.text && (
+        <MessageContent
+          variant="contained"
+          className="min-w-0 w-full group-[.is-user]:bg-surface-100 group-[.is-user]:text-ink dark:group-[.is-user]:bg-surface-800 dark:group-[.is-user]:text-ink-inverse"
+        >
+          <p className="text-body-sm leading-relaxed whitespace-pre-wrap">{sent.text}</p>
+        </MessageContent>
+      )}
+    </Message>
+  )
 }
 
 /** Reasoning split at its bold labels into steps, as ren's `reasoningSteps`. */

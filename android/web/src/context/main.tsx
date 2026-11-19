@@ -9,7 +9,7 @@
  * interview and interest graph as ren desktop's. The page tells the app what to make room for (`layout`): nothing, the orb, the orb with a finished
  * run's or a dream's notice, or the open panel, which the dream's review checklist takes too.
  */
-import { onApp, reportAccount, tell } from "../host"
+import { askRen, onApp, reportAccount, tell } from "../host"
 import "../page.css"
 import "@/index.css"
 import "./context.css"
@@ -17,7 +17,7 @@ import { StrictMode, useEffect } from "react"
 import { createRoot } from "react-dom/client"
 import { ContextBridge } from "@/components/interests/ContextBridge"
 import { InterestsWidget } from "@/components/interests/InterestsWidget"
-import { AgentUiProvider } from "@/context/AgentUiContext"
+import { AgentUiProvider, useAgentUi } from "@/context/AgentUiContext"
 import { runNotifications } from "@/lib/context-api"
 import { useAuthStore } from "@/stores/authStore"
 import { useContextAgentStore } from "@/stores/contextAgentStore"
@@ -46,6 +46,19 @@ onApp((event) => {
   else void useAuthStore.getState().logout()
 })
 
+/**
+ * What the widget opens in Ren (Ask Ren on saved context, a suggested agent) goes to the app's agent panel: the
+ * attachments as cards in its composer, a prompt sent with them. ren desktop's own panel reads the same queues.
+ */
+function AskRenBridge() {
+  const { agentPanelQueuedPrompts, agentPanelQueuedAttachments, consumeAgentPanelPrompt, consumeAgentPanelAttachments } = useAgentUi()
+  useEffect(() => {
+    if (!agentPanelQueuedPrompts.length && !agentPanelQueuedAttachments.length) return
+    askRen(consumeAgentPanelPrompt() ?? "", consumeAgentPanelAttachments())
+  }, [agentPanelQueuedPrompts, agentPanelQueuedAttachments, consumeAgentPanelPrompt, consumeAgentPanelAttachments])
+  return null
+}
+
 function Widget() {
   const signedIn = useAuthStore((state) => state.isAuthenticated && state.user !== null)
   const surveyComplete = useOnboardingStore((state) => state.isComplete)
@@ -63,6 +76,7 @@ function Widget() {
   return (
     <AgentUiProvider>
       <ContextBridge />
+      <AskRenBridge />
       <InterestsWidget />
     </AgentUiProvider>
   )

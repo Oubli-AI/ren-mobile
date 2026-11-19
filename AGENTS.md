@@ -123,6 +123,14 @@ What the overhaul added, on the branch `claude/project-thread-tnj6xo` (PR #14) a
   computer at `http://computer:8080/computer/mcp`. JDK 21, Gradle 8.14.3 and the Android SDK (platform 36, build-tools
   36.0.0) are in the shared home (`deploy/vm/toolbox/android.sh`, run once), on the computer image's `PATH`, with
   `JAVA_HOME` and `ANDROID_HOME` passed to Desktop Commander; the computer has 8 GB for the Gradle daemons.
+- **Attachments in the agent panel** (2026-11-18, ren PR #30): as in ren desktop's composer, every paste in the
+  composer (the text toolbar's Paste or Ctrl+V; `PasteAsAttachment` hands the field's clipboard read to
+  `RenRuntime.attachPaste`) becomes a card above the field, named from its text (`core/PromptAttachments.kt`, a port
+  of ren's `prompt-attachments.ts`), and Ask Ren in the Context widget (a saved item opened with its question, or a
+  selection) puts its items in the composer as cards and opens the panel (`{"type":"ask"}` over `RenHost`,
+  `ContextWidget.asked`). A message goes to the agent as the typed text, ren's instruction when a paste rides along,
+  then one `<attachment>` block per card, written character for character as ren's `attachmentBlock`; the chat page
+  draws those blocks as ren's cards again (`splitAttachments`, `SentAttachments`).
 - **Default browser** (2026-11-13): `MainActivity` takes `VIEW` `http`/`https` links (BROWSABLE, DEFAULT) and
   `APP_BROWSER`, so Android offers Ren for the browser role; a link from another app opens in a new tab in front.
   Onboarding's step 4 and Settings › What Ren can use › Default browser ask for the role

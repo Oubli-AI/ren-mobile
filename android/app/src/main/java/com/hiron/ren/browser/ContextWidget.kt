@@ -10,6 +10,8 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import androidx.webkit.JavaScriptReplyProxy
+import com.hiron.ren.core.PromptAttachment
+import com.hiron.ren.core.PromptAttachments
 import androidx.webkit.WebViewAssetLoader
 import androidx.webkit.WebViewClientCompat
 import androidx.webkit.WebViewCompat
@@ -84,6 +86,9 @@ public class ContextWidget(
 ) {
     private val _account = MutableStateFlow(RenAccount())
     public val account: StateFlow<RenAccount> = _account.asStateFlow()
+
+    /** Ask Ren in the widget (saved context, a suggested agent): what it opens in the agent panel, and the prompt to send. */
+    public var asked: (text: String, attachments: List<PromptAttachment>) -> Unit = { _, _ -> }
 
     private val _layout = MutableStateFlow(ContextLayout.None)
     public val layout: StateFlow<ContextLayout> = _layout.asStateFlow()
@@ -176,6 +181,13 @@ public class ContextWidget(
                 }
             }
             "layout" -> _layout.value = ContextLayout.of(message.optString("layout"))
+            "ask" -> {
+                val items = message.optJSONArray("attachments")
+                val attachments = if (items == null) emptyList() else (0 until items.length()).mapNotNull { index ->
+                    items.optJSONObject(index)?.let(PromptAttachments::parse)
+                }
+                asked(message.optString("text"), attachments)
+            }
         }
     }
 
