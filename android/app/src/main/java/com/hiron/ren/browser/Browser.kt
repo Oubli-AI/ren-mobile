@@ -8,6 +8,7 @@ import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.MutableContextWrapper
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.net.Uri
@@ -41,6 +42,8 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebStorage
 import android.webkit.WebView
+import androidx.browser.customtabs.CustomTabsClient
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
@@ -58,6 +61,7 @@ import androidx.webkit.WebViewFeature
 import com.hiron.ren.MainActivity
 import com.hiron.ren.R
 import com.hiron.ren.core.Settings
+import com.hiron.ren.ui.ThemeChoice
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
@@ -469,6 +473,36 @@ public class Browser internal constructor(
         }
     }
 
+    /** Loads Ren's own pages again (the theme changed); web pages stay as they are. */
+    internal fun reloadPages() {
+        views.values.filter { it.url?.startsWith(PAGES) == true }.forEach(WebView::reload)
+    }
+
+    /**
+     * Opens a social sign-in's provider page (https only) in another browser's Custom Tab, since Google refuses
+     * sign-in inside an app's WebView; with no other browser that offers Custom Tabs it opens in a new tab here.
+     */
+    private fun signInPage(url: String, incognito: Boolean) {
+        val page = Uri.parse(url)
+        if (page.scheme != "https") return
+        val browsers = context.packageManager
+            .queryIntentActivities(Intent(Intent.ACTION_VIEW, Uri.parse("https://")), PackageManager.MATCH_ALL)
+            .map { it.activityInfo.packageName }
+            .filter { it != context.packageName }
+        val custom = CustomTabsClient.getPackageName(context, browsers, true)
+        if (custom == null) {
+            val _ = open(url, select = true, incognito = incognito)
+            return
+        }
+        val tab = CustomTabsIntent.Builder().build()
+        tab.intent.setPackage(custom)
+        tab.intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        tab.launchUrl(context, page)
+    }
+
+    /** The theme chosen in Settings, as ren's pages name it. */
+    private fun theme(): String = (browserSettings?.theme ?: ThemeChoice.System).wire
+
     public fun reload() {
         val tab = _state.value.current ?: return
         if (tab.error != null) {
@@ -855,6 +889,18 @@ public class Browser internal constructor(
         return ByteArrayOutputStream().also { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
     }
 
+    /**
+     * Keeps the workspace token as the cookie `ren_token` on ren's backend, for what a page can't add a header to:
+     * WebSockets and iframes. Caddy takes it in place of X-Ren-Token.
+     */
+    private fun backendCookie() {
+        CookieManager.getInstance().setCookie(Applications.API, "ren_token=${token()}; Path=/; Secure; HttpOnly; SameSite=None")
+    }
+
+    /** The tab's page as it is drawn now, as a PNG data URL; null as for [capture]. */
+    public fun captureDataUrl(id: String): String? =
+        capture(id)?.let { "data:image/png;base64," + Base64.encodeToString(it, Base64.NO_WRAP) }
+
     /** Pauses or resumes every page's timers and media with the app. */
     public fun visible(visible: Boolean) {
         views.values.toList().forEach { if (visible) it.onResume() else it.onPause() }
@@ -1074,14 +1120,25 @@ public class Browser internal constructor(
             handleLongPress(webView)
         }
         if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
-            // Ren's pages ask for the workspace token their requests carry and for the favorites, give back the
+            // Ren's pages ask for the workspace token their requests carry, the theme and the favorites, give back the
             // favorites Discover changed and say which ren account they are signed in to; no other origin reaches this
             // listener.
             WebViewCompat.addWebMessageListener(webView, "RenHost", setOf("https://$ORIGIN_HOST")) { _, message, _, isMainFrame, reply ->
                 val asked = message.data?.let { runCatching { JSONObject(it) }.getOrNull() }
                 if (isMainFrame && asked != null) {
                     when (asked.optString("type")) {
-                        "token" -> reply.postMessage(JSONObject().put("type", "token").put("token", token()).toString())
+                        "token" -> {
+                            backendCookie()
+                            reply.postMessage(JSONObject().put("type", "token").put("token", token()).toString())
+                        }
+                        "theme" -> reply.postMessage(JSONObject().put("type", "theme").put("theme", theme()).toString())
+                        "oauth-redirect" -> {
+                            val redirect = OAuthLoopback(context.packageName) { url ->
+                                reply.postMessage(JSONObject().put("type", "oauth-callback").put("url", url).toString())
+                            }.start()
+                            reply.postMessage(JSONObject().put("type", "oauth-redirect").put("url", redirect).toString())
+                        }
+                        "oauth" -> signInPage(asked.optString("url"), incognito = isIncognito(id))
                         "favorites" -> asked.optJSONArray("favorites")?.let { favorites.replace(Favorites.parse(it)) }
                             ?: reply.postMessage(JSONObject().put("type", "favorites").put("favorites", JSONArray(Favorites.json(favorites.list.value))).toString())
                         "account" -> accountReported(RenAccount.parse(asked))
@@ -1354,6 +1411,8 @@ public class Browser internal constructor(
         }
 
         override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
+            // Ren's pages send the token cookie to the backend from another site; a website gets no third-party cookies.
+            CookieManager.getInstance().setAcceptThirdPartyCookies(view, url.startsWith(PAGES))
             if (overHome.contains(tabId)) return
             update(tabId) {
                 it.copy(

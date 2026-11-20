@@ -108,6 +108,8 @@ services:
     volumes:
       - laptop_home:/config
       - x11:/tmp/.X11-unix
+      # The agents' prompts when elevenlabs.env has no ELEVENLABS_API_KEY: gemini-prompts/<agent id>.md.
+      - ./gemini-prompts:/opt/gemini/prompts:ro
 
   # Ren's hub: one MCP server joining the phone and ren desktop, at https://rivet.ron-ai.dev/hub/.
   hub:
@@ -120,7 +122,7 @@ services:
   # Projects, Documents, Calendar, Vibe and Build, at https://rivet.ron-ai.dev/.
   ren:
     build: ./ren
-    image: ren-api:a6213d7
+    image: ren-api:ab77c6f
     restart: unless-stopped
     env_file:
       # The Brave keys and NIM's key.
@@ -135,8 +137,6 @@ services:
       # Sessions, run journals and memory in ren desktop's own bucket, so the phone and the desktop share one account.
       PANEL_STORAGE: huggingface
       HF_BUCKET_ID: IAMRonHIT/RonBrowserRebuildBucket
-      # Scheduled specialist runs stay with ren desktop: this backend neither starts them nor follows the ones that are running.
-      RON_AGENT_SCHEDULES: "0"
       # Search sessions and the guest Projects database (projects.sqlite3).
       SESSION_STORAGE_DIR: /home/ren/data
       # Deep Research's working files (reports, charts, PDFs), on the volume so a new container keeps them.

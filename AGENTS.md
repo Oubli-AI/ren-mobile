@@ -22,8 +22,10 @@ What the overhaul added, on the branch `claude/project-thread-tnj6xo` (PR #14) a
   and `#8D98FE` in Dark, ink `#0B0C17`, colourless dark surfaces, flat surfaces with no glows, 10 dp controls, 12 dp
   cards. Bricolage Grotesque (display), Inter and JetBrains Mono, as variable fonts in `res/font/`. The logo is the
   "ren." logotype (`docs/design/ren-logotype.json`, copied from ren desktop's `logotype.ts`); `tools/build_icon.py`
-  generates the launcher icon, the R notification icon and the wordmark from it. Light and Dark follow the phone;
-  Glass is not built.
+  generates the launcher icon, the R notification icon and the wordmark from it. Settings › Browser and privacy ›
+  Theme picks Light, Dark, Glass or System (2026-11-20). Glass is ren desktop's: the window is translucent over the
+  wallpaper (`Theme.Ren.Glass`), blurred on Android 12+ where the phone allows cross-window blur, the app draws ren's
+  glass tokens (`glassPalette`), and the bundled pages take ren's own classes (`lib/theme.ts`, `src/theme.ts`).
 - **Robot: Cato**, unmodified in `android/web/src/cato/` (github.com/ImRonAI/cato-labs at `2a7a9b6`, hashes in
   `SHA256SUMS`). `scripts/gen-ren-robot.mjs` generates ren's robot from it into `src/robot/`: the same geometry, rig,
   moves and renderer, with Cato's blue changed to volt and an sRGB step added to the body shader (Cato's phone tier
@@ -59,15 +61,30 @@ What the overhaul added, on the branch `claude/project-thread-tnj6xo` (PR #14) a
   `MainContent` draws for the addresses its tab store opens (`ron://projects`, `ron://project/<key>`,
   `ron://documents`), all unmodified in `src/ren`, and `DeepResearchPage` for Research. `src/destinations/` mounts
   them under a switcher (ren desktop's `navigation/destinations.ts`: Home and the seven destinations); Home's switcher
-  scrolls to the same seven. A story opens in the
-  same tab (the mount follows ren's tab store, where Electron would open `ron://read`), and Back returns. Projects work
+  scrolls to the same seven. A story opens in ren
+  desktop's article reader (`ArticleReaderPage`, `ron://read`) in the same tab, and Back returns. Projects work
   as ren's guest workspace (`X-Ron-Workspace`, kept in SQLite on the VM) or signed in with Supabase (email and
-  password; ren's social sign-in says it runs in the desktop app). The build needs `VITE_SUPABASE_URL` and
+  password, or ren's Google and GitHub buttons: the provider's page opens in a Custom Tab of another browser, since
+  Google refuses sign-in in a WebView, and comes back to a loopback address the app listens on, `browser/OAuthLoopback.kt`,
+  as ren desktop's comes back to `http://127.0.0.1:<port>/auth/callback`; ren's Supabase allows that redirect). The build needs `VITE_SUPABASE_URL` and
   `VITE_SUPABASE_ANON_KEY` in `android/web/.env.local` (gitignored; the values are ren desktop's `.env`).
   The pages are ren desktop at `0f6fa57` (`Oubli-AI/ren`, which was `ImRonAI/TheBrowser`, PR #8: main with deep
   research's formation graph and the Context Agent's `[phone]` turn, plus the account profile; Deep Research's pages and libs are from ren PR #14 (`bf91e1c`); see `src/ren/SOURCE.txt`, and `node scripts/sync-ren.mjs <checkout> .` copies
-  them again), so the pages type-check with no errors. Build's live preview (an iframe) and ren's voice and teaching WebSockets can't
-  carry the workspace token, so the VM refuses them.
+  them again), so the pages type-check with no errors. The app also sets the workspace token as the cookie `ren_token` on ren's
+  origin (`Browser.backendCookie`; third-party cookies on for the bundled pages only), and Caddy lets a request with
+  that cookie through to ren, so Build's live preview (an iframe) and ren's voice and teaching WebSockets, which can't
+  carry a header, reach it (2026-11-20).
+- **ren desktop's agent panel and what lays over its pages** (2026-11-20; owner: only ren mobile is built from now
+  on, and every feature of ren desktop comes to it): `src/shell.tsx` puts ren's `AgentPanel` (threads, Memory, the
+  specialist and project pickers, `render_ui` cards, voice, Teach Ren), `MusicSidePanel` (Live Music and batch music),
+  `ScreenVisionOverlay` and `RepairBridge` over every bundled page, as BrowserLayout lays them over every tab, and
+  follows ren's tab store as the phone's browser (`followTabs`: a web page or another of ren's pages opens in a new
+  tab). `ren://agent` is the agent panel on a page of its own (Home's switcher, a sparkle). **Add to Ren context**
+  (ren's context kinds, into the Context widget, which opens): the menu adds the page or a screenshot of it, a
+  long-press adds a link or an image, and "Add to Ren context" in Android's text-selection menu adds the selection
+  from any app (`ContextAddActivity`, `PROCESS_TEXT`); all of them only while the account is ready. **Split view**
+  (the menu) shows two tabs at once, one above the other or side by side in landscape; touching a pane makes its tab
+  the active one.
 - **Context widget** (2026-11-15, `browser/ContextWidget.kt`, `device/AppUsage.kt`, `src/context/`): ren desktop's
   Context widget (`InterestsWidget`) and what feeds its Context Agent (`ContextBridge`), unmodified, on a bundled page
   in one WebView the app keeps for as long as it runs, laid over the browser under the agent panel. The page tells the
@@ -173,11 +190,12 @@ What the overhaul added, on the branch `claude/project-thread-tnj6xo` (PR #14) a
   since ren's Projects requests carry Supabase's bearer in `Authorization`). The page gets the
   token from the `RenHost` web message listener, which answers only the app's bundled origin
   (`https://appassets.androidplatform.net`). The backend is ren desktop's own backend on the VM, run as ren
-  runs it (`python agent/api/main.py`; `deploy/vm/ren`, image built from `Oubli-AI/ren` at `a6213d7` (ren main through PR #38; before it `beaa580`, ren main with PRs #16 to #19, #21 to #29, on `2d24e4c`, which holds the pages' commit `0f6fa57`, the web tools (ren PR #11), the Context Agent with OpenCode (ren PR #12), the Search page off Brave (ren PR #13) and Deep Research as the Strands SDK documents it (ren PR #14: plain `Swarm`s and `GraphBuilder` graphs, the outer graph's `stream_async` events); PR #16 makes Mistral every agent's default and takes the harness's EnvironmentContext, which handed the agent ren's checkout path and AGENTS.md, off every user agent, owner 2026-11-17; PR #19 tells every swarm agent when it hands off, as the Strands swarm docs do; PR #22 sends every Mistral model its largest `max_tokens`: 262144 for Mistral Large 4, 131072 for the GLM and DeepSeek models Mistral hosts, the context window for the rest; PR #23 lets only the fact checker open sources and gives each Deep Research agent only the sections of its skill that fit its role; PR #24 gives Deep Research six levels after Perplexity's Agent API presets (fast, low, medium, high, xhigh and ultra, 5–8 up to 30–40 pages), a turn budget per agent with a wrap-up reminder over its last five turns, the Slidev skills on the deck agents, each run's report as a Document under a personal Deep Research page, and Print to PDF, HTML and Word on every Document; PR #27 lists and opens runs saved before the levels, mapping standard, deep and exhaustive to low, medium and ultra; PR #21 takes the overall time cap off the top-level graph, so only each swarm keeps `RON_DEEP_RESEARCH_EXECUTION_TIMEOUT` (3 h)) (scheduled specialist runs are left to ren desktop: `RON_AGENT_SCHEDULES=0`, which also stops the VM resuming runs), with electron-playwright-mcp (no remote: the VM's `ren/electron-playwright-mcp/` is a copy of its `pyproject.toml`, `README.md` and `src/electron_playwright_mcp` from the owner's checkout at `4612a9b`) and Playwright's Chromium for deep research's PDF, with the toolbox's Node 26.13.0 and pnpm for its Slidev deck, keys in
+  runs it (`python agent/api/main.py`; `deploy/vm/ren`, image built from `Oubli-AI/ren` at `ab77c6f` (ren main through PR #46, 2026-11-20; before it `a6213d7`, ren main through PR #38, and before that `beaa580`, ren main with PRs #16 to #19, #21 to #29, on `2d24e4c`, which holds the pages' commit `0f6fa57`, the web tools (ren PR #11), the Context Agent with OpenCode (ren PR #12), the Search page off Brave (ren PR #13) and Deep Research as the Strands SDK documents it (ren PR #14: plain `Swarm`s and `GraphBuilder` graphs, the outer graph's `stream_async` events); PR #16 makes Mistral every agent's default and takes the harness's EnvironmentContext, which handed the agent ren's checkout path and AGENTS.md, off every user agent, owner 2026-11-17; PR #19 tells every swarm agent when it hands off, as the Strands swarm docs do; PR #22 sends every Mistral model its largest `max_tokens`: 262144 for Mistral Large 4, 131072 for the GLM and DeepSeek models Mistral hosts, the context window for the rest; PR #23 lets only the fact checker open sources and gives each Deep Research agent only the sections of its skill that fit its role; PR #24 gives Deep Research six levels after Perplexity's Agent API presets (fast, low, medium, high, xhigh and ultra, 5–8 up to 30–40 pages), a turn budget per agent with a wrap-up reminder over its last five turns, the Slidev skills on the deck agents, each run's report as a Document under a personal Deep Research page, and Print to PDF, HTML and Word on every Document; PR #27 lists and opens runs saved before the levels, mapping standard, deep and exhaustive to low, medium and ultra; PR #21 takes the overall time cap off the top-level graph, so only each swarm keeps `RON_DEEP_RESEARCH_EXECUTION_TIMEOUT` (3 h)) (scheduled specialist runs on, ren's default, since 2026-11-20), with electron-playwright-mcp (no remote: the VM's `ren/electron-playwright-mcp/` is a copy of its `pyproject.toml`, `README.md` and `src/electron_playwright_mcp` from the owner's checkout at `4612a9b`) and Playwright's Chromium for deep research's PDF, with the toolbox's Node 26.13.0 and pnpm for its Slidev deck, keys in
   `search.env`, Supabase's, `HF_TOKEN`, `PERPLEXITY_API_KEY` (its tool-repair fixer runs on Perplexity) and ren desktop's own providers (`RON_CHAT_PROVIDERS`, `TELNYX_API_KEY`, `GEMINI_API_KEY`, `MISTRAL_API_KEY`, `XAI_API_KEY`, 2026-11-16) in `ren.env`, so Deep Research picks ren desktop's default, Telnyx `moonshotai/Kimi-K3.1-Pro` (with only NIM it ran on `minimaxai/minimax-m3.1-flash`, which went silent mid-reply and failed the run); Deep Research's working files are on the `ren_data` volume (`RON_DEEP_RESEARCH_ARTIFACTS_DIR`, since a new container lost a run's report on 2026-11-17); its storage is ren desktop's Hugging Face bucket, see "Context
   widget"), at `https://rivet.ron-ai.dev/` behind the same token (Caddy sends every
-  path the other services don't take to it, except ren's A2A endpoint). "Add search to Ren context" and "Search deeper" need ren desktop's context
-  store and Electron, so the first fails on the phone and the second is not shown.
+  path the other services don't take to it, except ren's A2A endpoint). "Add search to Ren context" goes to the signed-in account's Context Agent
+  (the mounts point ren's context store at the account, as `ContextBridge` does on the desktop), and "Search deeper"
+  loads ren's deeper search in the tab.
 - **Ren's hub** (`deploy/vm/hub/app.py`, FastMCP 3.4.0 and mcp 1.26.0, the versions ren desktop pins; the `hub`
   container at `https://rivet.ron-ai.dev/hub/` behind `EMRYS_GEMINI_TOKEN`): the one place the phone, ren desktop and
   the agents meet. A phone and a desktop are behind home routers, so each dials out
@@ -599,7 +617,7 @@ cd deploy/vm/hub && uvx --python 3.12 --with fastmcp==3.4.0 --with mcp==1.26.0 -
    simplified Settings), CloudFS, and triggers and webhooks.
 7. **The Strands agents** (plan https://claude.ai/artifact/Ri9R22DZiVUhd2x2oW6CeL): they run on the Gemini API (AI
    Studio, owner, 2026-11-06), NIM, Mistral, Telnyx and xAI. The `gemini` and `search` images are built on the VM
-   (`emrys-gemini:1.64.0`, `ren-api:a6213d7`) and start once their env files are in `/opt/emrys`: `gemini.env`
+   (`emrys-gemini:1.64.0`, `ren-api:ab77c6f`) and start once their env files are in `/opt/emrys`: `gemini.env`
    (`GOOGLE_API_KEY`, `NVIDIA_NIM_API_KEY`, `MISTRAL_API_KEY`, `TELNYX_API_KEY`, `XAI_API_KEY`; without `TELNYX_MCP_AUTHORIZATION` oubliai-telnyx
    doesn't load there), `search.env` (`BRAVE_SEARCH_API_KEY`, `BRAVE_ANSWERS_API_KEY`, `NVIDIA_NIM_API_KEY`) and
    `ren.env` (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `HF_TOKEN`, `PERPLEXITY_API_KEY`, `RON_CHAT_PROVIDERS` and ren desktop's provider keys).
@@ -615,7 +633,7 @@ cd deploy/vm/hub && uvx --python 3.12 --with fastmcp==3.4.0 --with mcp==1.26.0 -
 9. **Telnyx** (PR #13): checked by mypy and offline (the model, its window from the catalogue, the catalogue's filter);
    not run live. It needs `TELNYX_API_KEY` in the VM's `gemini.env` and the `gemini` image rebuilt, then one typed
    conversation from Settings › Agents › Telnyx with a tool call.
-10. **Memory:** the `gemini` image is pinned to ren `7d3a9b2` and the `ren` image to `a6213d7`, both with ren PRs #25 and #26. Not run live: one
+10. **Memory:** the `gemini` image is pinned to ren `7d3a9b2` and the `ren` image to `ab77c6f`, both with ren PRs #25 and #26. Not run live: one
     conversation, one dream and one review. The `gemini` service keeps its brain in ren's `local` storage on the VM
     under the app's install id, and the `ren` service in ren desktop's bucket under the account, so the phone's
     Strands agents and ren's pages don't share one brain yet.

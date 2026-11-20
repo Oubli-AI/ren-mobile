@@ -1,6 +1,6 @@
-ren desktop's pages and components, unmodified: github.com/Oubli-AI/ren (was ImRonAI/TheBrowser) at a6213d7 (main,
-pull 38; with pulls 31, 32 and 38: the Context Agent's drafted replies, twice-daily reviews with OpenCode, people, the
-calls and texts in its [phone] turn, and its [notification] turn).
+ren desktop's pages and components, unmodified: github.com/Oubli-AI/ren (was ImRonAI/TheBrowser) at ab77c6f (main,
+pull 46; with pulls 31, 32 and 38: the Context Agent's drafted replies, twice-daily reviews with OpenCode, people, the
+calls and texts in its [phone] turn, and its [notification] turn; and the agent panel, Live Music and the reader).
 
   pages/SearchResultsPage.tsx                               ren's search results
   pages/HomePage.tsx, OnboardingPage.tsx, SignInPage.tsx    Discover and the destinations, the interview, sign-in
@@ -8,6 +8,12 @@ calls and texts in its [phone] turn, and its [notification] turn).
   pages/DocumentsPage.tsx, ProjectsIndexPage.tsx,
   ProjectHomePage.tsx, layouts/AuthPageLayout.tsx           Projects and Documents
   components/interests/InterestsWidget.tsx, ContextBridge   the Context widget and what feeds its Context Agent
+  components/agent-panel/AgentPanel.tsx, MusicSidePanel,
+  ScreenVisionOverlay, RepairBridge                         what BrowserLayout lays over every page: Ren's agent
+                                                            panel, the Live Music deck, the screen-vision frame and
+                                                            the repair review
+  pages/ArticleReaderPage.tsx                               the article reader (ron://read)
+  lib/theme.ts                                              Light, Dark and Glass
   components/navigation/destinations.ts                     the destinations, as ren desktop's sidebar lists them
   components/ai-elements/*, chrome/UrlBar.tsx,
   context/AgentUiContext.tsx                                the agent panel's conversation components
@@ -33,3 +39,5 @@ ren account the pages are signed in to, and the app's events):
   src/context/       InterestsWidget and ContextBridge over the browser, for a signed-in account that finished the
                      interview; the Context Agent hears the phone's pages ([browsing]) and the phone ([phone])
   src/panel/         the agent panel's chat, drawn with the ai-elements the way AgentPanel.tsx draws it
+  src/shell.tsx      AgentPanel, MusicSidePanel, ScreenVisionOverlay and RepairBridge over every mount, as ren
+                     desktop's BrowserLayout lays them over every tab; ren://agent is AgentPanel on a page of its own

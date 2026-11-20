@@ -149,10 +149,11 @@ public fun SettingsScreen(runtime: RenRuntime, onOpen: (String) -> Unit = {}) {
     }
 }
 
-/** Secure DNS, Shields, search engine, page appearance, saved site permissions and clear browsing data. */
+/** Secure DNS, search engine, theme, Shields, page appearance, saved site permissions and clear browsing data. */
 @Composable
 private fun BrowserAndPrivacy(runtime: RenRuntime, refresh: Int) {
     val p = LocalPalette.current
+    val context = LocalContext.current
     val s = runtime.settings
     val scope = rememberCoroutineScope()
     var dnsMode by remember(refresh) { mutableStateOf(s.dnsMode) }
@@ -209,6 +210,15 @@ private fun BrowserAndPrivacy(runtime: RenRuntime, refresh: Int) {
             Choices(SearchEngine.entries.map { it to it.label }, searchEngine) { engine ->
                 searchEngine = engine
                 s.searchEngine = engine
+            }
+        }
+        RowRule()
+        Column(Modifier.padding(horizontal = RowInset, vertical = 18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("Theme", style = Type.labelLg, color = p.ink2)
+            Choices(ThemeChoice.entries.map { it to it.label }, s.theme) { theme ->
+                s.theme = theme
+                runtime.themeChanged()
+                context.findActivity()?.recreate()
             }
         }
         RowRule()

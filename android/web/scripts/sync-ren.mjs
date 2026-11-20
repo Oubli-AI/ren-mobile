@@ -15,6 +15,8 @@ const entries = [
   "src/lib/search-api.ts", "src/lib/sign-in.ts", "src/stores/authStore.ts", "src/stores/favoritesStore.ts",
   "src/stores/navigationStore.ts", "src/stores/tabStore.ts", "src/stores/onboardingStore.ts", "src/stores/contextAgentStore.ts",
   "src/stores/interestsStore.ts", "src/stores/accountProfileStore.ts", "src/utils/cn.ts", "src/index.css", "src/vite-env.d.ts", "src/pages/types/electron.ts",
+  "src/components/agent-panel/AgentPanel.tsx", "src/components/agent-panel/MusicSidePanel.tsx", "src/components/agent-panel/ScreenVisionOverlay.tsx",
+  "src/components/agent-panel/RepairBridge.tsx", "src/pages/ArticleReaderPage.tsx", "src/lib/theme.ts",
 ]
 const extensions = ["", ".ts", ".tsx", ".d.ts", "/index.ts", "/index.tsx"]
 

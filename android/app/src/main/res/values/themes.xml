@@ -6,4 +6,12 @@
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
+
+    <!-- Glass (Settings › Browser › Theme): the window is see-through over the wallpaper and what is behind Ren, which
+         Android 12 and later blur (values-v31), as ren desktop's Glass sits on the desktop's own material. -->
+    <style name="Theme.Ren.Glass">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowShowWallpaper">true</item>
+    </style>
 </resources>

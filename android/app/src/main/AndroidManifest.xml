@@ -52,6 +52,15 @@
         <intent>
             <action android:name="android.speech.RecognitionService" />
         </intent>
+        <!-- Social sign-in opens the provider's page in another browser's Custom Tab (OAuthLoopback). -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="https" />
+        </intent>
+        <intent>
+            <action android:name="android.support.customtabs.action.CustomTabsService" />
+        </intent>
     </queries>
 
     <application
@@ -115,6 +124,21 @@
             <meta-data
                 android:name="android.app.shortcuts"
                 android:resource="@xml/shortcuts" />
+        </activity>
+
+        <!-- "Add to Ren context" in the text selection menu, in Ren and in other apps. -->
+        <activity
+            android:name=".browser.ContextAddActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:label="@string/context_add_label"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.intent.action.PROCESS_TEXT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
         </activity>
 
         <receiver

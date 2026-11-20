@@ -5,6 +5,7 @@ import android.app.Activity
 import android.app.SearchManager
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings as AndroidSettings
 import android.widget.Toast
@@ -15,6 +16,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import android.view.ViewGroup
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -25,6 +27,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.key
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.hiron.ren.R
 import com.hiron.ren.browser.ContextLayout
 import androidx.compose.ui.platform.testTag
 import com.hiron.ren.ui.BrowserScreen
@@ -71,9 +74,11 @@ import com.hiron.ren.ui.Onboarding
 import com.hiron.ren.ui.RenTheme
 import com.hiron.ren.ui.Quick
 import com.hiron.ren.ui.SettingsScreen
+import com.hiron.ren.ui.ThemeChoice
 import com.hiron.ren.voice.AgentMode
 import com.hiron.ren.voice.RenVoiceService
 import com.hiron.ren.widget.RenWidgets
+import java.util.function.Consumer
 import kotlinx.coroutines.CompletableDeferred
 
 public class MainActivity : FragmentActivity() {
@@ -83,6 +88,10 @@ public class MainActivity : FragmentActivity() {
     private var linkRequests by mutableIntStateOf(0)
     private var searchRequests by mutableIntStateOf(0)
     private var pendingWebPermissions: CompletableDeferred<Map<String, Boolean>>? = null
+
+    /** Glass's window blur is on (off while the phone saves battery): only then are Ren's surfaces see-through. */
+    private var blurred by mutableStateOf(false)
+    private val blurListener = Consumer<Boolean> { blurred = it }
 
     private val webPermissions = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { results ->
         pendingWebPermissions?.complete(results)
@@ -101,12 +110,28 @@ public class MainActivity : FragmentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Glass is a see-through window; changing the theme in Settings recreates the activity.
+        val theme = ren.settings.theme
+        if (theme == ThemeChoice.Glass) setTheme(R.style.Theme_Ren_Glass)
         super.onCreate(savedInstanceState)
+        if (theme == ThemeChoice.Glass && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            blurred = windowManager.isCrossWindowBlurEnabled
+            windowManager.addCrossWindowBlurEnabledListener(mainExecutor, blurListener)
+        }
         // Edge to edge, with the system bars' icons following the theme.
         enableEdgeToEdge()
         // A recreated activity (rotation, theme change) must not replay the request that first opened it.
         if (savedInstanceState == null) handle(intent)
-        setContent { RenTheme { CompositionLocalProvider(LocalImages provides ren.images) { RenAppUi(ren, listenRequests, focusRequests, homeRequests, linkRequests, searchRequests) } } }
+        setContent {
+            val dark = when (theme) {
+                ThemeChoice.Light -> false
+                ThemeChoice.Dark -> true
+                ThemeChoice.Glass, ThemeChoice.System -> isSystemInDarkTheme()
+            }
+            RenTheme(dark = dark, glass = blurred) {
+                CompositionLocalProvider(LocalImages provides ren.images) { RenAppUi(ren, listenRequests, focusRequests, homeRequests, linkRequests, searchRequests) }
+            }
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -132,6 +157,7 @@ public class MainActivity : FragmentActivity() {
     }
 
     override fun onDestroy() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) windowManager.removeCrossWindowBlurEnabledListener(blurListener)
         pendingWebPermissions?.complete(emptyMap())
         pendingWebPermissions = null
         super.onDestroy()

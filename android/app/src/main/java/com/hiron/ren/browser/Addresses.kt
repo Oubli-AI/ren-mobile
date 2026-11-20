@@ -44,8 +44,9 @@ internal enum class SearchEngine(val wire: String, val label: String) {
 }
 
 /**
- * ren desktop's destinations after Home, as its sidebar lists them (`DESTINATIONS` in `navigation/destinations.ts`);
- * each is Ren's page at [address].
+ * ren desktop's destinations after Home, as its sidebar lists them (`DESTINATIONS` in `navigation/destinations.ts`),
+ * then [Agent], ren desktop's agent panel (`AgentPanel.tsx`: its threads, Memory, agent picker, voice, Teach Ren and
+ * Live Music) on a page of its own; each is Ren's page at [address].
  */
 public enum class Destination {
     Discover,
@@ -55,6 +56,7 @@ public enum class Destination {
     Calendar,
     Vibe,
     Build,
+    Agent,
     ;
 
     public val id: String = name.lowercase()

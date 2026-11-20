@@ -47,3 +47,8 @@ recoloured to volt, and it opens on a browser whose search page is ren desktop's
 (`ImRonAI/TheBrowser`) each serve an MCP server through Ren's hub on the VM (FastMCP) and call each other through it;
 the Strands agents use the hub too. Code copied from ren desktop or Cato stays byte for byte under `android/web/src/ren`
 and `android/web/src/cato` (hash-checked); adapt around it, never edit it. See "ren mobile" in `AGENTS.md`.
+
+## Addendum, 2026-11-20: mobile only
+From now on only ren mobile is built. ren desktop (`Oubli-AI/ren`) is the source of its features, not a target: every
+feature built there comes to the phone, by copying its components into `android/web/src/ren` with
+`scripts/sync-ren.mjs` and mounting them. Backend changes that serve the phone are fine; ren desktop's UI is not changed.

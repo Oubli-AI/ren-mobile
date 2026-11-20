@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.MutableContextWrapper
+import android.content.res.Configuration
 import android.net.Uri
 import android.view.ViewGroup
 import android.webkit.ValueCallback
@@ -55,6 +56,7 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Bookmark
+import androidx.compose.material.icons.outlined.BookmarkAdd
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.Bookmarks
 import androidx.compose.material.icons.outlined.Close
@@ -67,11 +69,13 @@ import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Restore
+import androidx.compose.material.icons.outlined.Screenshot
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.Timeline
 import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.outlined.VerticalSplit
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -98,7 +102,9 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -139,14 +145,15 @@ public const val MORE_TAG: String = "more"
 public enum class Page { Activity, Settings }
 
 /**
- * The browser: the toolbar with the address bar and Ask Ren, the active tab (Ren's home page or a web page), and the
- * bottom bar with back, forward, search, the tabs and the menu. The bottom bar steps aside while the keyboard is up.
+ * The browser: the toolbar with the address bar and Ask Ren, the active tab (Ren's home page or a web page, or two tabs
+ * in split view), and the bottom bar with back, forward, search, the tabs and the menu. The bottom bar steps aside while the keyboard is up.
  * Each new [searchRequests] (the search widget) puts the address bar in editing, with the keyboard up.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 public fun BrowserScreen(runtime: RenRuntime, waiting: Int, searchRequests: Int = 0, onAskRen: () -> Unit, onOpen: (Page) -> Unit) {
     val p = LocalPalette.current
+    val context = LocalContext.current
     val browser = runtime.browser
     val state by browser.state.collectAsStateWithLifecycle()
     val tab = state.current ?: return
@@ -156,9 +163,14 @@ public fun BrowserScreen(runtime: RenRuntime, waiting: Int, searchRequests: Int 
     var menu by rememberSaveable { mutableStateOf(false) }
     var historySheet by rememberSaveable { mutableStateOf(false) }
     var bookmarksSheet by rememberSaveable { mutableStateOf(false) }
+    var split by rememberSaveable { mutableStateOf(listOf<String>()) }
+    val panes = split.takeIf { ids ->
+        tab.id in ids && ids.all { id -> state.tabs.any { it.id == id && !it.home } }
+    }
 
     val findState by browser.findState.collectAsStateWithLifecycle()
     val contextMenu by browser.contextMenu.collectAsStateWithLifecycle()
+    val contextAccount by runtime.contextWidget.account.collectAsStateWithLifecycle()
     val httpAuth by browser.httpAuth.collectAsStateWithLifecycle()
     val jsDialog by browser.jsDialog.collectAsStateWithLifecycle()
     val permissionPrompt by browser.sitePermissions.prompt.collectAsStateWithLifecycle()
@@ -213,6 +225,8 @@ public fun BrowserScreen(runtime: RenRuntime, waiting: Int, searchRequests: Int 
         Box(Modifier.weight(1f).fillMaxWidth()) {
             if (tab.home) {
                 BrowserHome(runtime, go)
+            } else if (panes != null) {
+                SplitPanes(browser, panes, tab.id)
             } else {
                 PullToRefreshTabContainer(
                     canRefresh = tab.error == null && tab.sslWarning == null,
@@ -287,6 +301,19 @@ public fun BrowserScreen(runtime: RenRuntime, waiting: Int, searchRequests: Int 
             onReload = { if (tab.loading) browser.stop() else browser.reload() },
             onOpenHistory = { historySheet = true },
             onOpenBookmarks = { bookmarksSheet = true },
+            split = panes != null,
+            onSplit = {
+                if (panes != null) {
+                    split = emptyList()
+                } else {
+                    val other = state.tabs.lastOrNull { it.id != tab.id && !it.home }
+                    if (other == null) {
+                        Toast.makeText(context, "Open a page in another tab to split the view.", Toast.LENGTH_SHORT).show()
+                    } else {
+                        split = listOf(other.id, tab.id)
+                    }
+                }
+            },
             onOpen = onOpen,
         )
     }
@@ -310,6 +337,7 @@ public fun BrowserScreen(runtime: RenRuntime, waiting: Int, searchRequests: Int 
             target = target,
             tab = tab,
             browser = browser,
+            addContext = if (contextAccount.contextReady) { kind, title, url -> runtime.contextWidget.addContext(kind, title, url) } else null,
             onDismiss = browser::dismissContextMenu,
         )
     }
@@ -464,6 +492,38 @@ private fun Uploads(browser: Browser) {
             }
         }
         onDispose { browser.fileChooser = null }
+    }
+}
+
+/**
+ * Two tabs at once, as ren desktop's split workspace shows them: one above the other, side by side in landscape. Touching
+ * a pane makes its tab the active one, which the address bar, the bottom bar and the menu act on; the volt edge marks it.
+ */
+@Composable
+private fun SplitPanes(browser: Browser, ids: List<String>, active: String) {
+    val p = LocalPalette.current
+    val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val pane = @Composable { id: String, modifier: Modifier ->
+        Box(
+            modifier
+                .background(if (id == active) p.accent else p.chrome)
+                .padding(2.dp)
+                .pointerInput(id) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                            if (event.type == PointerEventType.Press) browser.select(id)
+                        }
+                    }
+                },
+        ) {
+            TabView(browser, id)
+        }
+    }
+    if (landscape) {
+        Row(Modifier.fillMaxSize()) { ids.forEach { pane(it, Modifier.weight(1f).fillMaxHeight()) } }
+    } else {
+        Column(Modifier.fillMaxSize()) { ids.forEach { pane(it, Modifier.weight(1f).fillMaxWidth()) } }
     }
 }
 
@@ -907,7 +967,11 @@ private fun Favicon(tab: BrowserTab) {
     }
 }
 
-/** The browser menu: tabs, page controls, Shields, Find in page, Desktop site, History, Bookmarks, Print, Activity and Settings. */
+/**
+ * The browser menu: tabs, split view, page controls, Shields, adding the page or a screenshot of it to Ren's context (as ren
+ * desktop's page context menu does, while the Context widget's account is ready), Find in page, Desktop site, History,
+ * Bookmarks, Print, Activity and Settings.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MenuSheet(
@@ -919,6 +983,8 @@ private fun MenuSheet(
     onReload: () -> Unit,
     onOpenHistory: () -> Unit,
     onOpenBookmarks: () -> Unit,
+    split: Boolean,
+    onSplit: () -> Unit,
     onOpen: (Page) -> Unit,
 ) {
     val p = LocalPalette.current
@@ -931,6 +997,7 @@ private fun MenuSheet(
     val savedBookmark = remember(favorites, normalizedBookmarkUrl) {
         if (normalizedBookmarkUrl == null) null else favorites.firstOrNull { it.url == normalizedBookmarkUrl }
     }
+    val contextReady = runtime.contextWidget.account.collectAsStateWithLifecycle().value.contextReady
     val shieldHost = remember(tab.url, tab.home) {
         if (tab.home) null else extractWebHost(tab.url)
     }
@@ -960,6 +1027,12 @@ private fun MenuSheet(
             MenuRow(Icons.Outlined.VisibilityOff, "New private tab") {
                 onNewPrivateTab()
                 onDismiss()
+            }
+            if (split || !tab.home) {
+                MenuRow(Icons.Outlined.VerticalSplit, if (split) "Close split view" else "Split view") {
+                    onSplit()
+                    onDismiss()
+                }
             }
             if (!tab.home) {
                 MenuRow(if (tab.loading) Icons.Outlined.Close else Icons.Outlined.Refresh, if (tab.loading) "Stop" else "Reload") {
@@ -994,6 +1067,21 @@ private fun MenuSheet(
                         shieldsRevision++
                         runtime.applyBrowserPreferences()
                         browser.reload()
+                    }
+                }
+                if (contextReady) {
+                    MenuRow(Icons.Outlined.BookmarkAdd, "Add page to Ren context") {
+                        runtime.contextWidget.addContext("link", tab.title.ifEmpty { tab.url }, tab.url)
+                        onDismiss()
+                    }
+                    MenuRow(Icons.Outlined.Screenshot, "Add screenshot to Ren context") {
+                        val shot = browser.captureDataUrl(tab.id)
+                        onDismiss()
+                        if (shot == null) {
+                            Toast.makeText(context, "Nothing to capture on this page.", Toast.LENGTH_SHORT).show()
+                        } else {
+                            runtime.contextWidget.addContext("screenshot", tab.title, tab.url, shot)
+                        }
                     }
                 }
                 MenuRow(Icons.Outlined.Search, "Find in page") {
@@ -1055,7 +1143,7 @@ private fun extractWebHost(url: String): String? {
     return if (host == "appassets.androidplatform.net") null else host
 }
 
-private tailrec fun Context.findActivity(): Activity? = when (this) {
+internal tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
     is ContextWrapper -> baseContext.findActivity()
     else -> null
