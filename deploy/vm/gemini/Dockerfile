@@ -6,15 +6,16 @@ RUN UV_PYTHON_INSTALL_DIR=/opt/python uv venv /opt/gemini --python 3.12 \
         strands-harness==0.4.0 mistralai==2.10.1 openai==2.50.0 strands-xai==0.6.1 xai-sdk==1.19.0 strands-agents-tools==0.8.12 google-genai==2.34.0 fastapi==0.162.0 uvicorn==0.54.0 elevenlabs==2.75.0
 # ren desktop's web tools and memory, as ren's own agents use them: ren's backend source at one commit, unmodified
 # (agent/api/core/web_tools.py, brave_tools.py, xai_model.py, dreaming.py and what they import), with the one package of
-# ren's that the image lacks; strands-agents-tools above vends the Tavily, Exa and Bright Data tools web_tools() gives.
-ARG REN_COMMIT=7d3a9b28d91b5811d2d2ca93aa78c9664ca19868
+# ren's that the image lacks and huggingface_hub (ren's pin) for its bucket storage; strands-agents-tools above vends the
+# Tavily, Exa and Bright Data tools web_tools() gives.
+ARG REN_COMMIT=ab77c6f31e9bb63aebf0a16e3c6bbebca79fa0de
 RUN git clone --filter=blob:none --no-checkout https://github.com/Oubli-AI/ren.git /opt/ren \
     && git -C /opt/ren sparse-checkout set agent \
     && git -C /opt/ren checkout --detach "$REN_COMMIT" \
-    && uv pip install --python /opt/gemini/bin/python python-dotenv==1.2.1
-# ren's config makes its session folder when it is imported; it goes in the agents' home on the shared volume, as do
-# the second brain and the journals (ren's `local` storage).
-ENV PYTHONPATH=/opt/ren SESSION_STORAGE_DIR=/config/emrys-gemini/ren PANEL_STORAGE=local PANEL_STORAGE_DIR=/config/emrys-gemini/storage
+    && uv pip install --python /opt/gemini/bin/python python-dotenv==1.2.1 huggingface_hub==1.20.1
+# ren's config makes its session folder when it is imported; it goes in the agents' home on the shared volume. The
+# second brain and the journals are in ren's own storage, which compose.yaml sets as the `ren` service's.
+ENV PYTHONPATH=/opt/ren SESSION_STORAGE_DIR=/config/emrys-gemini/ren
 COPY app.py providers.py studio.py mistral_model.py media_capabilities.py context_windows.py /opt/gemini/
 USER 1000:1000
 WORKDIR /config/workspace

@@ -33,8 +33,10 @@ the voices, and Lyria RealTime on ren's own music session. Both agents have the 
 
 Memory is ren desktop's own (`agent/api/core/dreaming.py` in the image's copy of ren): both agents search the user's
 second brain and keep a journal in the folder `phone`, and the dream files the journal into the brain once the user
-has been idle. The text agent's turns are journaled and what it remembers is injected before each turn, as the SDK
-does both; the voice agent, a `BidiAgent`, has the two tools.
+has been idle. `user_id` is the signed-in ren account's (the install's when signed out) and the storage is the `ren`
+service's bucket, so the brain is the one ren's pages and the Context widget use. The text agent's turns are journaled
+and what it remembers is injected before each turn, as the SDK does both; the voice agent, a `BidiAgent`, has the two
+tools.
 """
 
 import asyncio

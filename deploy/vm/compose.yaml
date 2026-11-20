@@ -95,13 +95,17 @@ services:
       - elevenlabs.env
       # The model keys, TAVILY_API_KEY, EXA_API_KEY, BRIGHTDATA_API_KEY and OLOSTEP_API_KEY for ren's web tools, and
       # ELEVENLABS_TOOLS_API_KEY for Vibe's ElevenLabs tools (studio.py; not ELEVENLABS_API_KEY, which reads the
-      # ElevenLabs agents' prompts).
+      # ElevenLabs agents' prompts), and HF_TOKEN for the storage bucket.
       - gemini.env
       # The Brave keys, for ren's Brave tools while RON_BRAVE_TOOLS=1.
       - search.env
     environment:
       # NIM's default text model (ren's `NIM_MODEL`; owner, 2026-11-13).
       NIM_MODEL: minimaxai/minimax-m3.1-flash
+      # The second brain and the journals in the `ren` service's bucket, so the phone's agents and ren's pages share
+      # the account's brain.
+      PANEL_STORAGE: huggingface
+      HF_BUCKET_ID: IAMRonHIT/RonBrowserRebuildBucket
       # The laptop's desktop, display :1.
       DISPLAY: ":1"
     ipc: service:laptop
