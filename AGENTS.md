@@ -37,7 +37,9 @@ What the overhaul added, on the branch `claude/project-thread-tnj6xo` (PR #14) a
   opens on it. Tabs are real WebViews, made on a tab's first navigation, with normal and private (WebView multi-profile)
   tabs, saved tab state, recently-closed tab reopen, desktop-site mode, find in page, pull-to-refresh, context menus,
   print/PDF, downloads (including `blob:`/`data:`), uploads, fullscreen video, HTTP auth and JS dialogs, inline page
-  error and TLS warning cards, and Custom Tabs. The address bar uses Mozilla's Public Suffix List to tell URLs from
+  error and TLS warning cards, and Custom Tabs. Tabs send WebView's user agent without its `; wv` and `Version/4.0`
+  tokens (`Browser.browserUserAgent`, 2026-11-20), as DuckDuckGo's browser does, since Google refuses sign-in in an
+  app's WebView. The address bar uses Mozilla's Public Suffix List to tell URLs from
   search phrases (ported from ren desktop's `navigable-url.ts` and `UrlBar.tsx`), shows omnibox suggestions from open
   tabs, bookmarks and history, strips tracking parameters, supports HTTPS-First, and routes searches through the chosen
   search engine (default Ren). **Secure DNS** (`BrowserDns.kt`) defaults to Cloudflare DoH with Quad9, AdGuard, Custom

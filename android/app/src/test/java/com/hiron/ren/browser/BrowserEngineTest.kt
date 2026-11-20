@@ -73,6 +73,17 @@ class BrowserEngineTest {
     }
 
     @Test
+    fun webTabsSendABrowserUserAgentNotAnAppWebViews() {
+        val webView = "Mozilla/5.0 (Linux; Android 17; SM-S921U1 Build/CP2A.260605.016; wv) AppleWebKit/537.36 " +
+            "(KHTML, like Gecko) Version/4.0 Chrome/142.0.7444.0 Mobile Safari/537.36"
+        assertEquals(
+            "Mozilla/5.0 (Linux; Android 17; SM-S921U1 Build/CP2A.260605.016) AppleWebKit/537.36 " +
+                "(KHTML, like Gecko) Chrome/142.0.7444.0 Mobile Safari/537.36",
+            Browser.browserUserAgent(webView),
+        )
+    }
+
+    @Test
     fun incognitoTabsExcludeStoreHistoryAndVisitedAndCloseCleanly() {
         var storedTabsJson: String? = null
         var storedHistoryJson: String? = null

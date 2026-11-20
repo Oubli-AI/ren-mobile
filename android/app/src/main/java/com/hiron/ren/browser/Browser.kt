@@ -1079,10 +1079,9 @@ public class Browser internal constructor(
         }
         webView.layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
         val webSettings = webView.settings
-        defaultUserAgents[id] = webSettings.userAgentString.orEmpty()
-        if (_state.value.tabs.firstOrNull { it.id == id }?.desktopSite == true) {
-            webSettings.userAgentString = DESKTOP_USER_AGENT
-        }
+        val mobileUa = browserUserAgent(webSettings.userAgentString.orEmpty())
+        defaultUserAgents[id] = mobileUa
+        webSettings.userAgentString = if (_state.value.tabs.firstOrNull { it.id == id }?.desktopSite == true) DESKTOP_USER_AGENT else mobileUa
         webSettings.javaScriptEnabled = true
         webSettings.domStorageEnabled = true
         webSettings.allowFileAccess = false
@@ -1711,6 +1710,12 @@ public class Browser internal constructor(
         internal const val MAX_LIVE_WEBVIEWS: Int = 6
         internal const val DESKTOP_USER_AGENT: String =
             "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36"
+
+        /**
+         * WebView's user agent as a browser's: without the `; wv` and `Version/4.0` tokens that mark an app's WebView,
+         * which Google's sign-in refuses ("This browser or app may not be secure"), as DuckDuckGo's browser drops them.
+         */
+        internal fun browserUserAgent(webView: String): String = webView.replace("; wv)", ")").replace(Regex("Version/\\S+ "), "")
 
         private const val ORIGIN_HOST: String = "appassets.androidplatform.net"
         private const val TAB_STATES_DIR: String = "tab_states"
