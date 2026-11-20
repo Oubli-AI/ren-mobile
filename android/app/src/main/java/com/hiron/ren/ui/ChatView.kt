@@ -228,6 +228,9 @@ private class ChatHost(context: Context, background: Int, private val onImage: (
         layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
         setBackgroundColor(background)
         settings.javaScriptEnabled = true
+        // The panel page's shared chunks read localStorage when they load; without DOM storage it is null, the
+        // script throws, and the chat stays blank.
+        settings.domStorageEnabled = true
         settings.allowFileAccess = false
         settings.allowContentAccess = false
         val loader = WebViewAssetLoader.Builder()
