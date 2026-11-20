@@ -195,6 +195,20 @@ What the overhaul added, on the branch `claude/project-thread-tnj6xo` (PR #14) a
   `hub_peers` says which side is attached. `/hub/agents/mcp` is the same hub for the ElevenLabs agents, which already
   run the phone's tools as client tools: only the phone's `browser_*` tools, `desktop_*` and `hub_peers`.
   FastMCP 4.1.0 pulls mcp 2.3.0, which has no WebSocket transport, which is why the hub is on 3.4.0.
+- **Work mode** (2026-11-20, owner: a work mode like Claude Code's, where Desktop Commander works on the user's own
+  machine; mobile only, owner 2026-11-20): the user's computer is the hub's third side, `local`. `deploy/local/computer.py`
+  runs on the computer (`REN_HUB_URL=wss://<host>/hub REN_HUB_TOKEN=<the hub's token> uv run deploy/local/computer.py`,
+  needs uv and Node): Desktop Commander 0.3.1 over stdio with the user's environment, served through FastMCP's proxy on
+  `/hub/attach/local`, dialing again after every drop. The hub lists its tools under `local_` on `/hub/mcp` and
+  `/hub/agents/mcp`, and `hub_peers` says `local`. Every Desktop Commander schema carries `$schema` and
+  `additionalProperties`, which Gemini Live refuses, so the connector serves them without those keys and voice gets the
+  same 25 tools as text (the VM's own Desktop Commander, `emrys-computer`, still has them, so voice doesn't get its
+  tools). The agent panel's Work pill (with a Strands provider; the ElevenLabs agents' tools are set in ElevenLabs)
+  takes a folder (`Settings.workFolder`); the session opens with `work=<folder>`, and `deploy/vm/gemini/app.py` ends
+  both agents' instructions with `work_prompt`: work there through `local_*` like a coding agent. Checked offline
+  (2026-11-20): the hub's test, and the connector with the real Desktop Commander against the hub on loopback (25
+  `local_` tools on both endpoints, `local_start_process` ran a command, every schema declarable on Gemini Live, and it
+  attached again after the hub restarted). Not run live.
 - **The phone on the hub** (`mcp/HubLink.kt`, `mcp/HubService.kt`, `mcp/PhoneMcpServer.kt`, `mcp/BrowserTools.kt`;
   Settings › Remote tools): a foreground service keeps the phone attached with the Kotlin MCP SDK 0.16.0
   (`Server.createSession(WebSocketClientTransport)`), proves the link with a ping every 20 s and retries from 2 s to

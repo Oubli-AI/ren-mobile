@@ -1,17 +1,20 @@
-"""Ren's hub: one MCP server that joins the phone and the desktop, for each other and for the agents.
+"""Ren's hub: one MCP server that joins the phone, ren desktop and the user's computer, for each other and the agents.
 
-The phone and ren desktop are behind home routers, so neither can be called from outside. Each dials out to the hub
-instead and serves its own MCP server over that WebSocket (``/attach/phone``, ``/attach/desktop``, the MCP ``mcp``
-subprotocol). The hub is an MCP client on those sockets and an MCP server at ``/mcp`` (Streamable HTTP), built with
+The phone, ren desktop and the user's computer are behind home routers, so none can be called from outside. Each dials
+out to the hub instead and serves its own MCP server over that WebSocket (``/attach/phone``, ``/attach/desktop``,
+``/attach/local``, the MCP ``mcp`` subprotocol). The hub is an MCP client on those sockets and an MCP server at ``/mcp`` (Streamable HTTP), built with
 FastMCP: each attached side is a ``ProxyProvider`` over its live session, so the hub lists and forwards whatever that
 side serves at the moment and nothing is copied or cached.
 
 The phone's tools keep their own names (``sms_send``, ``browser_navigate``), the names the agents' prompts use; the
-desktop's are under ``desktop_``. ``hub_peers`` says which sides are attached. Caddy puts the hub at
+desktop's are under ``desktop_``, and the user's computer's under ``local_``: Desktop Commander on the machine ren
+desktop runs on (ren's ``agent/local_computer.py``, started by ren desktop), the tools of work mode. ``hub_peers``
+says which sides are attached. Caddy puts the hub at
 ``https://rivet.ron-ai.dev/hub/`` behind the bearer token; the agents on the VM reach it at ``http://hub:8300/mcp``.
 
 ``/agents/mcp`` is the same hub for the ElevenLabs agents, which already run the phone's own tools as client tools on
-the phone: it serves what they lack, the phone's browser (``browser_*``) and ren desktop (``desktop_*``).
+the phone: it serves what they lack, the phone's browser (``browser_*``), ren desktop (``desktop_*``) and the user's
+computer (``local_*``).
 """
 
 from __future__ import annotations
@@ -38,7 +41,7 @@ from starlette.applications import Starlette
 from starlette.routing import Mount, WebSocketRoute
 from starlette.websockets import WebSocket
 
-Peer = Literal["phone", "desktop"]
+Peer = Literal["phone", "desktop", "local"]
 PEERS: tuple[Peer, ...] = get_args(Peer)
 
 #: How often the hub pings an attached side; a ping that fails means it has gone.
@@ -68,8 +71,9 @@ class Attached(ClientTransport):
 hub: FastMCP[None] = FastMCP(
     "ren-hub",
     instructions=(
-        "Ren's phone and desktop. Tools without a prefix run on the phone (its phone tools and its browser's "
-        "`browser_*` tools); tools under `desktop_` run in ren desktop. Call hub_peers to see which are attached."
+        "Ren's phone, desktop and the user's computer. Tools without a prefix run on the phone (its phone tools and its "
+        "browser's `browser_*` tools); tools under `desktop_` run in ren desktop; tools under `local_` are Desktop "
+        "Commander on the user's own computer (files, terminal, processes). Call hub_peers to see which are attached."
     ),
 )
 
@@ -103,26 +107,29 @@ class Only(Transform):
 
 
 def hub_peers() -> dict[Peer, bool]:
-    """Which of Ren's sides are attached to the hub right now: the phone and ren desktop."""
+    """Which of Ren's sides are attached to the hub right now: the phone, ren desktop and the user's computer (local)."""
     return {peer: peer in attached for peer in PEERS}
 
 
 hub.add_provider(ProxyProvider(lambda: session("phone"), cache_ttl=0))
 hub.add_provider(ProxyProvider(lambda: session("desktop"), cache_ttl=0), namespace="desktop")
+hub.add_provider(ProxyProvider(lambda: session("local"), cache_ttl=0), namespace="local")
 hub.tool(hub_peers, annotations={"readOnlyHint": True})
 
-#: The hub as the ElevenLabs agents see it: the phone's browser and ren desktop.
+#: The hub as the ElevenLabs agents see it: the phone's browser, ren desktop and the user's computer.
 agents: FastMCP[None] = FastMCP(
     "ren-hub",
     instructions=(
-        "Ren's browsers. `browser_*` tools drive the browser in the ren app on the phone; tools under `desktop_` run "
-        "in ren desktop (its browser and Ren's agent there). Call hub_peers to see which are attached."
+        "Ren's browsers and the user's computer. `browser_*` tools drive the browser in the ren app on the phone; tools "
+        "under `desktop_` run in ren desktop (its browser and Ren's agent there); tools under `local_` are Desktop "
+        "Commander on the user's own computer. Call hub_peers to see which are attached."
     ),
 )
 phone_browser = ProxyProvider(lambda: session("phone"), cache_ttl=0)
 phone_browser.add_transform(Only("browser_"))
 agents.add_provider(phone_browser)
 agents.add_provider(ProxyProvider(lambda: session("desktop"), cache_ttl=0), namespace="desktop")
+agents.add_provider(ProxyProvider(lambda: session("local"), cache_ttl=0), namespace="local")
 agents.tool(hub_peers, annotations={"readOnlyHint": True})
 
 

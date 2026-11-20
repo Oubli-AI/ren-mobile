@@ -320,6 +320,15 @@ public class RenRuntime(private val app: Context) {
         }
     }
 
+    /**
+     * Starts work mode in [folder] on the user's computer, or ends it (null). The running session stops, so the next
+     * message opens one with it; the chat carries on.
+     */
+    public fun work(folder: String?) {
+        settings.workFolder = folder
+        agent.stop()
+    }
+
     /** Ends the conversation: its session stops and the chat clears, back to Ren on its stage. */
     public fun newChat() {
         agent.stop()

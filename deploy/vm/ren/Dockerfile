@@ -31,7 +31,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl xz-utils &
     && tar -xJf "node-v$NODE-linux-x64.tar.xz" -C /usr/local --strip-components=1 \
         --exclude CHANGELOG.md --exclude LICENSE --exclude README.md \
     && rm "node-v$NODE-linux-x64.tar.xz" && npm install -g pnpm@12.16.1 && npm cache clean --force
-RUN useradd --create-home --uid 1000 ren && install -d -o ren -g ren /home/ren/data && chown -R ren:ren /opt/ms-playwright
+# ren's agents watch ./tools for tools they write (native load_tools_from_directory), so the agents' user owns it.
+RUN useradd --create-home --uid 1000 ren && install -d -o ren -g ren /home/ren/data /opt/ren/tools && chown -R ren:ren /opt/ms-playwright
 USER 1000:1000
 ENV PYTHONPATH=/opt/ren PYTHONUNBUFFERED=1 API_HOST=0.0.0.0 API_PORT=8765
 EXPOSE 8765 8766

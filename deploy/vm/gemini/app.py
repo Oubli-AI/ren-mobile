@@ -19,6 +19,11 @@ subagent tool and `web_fetch` run their children on the text model, since the Li
 The instructions are the ElevenLabs agents' own prompts, read when the conversation opens and filled in the way
 ElevenLabs fills its dynamic variables.
 
+Work mode: with `work` (a folder on the user's own computer) the instructions end with `work_prompt`, and the agent
+works there through the hub's `local_*` tools, Desktop Commander on that computer (`deploy/local/computer.py`), as a
+coding agent works in a terminal. Every agent has those tools whenever the computer is attached; work mode says to use
+them.
+
 Memory is ren desktop's own (`agent/api/core/dreaming.py` in the image's copy of ren): both agents search the user's
 second brain and keep a journal in the folder `phone`, and the dream files the journal into the brain once the user
 has been idle. The text agent's turns are journaled and what it remembers is injected before each turn, as the SDK
@@ -106,7 +111,8 @@ MEMORY_FOLDER = "phone"
 GEMINI_BUILTINS: BuiltinToolsConfig = {"web_search": os.getenv("GEMINI_WEB_SEARCH", "1") != "0"}
 
 # The ElevenLabs agents' MCP servers plus Ren's hub, unprefixed so the tool names match the prompt. The hub serves
-# the phone's tools under their own names and ren desktop's under `desktop_`, whichever of the two is attached.
+# the phone's tools under their own names, ren desktop's under `desktop_` and the user's computer's under `local_`,
+# whichever is attached.
 SERVERS: dict[str, MCPServerConfig] = {
     "ren-hub": {"url": "http://hub:8300/mcp", "prefix": ""},
     "emrys-computer": {"url": "http://computer:8080/computer/mcp", "prefix": ""},
@@ -170,6 +176,24 @@ async def instructions(agent_id: str, values: Mapping[str, str]) -> str:
     if config is None or config.prompt is None or config.prompt.prompt is None:
         raise RuntimeError(f"{agent_id} has no prompt")
     return re.sub(r"\{\{(\w+)\}\}", lambda found: values.get(found.group(1), found.group(0)), config.prompt.prompt)
+
+
+def work_prompt(folder: str | None) -> str:
+    """Work mode's instructions: work in [folder] on the user's computer through its `local_*` tools; none when off."""
+    if not folder:
+        return ""
+    return f"""
+
+## Work mode
+You are working on the user's own computer, in {folder}, the way a coding agent works in a terminal. The computer's
+files, terminal and processes are your `local_*` tools (Desktop Commander on that computer); your own shell and file
+tools run on Ren's workspace computer, not the user's, so use the `local_*` tools for this work. If you have no
+`local_*` tools, the user's computer isn't connected to Ren: say so and stop.
+- Look before you change: `local_list_directory`, `local_start_search`, `local_read_file`.
+- Change files with `local_edit_block` (an exact, small replacement) and `local_write_file` (new files).
+- Run commands, builds and tests with `local_start_process`; follow long ones with `local_read_process_output` and
+  `local_interact_with_process`.
+- Finish the task, check it works, then say what you changed and what you ran."""
 
 
 def variables(websocket: WebSocket, text_only: bool) -> dict[str, str]:
@@ -242,13 +266,18 @@ async def efforts(provider: ProviderName, model: str) -> dict[str, list[str]]:
 
 @app.websocket("/gemini/voice")
 async def voice(
-    websocket: WebSocket, user_id: str, provider: ProviderName = "gemini", model: str | None = None, effort: str = "auto"
+    websocket: WebSocket,
+    user_id: str,
+    provider: ProviderName = "gemini",
+    model: str | None = None,
+    effort: str = "auto",
+    work: str | None = None,
 ) -> None:
     await websocket.accept()
     helper = text_model(provider, model or provider_default_model(provider), effort)
     agent = BidiAgent(
         model=GoogleGeminiLiveModel(model_id=VOICE_MODEL, voice=VOICE),
-        system_prompt=await instructions(VOICE_AGENT, variables(websocket, text_only=False)) + dreaming.JOURNAL_DIRECTIVE,
+        system_prompt=await instructions(VOICE_AGENT, variables(websocket, text_only=False)) + work_prompt(work) + dreaming.JOURNAL_DIRECTIVE,
         tools=[
             *(MCPClient(
                 url=config["url"],
@@ -286,14 +315,20 @@ async def voice(
 
 @app.websocket("/gemini/text")
 async def text(
-    websocket: WebSocket, conversation: str, user_id: str, provider: ProviderName = "gemini", model: str | None = None, effort: str = "auto"
+    websocket: WebSocket,
+    conversation: str,
+    user_id: str,
+    provider: ProviderName = "gemini",
+    model: str | None = None,
+    effort: str = "auto",
+    work: str | None = None,
 ) -> None:
     await websocket.accept()
     chosen = model or provider_default_model(provider)
     agent = create_harness(
         model=f"google/{chosen}" if provider == "gemini" else text_model(provider, chosen, effort),
         effort=harness_effort(effort) if provider == "gemini" else "auto",
-        instructions=await instructions(TEXT_AGENT, variables(websocket, text_only=True)) + dreaming.JOURNAL_DIRECTIVE,
+        instructions=await instructions(TEXT_AGENT, variables(websocket, text_only=True)) + work_prompt(work) + dreaming.JOURNAL_DIRECTIVE,
         tools=[python_repl, http_request, notebook, sleep, stop, handoff_to_user, swarm, graph, make_mcp_router(servers=SERVERS), *brave_tools(), *web_tools()],
         builtin_tools=GEMINI_BUILTINS if provider == "gemini" else None,
         mcp_servers=SERVERS,

@@ -83,6 +83,17 @@ def desktop() -> FastMCP[None]:
     return side
 
 
+def local() -> FastMCP[None]:
+    side: FastMCP[None] = FastMCP("ren-local")
+
+    @side.tool
+    def list_directory(path: str) -> list[str]:
+        """List a folder on the user's computer."""
+        return [f"{path}/README.md"]
+
+    return side
+
+
 async def names(port: int) -> set[str]:
     async with Client(f"http://127.0.0.1:{port}/mcp") as client:
         return {tool.name for tool in await client.list_tools()}
@@ -98,7 +109,7 @@ async def test_attached_sides_are_listed_and_called_through_the_hub(monkeypatch:
             # The phone's tools keep their names; the desktop's are under desktop_.
             assert await names(port) == {"hub_peers", "device_status", "browser_tabs", "desktop_browser_open"}
             async with Client(f"http://127.0.0.1:{port}/mcp") as client:
-                assert (await client.call_tool("hub_peers")).data == {"phone": True, "desktop": True}
+                assert (await client.call_tool("hub_peers")).data == {"phone": True, "desktop": True, "local": False}
                 assert (await client.call_tool("device_status")).data == {"battery": 81}
                 opened = await client.call_tool("desktop_browser_open", {"url": "https://example.com"})
                 assert opened.data == "opened https://example.com"
@@ -108,6 +119,18 @@ async def test_attached_sides_are_listed_and_called_through_the_hub(monkeypatch:
             while hub_app.attached:
                 await anyio.sleep(0.05)
         assert await names(port) == {"hub_peers"}
+
+
+@pytest.mark.anyio
+async def test_the_users_computer_is_served_under_local_on_both_endpoints(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(hub_app, "PING_SECONDS", 0.1)
+    async with running_hub() as port, attached(port, "local", local()):
+        for path in ("/mcp", "/agents/mcp"):
+            async with Client(f"http://127.0.0.1:{port}{path}") as client:
+                assert {tool.name for tool in await client.list_tools()} == {"hub_peers", "local_list_directory"}
+                assert (await client.call_tool("hub_peers")).data == {"phone": False, "desktop": False, "local": True}
+                listed = await client.call_tool("local_list_directory", {"path": "/Users/tim/ren"})
+                assert listed.data == ["/Users/tim/ren/README.md"]
 
 
 @pytest.mark.anyio

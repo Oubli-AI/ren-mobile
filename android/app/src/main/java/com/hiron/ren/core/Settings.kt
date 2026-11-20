@@ -171,6 +171,14 @@ public class Settings(context: Context) {
 
     public fun setEffort(provider: Provider, effort: String): Unit = prefs.edit().putString("effort_${provider.name}", effort).apply()
 
+    /**
+     * Work mode: the folder on the user's own computer that the Strands agents work in, through Desktop Commander on
+     * Ren's hub (its `local_*` tools, `deploy/local/computer.py`); null is off.
+     */
+    public var workFolder: String?
+        get() = prefs.getString("work_folder", null)
+        set(value) = prefs.edit().putString("work_folder", value?.trim()?.ifEmpty { null }).apply()
+
     /** The bearer token for the workspace VM: the Strands agents, Ren's hub and Ren's search. */
     public var geminiToken: String
         get() = prefs.getString("gemini_token", null) ?: BuildConfig.DEFAULT_GEMINI_TOKEN
@@ -199,6 +207,6 @@ public class Settings(context: Context) {
         public const val AUTO: String = "auto"
 
         /** Ren's hub on the owner's workspace VM. */
-        public const val DEFAULT_HUB_URL: String = "wss://rivet.ron-ai.dev/hub"
+        public val DEFAULT_HUB_URL: String = "wss://${BuildConfig.WORKSPACE_HOST}/hub"
     }
 }

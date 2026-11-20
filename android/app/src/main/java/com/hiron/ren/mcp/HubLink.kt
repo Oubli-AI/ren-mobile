@@ -56,7 +56,7 @@ public sealed interface HubState {
  */
 public class HubLink(
     private val scope: CoroutineScope,
-    /** The hub's WebSocket base, like `wss://rivet.ron-ai.dev/hub`. */
+    /** The hub's WebSocket base, like `wss://<workspace host>/hub`. */
     private val url: () -> String,
     private val token: () -> String,
     private val version: String,
