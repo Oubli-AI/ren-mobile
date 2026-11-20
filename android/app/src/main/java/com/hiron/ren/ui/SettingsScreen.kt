@@ -88,6 +88,7 @@ import com.hiron.ren.BuildConfig
 import com.hiron.ren.browser.BrowserDns
 import com.hiron.ren.browser.DnsMode
 import com.hiron.ren.browser.SearchEngine
+import com.hiron.ren.browser.SearchLevel
 import com.hiron.ren.core.PermAction
 import com.hiron.ren.core.PermissionGroups
 import com.hiron.ren.core.RenRuntime
@@ -340,7 +341,7 @@ private fun Section(number: Int, title: String, content: @Composable ColumnScope
 @Composable
 private fun RowRule() = Rule(Modifier.padding(horizontal = RowInset), color = LocalPalette.current.line)
 
-/** Who runs the agents, the text model and its reasoning, and the talk key. */
+/** Who runs the agents, the text model, its reasoning and the research depth, and the talk key. */
 @Composable
 private fun Agents(runtime: RenRuntime, refresh: Int) {
     val p = LocalPalette.current
@@ -357,6 +358,7 @@ private fun Agents(runtime: RenRuntime, refresh: Int) {
                 }
             }
             if (provider.strands != null) TextModelSetting(runtime, provider, refresh)
+            ResearchDepthSetting(runtime, refresh)
         }
         RowRule()
         Toggle("Talk key", voiceModel, detail = "Shows the mic key, so you can talk to Ren out loud.") {
@@ -366,6 +368,24 @@ private fun Agents(runtime: RenRuntime, refresh: Int) {
     }
     if (provider.strands != null) {
         InfoStrip("${provider.label} runs Ren's text agent in Strands, talks on Gemini 3.8 Live, and reaches the phone's tools through Remote tools, below.")
+    }
+}
+
+/** How hard Ren's searches work, the level Home's chips set too: the address bar's and the agents' browser searches. */
+@Composable
+private fun ResearchDepthSetting(runtime: RenRuntime, refresh: Int) {
+    val p = LocalPalette.current
+    var depth by remember(refresh) { mutableStateOf(runtime.settings.searchLevel) }
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text("Research depth", style = Type.labelLg, color = p.ink2)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            SearchLevel.entries.forEach { level ->
+                FilterChip(level.label, level == depth, {
+                    depth = level
+                    runtime.settings.searchLevel = level
+                }, Modifier.heightIn(min = 40.dp))
+            }
+        }
     }
 }
 

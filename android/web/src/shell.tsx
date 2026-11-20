@@ -17,6 +17,8 @@ import { AgentUiProvider } from "@/context/AgentUiContext"
 import { useAuthStore } from "@/stores/authStore"
 import { useContextAgentStore } from "@/stores/contextAgentStore"
 import { useTabStore } from "@/stores/tabStore"
+import { PickerFooter } from "./destinations/picker"
+import { ResearchDepth } from "./destinations/research-depth"
 
 /** ren desktop's addresses for its own pages, and the phone's for the ones the phone's browser opens. */
 const RON = "ron://"
@@ -57,13 +59,16 @@ export function Shell({ children }: { children: ReactNode }) {
   useEffect(() => setUser(userId), [userId, setUser])
   return (
     <AgentUiProvider>
-      <div className="relative h-full">
-        {children}
-        <AgentPanel />
-        <MusicSidePanel />
-        <ScreenVisionOverlay />
-        <RepairBridge />
-      </div>
+      {/* Every model picker on ren's pages ends with Research Depth (destinations/picker.tsx). */}
+      <PickerFooter.Provider value={<ResearchDepth />}>
+        <div className="relative h-full">
+          {children}
+          <AgentPanel />
+          <MusicSidePanel />
+          <ScreenVisionOverlay />
+          <RepairBridge />
+        </div>
+      </PickerFooter.Provider>
     </AgentUiProvider>
   )
 }
