@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Ren</string>
+    <string name="context_add_label">Add to Ren context</string>
     <string name="operator_stop">■  Stop Ren</string>
     <string name="operator_label">Ren app operator</string>
     <string name="operator_description">Lets Ren read the screen and tap, type and scroll in other apps when you ask it to. Ren never reads or types passwords, shows a Stop button while it works, and asks you before anything that sends, pays or deletes.</string>

@@ -58,6 +58,14 @@ rivet.ron-ai.dev {
 				flush_interval -1
 			}
 		}
+		# A WebSocket (voice, Teach Ren, Live Music) or an iframe (Build's live preview) can't carry a header, so the
+		# app also gives its pages' WebViews the token as the cookie ren_token on this host.
+		@cookie header Cookie *ren_token={$EMRYS_GEMINI_TOKEN}*
+		handle @cookie {
+			reverse_proxy ren:8765 {
+				flush_interval -1
+			}
+		}
 		respond 401
 	}
 }

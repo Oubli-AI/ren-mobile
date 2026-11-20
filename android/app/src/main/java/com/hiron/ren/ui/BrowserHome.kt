@@ -39,6 +39,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Android
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Biotech
 import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.CalendarToday
@@ -172,7 +173,10 @@ private fun Environments(onGo: (String) -> Unit) {
     }
 }
 
-/** The icon ren desktop's sidebar draws for a destination (lucide's Compass, Microscope, Columns3, FileText, Calendar, Music2, Hammer). */
+/**
+ * The icon ren desktop's sidebar draws for a destination (lucide's Compass, Microscope, Columns3, FileText, Calendar,
+ * Music2, Hammer); the agent panel has none there, so it takes a sparkle.
+ */
 private val Destination.icon: ImageVector
     get() = when (this) {
         Destination.Discover -> Icons.Outlined.Explore
@@ -182,6 +186,7 @@ private val Destination.icon: ImageVector
         Destination.Calendar -> Icons.Outlined.CalendarToday
         Destination.Vibe -> Icons.Outlined.MusicNote
         Destination.Build -> Icons.Outlined.Build
+        Destination.Agent -> Icons.Outlined.AutoAwesome
     }
 
 @Composable

@@ -9,18 +9,25 @@
  */
 import { API_BASE_URL } from "@/lib/api-base"
 import type { PhoneAction, PhoneActivity, PhoneApp, PhoneCall, PhoneNotification, PhoneSms } from "@/lib/context-api"
+import type { ContextAddPayload } from "@/pages/types/electron"
 import type { PromptAttachment } from "@/lib/prompt-attachments"
+import { THEME_OPTIONS, type ThemeName } from "@/lib/theme"
 import { useAuthStore } from "@/stores/authStore"
 import type { Favorite } from "@/stores/favoritesStore"
 import { useOnboardingStore } from "@/stores/onboardingStore"
 
-/** What the app answers: `{"type":"token","token":…}` or `{"type":"favorites","favorites":[…]}`. */
-type Answer = { type: "token"; token: string } | { type: "favorites"; favorites: Favorite[] }
+/** What the app answers: `{"type":"token","token":…}`, `{"type":"favorites","favorites":[…]}` or `{"type":"theme","theme":…}`. */
+type Answer =
+  | { type: "token"; token: string }
+  | { type: "favorites"; favorites: Favorite[] }
+  | { type: "theme"; theme: ThemeName }
+  | { type: "oauth-redirect"; url: string }
 
 /**
  * What the app tells the Context widget's page unasked: a page the phone's browser loaded, a search there, a chat
  * with Ren on the phone, a notification another app posted, what happened on the phone since the last report, and the
- * panel's Back and Settings' Sign out.
+ * panel's Back and Settings' Sign out, and what the user added to Ren's context from the browser (a selection, a link, an
+ * image, a video, or a screenshot of the page, which comes as a data URL in `text`), as ren desktop's context menu does.
  */
 export type AppEvent =
   | { type: "visit"; url: string; title: string }
@@ -28,6 +35,7 @@ export type AppEvent =
   | { type: "chat"; channel: string; user: string; assistant: string }
   | { type: "notification"; notification: PhoneNotification }
   | { type: "phone"; activity: PhoneActivity }
+  | { type: "context-add"; payload: ContextAddPayload }
   | { type: "close" }
   | { type: "sign-out" }
 
@@ -137,6 +145,13 @@ function eventOf(data: string): AppEvent | null {
       },
     }
   }
+  const add = message["type"] === "context-add" ? record(message["payload"]) : null
+  if (add !== null) {
+    const kind = add["kind"]
+    if (kind === "selection" || kind === "link" || kind === "image" || kind === "video" || kind === "screenshot") {
+      return { type: "context-add", payload: { kind, title: text(add, "title"), url: text(add, "url"), text: text(add, "text") } }
+    }
+  }
   if (message["type"] === "close" || message["type"] === "sign-out") return { type: message["type"] }
   return null
 }
@@ -161,12 +176,34 @@ function answerOf(data: string): Answer | null {
     const favorites: unknown[] = message.favorites
     return { type: "favorites", favorites: favorites.filter(isFavorite) }
   }
+  if (message.type === "oauth-redirect" && "url" in message && typeof message.url === "string") return { type: "oauth-redirect", url: message.url }
+  if (message.type === "theme" && "theme" in message) {
+    const theme = THEME_OPTIONS.find((it) => it.id === message.theme)
+    if (theme !== undefined) return { type: "theme", theme: theme.id }
+  }
   return null
+}
+
+let oauthCallback: ((url: string) => void) | null = null
+
+/** Hears the provider's redirect from the app's loopback listener, for ren's social sign-in (`src/oauth.ts`). */
+export function onOAuthCallback(handler: (url: string) => void) {
+  oauthCallback = handler
+}
+
+function oauthCallbackOf(data: string): string | null {
+  const message = record(JSON.parse(data))
+  return message !== null && message["type"] === "oauth-callback" && typeof message["url"] === "string" ? message["url"] : null
 }
 
 const host = window.RenHost
 if (host !== undefined) {
   host.onmessage = (event) => {
+    const callback = oauthCallbackOf(event.data)
+    if (callback !== null) {
+      oauthCallback?.(callback)
+      return
+    }
     const happened = eventOf(event.data)
     if (happened !== null) {
       listener?.(happened)
@@ -194,6 +231,23 @@ export async function favorites(): Promise<Favorite[] | null> {
   return answer?.type === "favorites" ? answer.favorites : null
 }
 
+/** The theme chosen in the app's Settings (Light, Dark, Glass or System); null outside the app. */
+export async function theme(): Promise<ThemeName | null> {
+  const answer = await ask("theme")
+  return answer?.type === "theme" ? answer.theme : null
+}
+
+/** The loopback address the app listens on for a social sign-in's redirect; null outside the app. */
+export async function oauthRedirect(): Promise<string | null> {
+  const answer = await ask("oauth-redirect")
+  return answer?.type === "oauth-redirect" ? answer.url : null
+}
+
+/** Opens a social sign-in's provider page in the phone's browser. */
+export function openOAuth(url: string) {
+  host?.postMessage(JSON.stringify({ type: "oauth", url }))
+}
+
 /** Ask Ren from a page: the app opens its agent panel with [attachments] as cards in the composer and sends [text] when there is any. */
 export function askRen(text: string, attachments: PromptAttachment[]) {
   host?.postMessage(JSON.stringify({ type: "ask", text, attachments }))
@@ -204,7 +258,11 @@ export function saveFavorites(list: Favorite[]) {
   host?.postMessage(JSON.stringify({ type: "favorites", favorites: list }))
 }
 
-/** The app's token for the backend, asked for once; null outside the app, where there is none to add. */
+/**
+ * The app's token for the backend, asked for once; null outside the app, where there is none to add. The app also
+ * keeps it as the cookie `ren_token` on the backend, for what can't carry a header: ren's WebSockets
+ * (voice, Teach Ren, Live Music) and iframes (Build's live preview).
+ */
 const token = ask("token").then((answer) => (answer?.type === "token" ? answer.token : null))
 
 const send = window.fetch.bind(window)

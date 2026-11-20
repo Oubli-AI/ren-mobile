@@ -132,8 +132,6 @@ services:
       # Sessions, run journals and memory in ren desktop's own bucket, so the phone and the desktop share one account.
       PANEL_STORAGE: huggingface
       HF_BUCKET_ID: IAMRonHIT/RonBrowserRebuildBucket
-      # Scheduled specialist runs stay with ren desktop: this backend neither starts them nor follows the ones that are running.
-      RON_AGENT_SCHEDULES: "0"
       # Search sessions and the guest Projects database (projects.sqlite3).
       SESSION_STORAGE_DIR: /home/ren/data
       # Deep Research's working files (reports, charts, PDFs), on the volume so a new container keeps them.

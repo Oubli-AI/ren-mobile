@@ -9,5 +9,14 @@
         <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
         <item name="android:windowSplashScreenIconBackgroundColor">@color/ren_accent_tile</item>
     </style>
+    <!-- Glass on Android 12+: what shows through is blurred, as ren desktop's sits on a frosted native material. The
+         blur is off while the phone saves battery (WindowManager.isCrossWindowBlurEnabled), and the app then keeps
+         the opaque palette, as ren's Reduce Transparency rule does. -->
+    <style name="Theme.Ren.Glass">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowShowWallpaper">true</item>
+        <item name="android:windowBackgroundBlurRadius">48dp</item>
+    </style>
     <color name="ren_accent_tile">#FF5543FF</color>
 </resources>
