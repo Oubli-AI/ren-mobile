@@ -144,6 +144,7 @@ public class StrandsAgent(
             .apply { settings.textModel(provider)?.let { addQueryParameter("model", it) } }
             .addQueryParameter("effort", settings.effort(provider))
             .addQueryParameter("user_id", settings.userId)
+            .apply { settings.workFolder?.let { addQueryParameter("work", it) } }
             .apply { settings.permissionVariables().forEach { (name, value) -> addQueryParameter(name, value) } }
             .build()
     }
