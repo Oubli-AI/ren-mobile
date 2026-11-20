@@ -245,7 +245,9 @@ public class RenRuntime(private val app: Context) {
 
     private val elevenLabs = RenAgent(app, settings, ::runTool, ::approve, ::update, { _robot.tryEmit(it) }, scope, braveSearch)
     /** Gemini, NVIDIA NIM, Mistral and Telnyx in Strands on the workspace VM. */
-    public val strands: StrandsAgent = StrandsAgent(app, settings, http, ::update, { _robot.tryEmit(it) }, scope)
+    public val strands: StrandsAgent = StrandsAgent(app, settings, http, ::update, { _robot.tryEmit(it) }, scope) {
+        contextWidget.account.value.let { if (it.signedIn) it.userId else "" }
+    }
 
     /** The agents for the provider chosen in Settings. */
     public val agent: Assistant

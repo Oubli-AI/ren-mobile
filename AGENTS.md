@@ -510,13 +510,15 @@ answers their client tools on the phone. Nothing sits in between: no backend, no
     built from Strands' events (`voice/GeminiEvents.kt`). `start_background_task`, `call_as_emrys`, Google Calendar
     and the ElevenLabs webhook tools have no Gemini counterpart yet.
   - Memory (2026-11-15) is ren desktop's own, from the image's copy of ren (`agent/api/core/dreaming.py` at ren's
-    `10ceb73`), in place of the harness's built-in memory. Both agents search the user's second brain (`search_memory`,
-    by meaning, on Mistral's `mistral-embed`) and keep a journal (`journal`) in the folder `phone`, in ren's `local`
-    storage under `/config/emrys-gemini/storage`, per `user_id`. The text agent's turns are journaled and what it
+    `ab77c6f`), in place of the harness's built-in memory. Both agents search the user's second brain (`search_memory`,
+    by meaning, on Mistral's `mistral-embed`) and keep a journal (`journal`) in the folder `phone`, in the `ren`
+    service's storage (ren desktop's Hugging Face bucket, `PANEL_STORAGE: huggingface`, `HF_TOKEN` in `gemini.env`),
+    per `user_id`: the signed-in ren account's id (`StrandsAgent`'s `account`, from the Context widget's report), or
+    the install's when signed out, so it is the brain ren's pages and the Context widget use (2026-11-20). The text agent's turns are journaled and what it
     remembers is injected before each turn, as the SDK does both, with no model call; the voice agent has the two
     tools. Once the user has journaled nothing for 300 s (ren's `RON_MEMORY_IDLE_SECONDS`) the dream files every
     journal into the brain as one version and removes what it filed, on NIM MiniMax M3.1 Flash, then Mistral GLM 5.3
-    Flash, NIM DeepSeek v4.1 Flash and Mistral Medium (ren's `DREAM_MODELS`, built by `providers.py`; the keys are
+    Flash and Mistral Medium (ren's `DREAM_MODELS`, built by `providers.py`; the keys are
     `NVIDIA_NIM_API_KEY` and `MISTRAL_API_KEY` in `gemini.env`). Both prompts end with ren's `JOURNAL_DIRECTIVE`, and
     the chat leaves `journal` calls out (`GeminiEvents`). Checked on the image's packages with scripted models and
     counted-word embeddings (a journaled turn, a dream, a search of what it filed); not run live.
@@ -667,10 +669,10 @@ cd deploy/vm/hub && uvx --python 3.12 --with fastmcp==3.4.0 --with mcp==1.26.0 -
 9. **Telnyx** (PR #13): checked by mypy and offline (the model, its window from the catalogue, the catalogue's filter);
    not run live. It needs `TELNYX_API_KEY` in the VM's `gemini.env` and the `gemini` image rebuilt, then one typed
    conversation from Settings › Agents › Telnyx with a tool call.
-10. **Memory:** the `gemini` image is pinned to ren `7d3a9b2` and the `ren` image to `ab77c6f`, both with ren PRs #25 and #26. Not run live: one
-    conversation, one dream and one review. The `gemini` service keeps its brain in ren's `local` storage on the VM
-    under the app's install id, and the `ren` service in ren desktop's bucket under the account, so the phone's
-    Strands agents and ren's pages don't share one brain yet.
+10. **Memory:** the `gemini` and `ren` images are both on ren `ab77c6f` and keep the brain in ren desktop's bucket
+    under the signed-in account, so the phone's Strands agents and ren's pages share one brain. Brains the `gemini`
+    service kept before 2026-11-20 under the install id stay in `/config/emrys-gemini/storage` and are not merged. Not
+    run live: one conversation, one dream and one review from the phone's agents.
 
 ## Before launch (checklist)
 1. **Release signing:** the APK is signed with the debug key (`android/app/build.gradle.kts`). Create a release

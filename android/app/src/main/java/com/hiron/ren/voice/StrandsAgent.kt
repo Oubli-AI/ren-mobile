@@ -46,6 +46,9 @@ public data class Catalogue(val models: List<TextModel>, val default: String)
  * microphone and speaker ([GeminiAudio]). Each opens a WebSocket with the user's id, their `perm_*` grants, the
  * provider, text model and reasoning level, and the agents reach the phone tools, `request_approval` and the searches
  * through the phone's MCP server. The chat is built from Strands' events ([GeminiEvents]).
+ *
+ * The user's id is the signed-in ren account's ([account]), so the agents journal into and search the same second
+ * brain as ren's pages and the Context widget; signed out, it is this install's id.
  */
 public class StrandsAgent(
     private val context: Context,
@@ -54,6 +57,7 @@ public class StrandsAgent(
     private val update: ((RenState) -> RenState) -> Unit,
     private val robot: (RobotCommand) -> Unit,
     private val scope: CoroutineScope,
+    private val account: () -> String,
 ) : Assistant {
     // Main thread only. Every start and stop moves [generation] on, so a stale callback can tell.
     private var generation = 0
@@ -150,7 +154,7 @@ public class StrandsAgent(
             .addQueryParameter("provider", provider.strands)
             .apply { settings.textModel(provider)?.let { addQueryParameter("model", it) } }
             .addQueryParameter("effort", settings.effort(provider))
-            .addQueryParameter("user_id", settings.userId)
+            .addQueryParameter("user_id", account().ifEmpty { settings.userId })
             .apply { settings.workFolder?.let { addQueryParameter("work", it) } }
             .apply { voice(mode)?.let { addQueryParameter("voice", it.id).addQueryParameter("voice_provider", it.provider) } }
             .apply { settings.permissionVariables().forEach { (name, value) -> addQueryParameter(name, value) } }
