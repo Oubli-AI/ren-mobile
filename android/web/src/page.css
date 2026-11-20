@@ -23,3 +23,8 @@ body,
 #root {
   height: 100%;
 }
+
+/* Research Depth is the model picker's last row on the phone (destinations/picker.tsx), not a control beside it. */
+form [role="radiogroup"][aria-label="Research depth"] {
+  display: none;
+}

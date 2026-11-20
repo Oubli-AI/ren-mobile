@@ -19,6 +19,13 @@ export default defineConfig({
   resolve: {
     alias: [
       { find: /^@\/components\/ui\/(orb|audio-player|waveform|voice-picker)$/, replacement: path.resolve(__dirname, "src/elevenlabs/components/ui/$1") },
+      // ren's model picker gets the phone's popover (src/destinations/picker.tsx), which can add Research Depth under it.
+      {
+        find: "@/components/ui/popover",
+        replacement: path.resolve(__dirname, "src/ren/components/ui/popover.tsx"),
+        customResolver: (source, importer) =>
+          importer?.endsWith("/components/agent-panel/ModelSelector.tsx") ? path.resolve(__dirname, "src/destinations/picker.tsx") : source,
+      },
       { find: "@catalyst", replacement: path.resolve(__dirname, "src/ren/components/catalyst") },
       { find: "@", replacement: path.resolve(__dirname, "src/ren") },
     ],

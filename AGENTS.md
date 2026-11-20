@@ -61,7 +61,7 @@ What the overhaul added, on the branch `claude/project-thread-tnj6xo` (PR #14) a
   `ren://calendar`, `ren://vibe`, `ren://build`): ren desktop's `HomePage.tsx` on the tab the address names, with
   `OnboardingPage` for Personalize, `SignInPage` behind `#signin`, and the Projects and Documents pages App.tsx's
   `MainContent` draws for the addresses its tab store opens (`ron://projects`, `ron://project/<key>`,
-  `ron://documents`), all unmodified in `src/ren`, and `DeepResearchPage` for Research. `src/destinations/` mounts
+  `ron://documents`), all unmodified in `src/ren`, and `DeepResearchPage` for Research. Research's model picker reads Model Provider, Model, Reasoning Effort, Research Depth (owner, 2026-11-20): ren's `ModelSelector` gets the phone's popover (`src/destinations/picker.tsx`, by a Vite alias for that importer alone), which adds the depth row from ren's Deep Research store (`research-depth.tsx`), and `page.css` hides the hero's own depth control. `src/destinations/` mounts
   them under a switcher (ren desktop's `navigation/destinations.ts`: Home and the seven destinations); Home's switcher
   scrolls to the same seven. A story opens in ren
   desktop's article reader (`ArticleReaderPage`, `ron://read`) in the same tab, and Back returns. Projects work
