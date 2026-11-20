@@ -1,6 +1,6 @@
-ren desktop's pages and components, unmodified: github.com/Oubli-AI/ren (was ImRonAI/TheBrowser) at 4bdf100 (main,
-pull 36; with pulls 31 and 32: the Context Agent's drafted replies, twice-daily reviews with OpenCode, people and every
-phone log, and its [notification] turn).
+ren desktop's pages and components, unmodified: github.com/Oubli-AI/ren (was ImRonAI/TheBrowser) at a6213d7 (main,
+pull 38; with pulls 31, 32 and 38: the Context Agent's drafted replies, twice-daily reviews with OpenCode, people, the
+calls and texts in its [phone] turn, and its [notification] turn).
 
   pages/SearchResultsPage.tsx                               ren's search results
   pages/HomePage.tsx, OnboardingPage.tsx, SignInPage.tsx    Discover and the destinations, the interview, sign-in
