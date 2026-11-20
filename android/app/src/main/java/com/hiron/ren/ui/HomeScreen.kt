@@ -56,8 +56,10 @@ import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.FormatQuote
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.Public
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -111,6 +113,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
@@ -212,6 +215,18 @@ public fun HomeScreen(
             state.lastError?.let { ErrorNote(it, Modifier.padding(horizontal = gutter(), vertical = 8.dp)) }
         }
         val attachments by runtime.attachments.collectAsStateWithLifecycle()
+        // Work mode is the Strands agents' (Settings › Agents); the ElevenLabs agents' tools are set in ElevenLabs.
+        var work by remember { mutableStateOf(runtime.settings.workFolder) }
+        var choosing by rememberSaveable { mutableStateOf(false) }
+        if (choosing) {
+            WorkDialog(work, onDone = { choice ->
+                choosing = false
+                if (choice != null) {
+                    work = choice.ifEmpty { null }
+                    runtime.work(work)
+                }
+            })
+        }
         Dock(
             quick = !chatting && !keyboard,
             voice = voice,
@@ -222,6 +237,8 @@ public fun HomeScreen(
             onRemove = runtime::detach,
             onSend = { val _ = runtime.send(it) },
             onListen = onListen,
+            work = if (runtime.settings.provider.strands != null) work.orEmpty() else null,
+            onWork = { choosing = true },
         )
     }
 }
@@ -362,9 +379,51 @@ private fun Banner(text: String, key: String, onClick: () -> Unit) {
 public const val COMPOSER_TAG: String = "composer"
 public const val ATTACHMENTS_TAG: String = "attachments"
 
-/** A quick request: a soft outline pill in Inter, its touch area kept at 48dp. */
+public const val WORK_TAG: String = "work"
+
+/**
+ * Work mode, Claude Code's way of working on the phone: Ren works in a folder on the user's own computer through
+ * Desktop Commander on Ren's hub. [onDone] gets the folder to start in, "" to stop, or null to leave it as it is.
+ */
 @Composable
-private fun QuickPill(text: String, onClick: () -> Unit) {
+private fun WorkDialog(folder: String?, onDone: (String?) -> Unit) {
+    val p = LocalPalette.current
+    var typed by rememberSaveable { mutableStateOf(folder ?: "~") }
+    val start = { if (typed.isNotBlank()) onDone(typed.trim()) }
+    AlertDialog(
+        onDismissRequest = { onDone(null) },
+        containerColor = p.card,
+        title = { Text("Work on your computer", style = Type.headline, color = p.ink) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    "Ren reads, edits and runs things in this folder on your computer, like a coding agent in a terminal.",
+                    style = Type.body,
+                    color = p.ink2,
+                )
+                RecessedField(
+                    typed,
+                    { typed = it },
+                    placeholder = "~/Projects/my-app",
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { start() }),
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = start) { Text(if (folder == null) "Start" else "Change", style = Type.button, color = p.accent) } },
+        dismissButton = {
+            if (folder != null) {
+                TextButton(onClick = { onDone("") }) { Text("Stop work mode", style = Type.button, color = p.ink2) }
+            } else {
+                TextButton(onClick = { onDone(null) }) { Text("Cancel", style = Type.button, color = p.ink2) }
+            }
+        },
+    )
+}
+
+/** A quick request: a soft outline pill in Inter, its touch area kept at 48dp; volt while [on]. */
+@Composable
+private fun QuickPill(text: String, onClick: () -> Unit, on: Boolean = false) {
     val p = LocalPalette.current
     val haptics = LocalHapticFeedback.current
     val source = remember { MutableInteractionSource() }
@@ -380,7 +439,7 @@ private fun QuickPill(text: String, onClick: () -> Unit) {
     ) {
         Box(
             Modifier.height(38.dp).clip(pill).background(if (pressed) p.cardHi else Color.Transparent)
-                .border(1.dp, if (pressed) p.ink.copy(alpha = 0.28f) else p.lineHi, pill).padding(horizontal = 16.dp),
+                .border(1.dp, if (on) p.accent else if (pressed) p.ink.copy(alpha = 0.28f) else p.lineHi, pill).padding(horizontal = 16.dp),
             contentAlignment = Alignment.Center,
         ) { Text(text, style = Type.labelLg, color = p.ink, maxLines = 1) }
     }
@@ -508,6 +567,8 @@ private fun Dock(
     onRemove: (String) -> Unit,
     onSend: (String) -> Unit,
     onListen: () -> Unit,
+    work: String?,
+    onWork: () -> Unit,
 ) {
     val p = LocalPalette.current
     val gutter = gutter()
@@ -528,9 +589,12 @@ private fun Dock(
         }
     }
     Column(Modifier.fillMaxWidth().background(p.bg).padding(top = 4.dp)) {
-        if (quick) {
+        // [work] is the work folder, empty while work mode is off, and null where there is no work mode.
+        val working = !work.isNullOrEmpty()
+        if (quick || working) {
             ChipRail(Modifier.padding(top = 6.dp), start = gutter) {
-                items(Quick.entries, key = { it.name }) { q -> QuickPill(q.label, { onSend(q.prompt) }) }
+                if (work != null) item(key = WORK_TAG) { QuickPill(if (working) "Work · $work" else "Work", onWork, on = working) }
+                if (quick) items(Quick.entries, key = { it.name }) { q -> QuickPill(q.label, { onSend(q.prompt) }) }
             }
         }
         if (attachments.isNotEmpty()) {
