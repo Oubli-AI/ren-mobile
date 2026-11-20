@@ -115,7 +115,10 @@ What the overhaul added, on the branch `claude/project-thread-tnj6xo` (PR #14) a
   installed at `~/.config/opencode/opencode.json` in the shared home. A dream that filed new memories is a notice
   over the Context widget's orb (`DreamNotice`); its Review is a checklist of the topics with a comment on each,
   sent to the dreaming agent, which applies it in its next dream. On the phone the notice takes the run notice's
-  place (`layout` `notice`) and the checklist the whole screen (`panel`); Back closes it. The `gemini` service
+  place (`layout` `notice`) and the review the whole screen (`panel`); Back closes it. The phone's review is its own
+  (`src/context/DreamReview.tsx`, owner 2026-11-20: never ask to OK what isn't shown): every topic the dream changed
+  with its whole text before and after (the earlier text from ren's `/memory/dreams`), the lines it added and removed
+  marked, a new topic's and a removed topic's whole text, and the same checklist and comments. The `gemini` service
   restarts dream countdowns a restart cut (`resume_dreams`), as ren's API does. The ElevenLabs text and voice
   agents (owner, 2026-11-17) reach the same server (ren PR #26, `core/memory_mcp.py`) as the MCP servers
   `ren-memory (text)` and `ren-memory (voice)` at `https://rivet.ron-ai.dev/memory/mcp/`, with Caddy's token
