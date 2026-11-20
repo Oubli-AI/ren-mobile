@@ -3,13 +3,15 @@
  * (ContextBridge), unmodified, on a page the app lays over the browser. As on the desktop the agent learns from the
  * pages and searches the user visits, here the phone's browser (`visit`, `search`), and from the phone itself: chats
  * with Ren there (`chat`), every notification another app posts (`notification`, the Context Agent's [notification]
- * turn), and the apps the user used, their calls and texts and what Ren did there (`phone`, its [phone] turn).
+ * turn), and the apps the user used, their calls and texts and what Ren did there (`phone`, its [phone] turn). What the
+ * user adds to Ren's context from the browser (`context-add`) is saved as ren desktop's context menu saves it.
  *
  * It shows only for a signed-in ren account that finished the interview, on either device: the same account, context,
  * interview and interest graph as ren desktop's. The page tells the app what to make room for (`layout`): nothing, the orb, the orb with a finished
  * run's or a dream's notice, or the open panel, which the dream's review checklist takes too.
  */
 import { askRen, onApp, reportAccount, tell } from "../host"
+import { applyTheme } from "../theme"
 import "../page.css"
 import "@/index.css"
 import "./context.css"
@@ -25,10 +27,7 @@ import { useInterestsStore } from "@/stores/interestsStore"
 import { useOnboardingStore } from "@/stores/onboardingStore"
 import { useAccountProfileReady, useAccountProfileSync } from "@/stores/accountProfileStore"
 
-const dark = window.matchMedia("(prefers-color-scheme: dark)")
-const applyTheme = () => document.documentElement.classList.toggle("dark", dark.matches)
 applyTheme()
-dark.addEventListener("change", applyTheme)
 
 reportAccount()
 
@@ -39,6 +38,20 @@ onApp((event) => {
   else if (event.type === "chat") store.observeChat(event.channel, event.user, event.assistant)
   else if (event.type === "notification") void store.alertNotification(event.notification)
   else if (event.type === "phone") void store.reportPhone(event.activity)
+  else if (event.type === "context-add") {
+    // As ContextBridge's onContextAdd: the widget opens on its Context tab, where the item lands.
+    const { payload } = event
+    useInterestsStore.getState().setExpanded(true)
+    store.setTab("context")
+    if (payload.kind === "screenshot") {
+      void fetch(payload.text ?? "").then((response) => response.blob()).then((blob) => store.uploadContext({
+        kind: "screenshot", blob, name: `screenshot-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.png`,
+        title: payload.title ? `Screenshot: ${payload.title}` : "Screenshot", source: payload.url,
+      }))
+    } else {
+      void store.addContext({ kind: payload.kind, title: payload.title, url: payload.url, text: payload.text ?? "" })
+    }
+  }
   else if (event.type === "close") {
     useInterestsStore.getState().setExpanded(false)
     store.setReviewingDream(false)

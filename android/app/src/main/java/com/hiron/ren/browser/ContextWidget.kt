@@ -12,6 +12,7 @@ import android.webkit.WebView
 import androidx.webkit.JavaScriptReplyProxy
 import com.hiron.ren.core.PromptAttachment
 import com.hiron.ren.core.PromptAttachments
+import com.hiron.ren.ui.ThemeChoice
 import androidx.webkit.WebViewAssetLoader
 import androidx.webkit.WebViewClientCompat
 import androidx.webkit.WebViewCompat
@@ -73,12 +74,13 @@ public class PhoneReport(
  * and its Context Agent's store unmodified, kept alive while the app runs so the agent hears what the phone does even
  * while the widget is closed. The app tells the page about [visit]s and searches in its browser, every
  * [notification] another app posts and, at most every [REPORT_EVERY_MS], what happened on the phone since the last
- * report ([PhoneReport] from [activity]); the page answers with the [account] it is signed in to and the [layout] it
- * needs.
+ * report ([PhoneReport] from [activity]), and what the user [addContext]s from the browser; the page answers with the
+ * [account] it is signed in to and the [layout] it needs.
  */
 public class ContextWidget(
     private val context: Context,
     private val token: () -> String,
+    private val theme: () -> ThemeChoice,
     private val activity: (since: Long, until: Long) -> PhoneReport,
     private val reportedAt: () -> Long,
     private val reported: (Long) -> Unit,
@@ -133,6 +135,15 @@ public class ContextWidget(
         tell(JSONObject().put("type", "notification").put("notification", json))
     }
 
+    /**
+     * Adds to Ren's context what the user picked in the browser, as ren desktop's page context menu does
+     * (`ContextAddPayload`): a `selection`, `link`, `image` or `screenshot` (a PNG, as a data URL in [text]).
+     */
+    public fun addContext(kind: String, title: String, url: String, text: String = "") {
+        val payload = JSONObject().put("kind", kind).put("title", title).put("url", url).put("text", text)
+        tell(JSONObject().put("type", "context-add").put("payload", payload))
+    }
+
     private fun tell(event: JSONObject) {
         val proxy = page
         if (proxy != null && _account.value.contextReady) proxy.postMessage(event.toString()) else {
@@ -143,6 +154,12 @@ public class ContextWidget(
 
     /** The app came to the front: what the user did on the phone since the last report goes to the Context Agent. */
     public fun resumed(): Unit = report()
+
+    /** Loads the page again (the theme changed). */
+    public fun reload() {
+        page = null
+        view?.reload()
+    }
 
     /** Closes the open panel (Back). */
     public fun close() {
@@ -168,6 +185,7 @@ public class ContextWidget(
     private fun onMessage(message: JSONObject, reply: JavaScriptReplyProxy) {
         when (message.optString("type")) {
             "token" -> reply.postMessage(JSONObject().put("type", "token").put("token", token()).toString())
+            "theme" -> reply.postMessage(JSONObject().put("type", "theme").put("theme", theme().wire).toString())
             "account" -> {
                 page = reply
                 _account.value = RenAccount.parse(message)

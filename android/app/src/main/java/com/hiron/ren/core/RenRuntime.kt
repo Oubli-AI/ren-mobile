@@ -131,6 +131,12 @@ public class RenRuntime(private val app: Context) {
     )
 
     /** Applies updated DNS, Shields and WebView preferences to [browserDns] and open browser tabs. */
+    /** Settings › Browser › Theme changed: Ren's pages load again to take it. */
+    internal fun themeChanged() {
+        browser.reloadPages()
+        contextWidget.reload()
+    }
+
     internal fun applyBrowserPreferences() {
         browserDns.configure(settings.dnsMode, settings.customDohUrl, settings.shieldsEnabled)
         browser.applyWebPreferences()
@@ -143,7 +149,7 @@ public class RenRuntime(private val app: Context) {
      * ren desktop's Context widget and Context Agent, on the ren account the pages are signed in to: it hears the
      * browser's pages, the apps the user used and what Ren did on the phone.
      */
-    public val contextWidget: ContextWidget = ContextWidget(app, { settings.geminiToken }, ::phoneActivity, { settings.phoneReportedAt }, { settings.phoneReportedAt = it })
+    public val contextWidget: ContextWidget = ContextWidget(app, { settings.geminiToken }, { settings.theme }, ::phoneActivity, { settings.phoneReportedAt }, { settings.phoneReportedAt = it })
 
     /** The apps OpenCode built for the ren account, on Home. */
     public val applications: Applications = Applications(app, http) { settings.geminiToken }

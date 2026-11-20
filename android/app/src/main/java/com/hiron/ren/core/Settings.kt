@@ -8,6 +8,7 @@ import com.hiron.ren.browser.SearchEngine
 import com.hiron.ren.browser.SearchLevel
 import com.hiron.ren.device.CarrierStyle
 import com.hiron.ren.device.ForwardMode
+import com.hiron.ren.ui.ThemeChoice
 import com.hiron.ren.voice.Provider
 import java.util.UUID
 
@@ -110,6 +111,11 @@ public class Settings(context: Context) {
     internal var httpsFirst: Boolean
         get() = prefs.getBoolean("https_first", true)
         set(value) = prefs.edit().putBoolean("https_first", value).apply()
+
+    /** The theme chosen in Settings › Browser: Light, Dark, Glass or System (ren desktop's four). */
+    public var theme: ThemeChoice
+        get() = ThemeChoice.of(prefs.getString("theme", null))
+        set(value) = prefs.edit().putString("theme", value.wire).apply()
 
     /** Whether WebView applies algorithmic darkening to web pages. */
     internal var darkWebPages: Boolean

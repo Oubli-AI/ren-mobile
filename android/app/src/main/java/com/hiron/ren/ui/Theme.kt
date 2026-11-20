@@ -219,10 +219,52 @@ public fun rememberReduceMotion(): Boolean {
     }
 }
 
-/** Ren's theme: Light or Dark, following the system unless [dark] says otherwise. */
+/**
+ * ren desktop's themes (`ThemeName` in its `lib/theme.ts`): Light, Dark, Glass and System. System and Glass follow the
+ * phone's dark mode.
+ */
+public enum class ThemeChoice(public val wire: String, public val label: String) {
+    Light("light", "Light"),
+    Dark("dark", "Dark"),
+    Glass("glass", "Glass"),
+    System("system", "System"),
+    ;
+
+    public companion object {
+        public fun of(wire: String?): ThemeChoice = entries.firstOrNull { it.wire == wire } ?: System
+    }
+}
+
+/**
+ * Glass, as ren desktop's "GLASS THEME" in `src/index.css` paints it over a real material: colourless veils (white in
+ * Light, black in Dark) over the phone's wallpaper and what is behind Ren, which the window blurs (`Theme.Ren.Glass`),
+ * with the same ink and volt. Chrome takes `--ron-glass-chrome`, pages and cards `--ron-glass-content`, sheets and
+ * menus `--ron-glass-popover`, wells and secondary keys `--ron-glass-fill`, active controls `--ron-glass-control`,
+ * rules `--ron-glass-hairline`.
+ */
+public fun glassPalette(dark: Boolean): Palette {
+    val base = if (dark) DarkPalette else LightPalette
+    val chrome = if (dark) Color(0f, 0f, 0f, 0.16f) else Color(1f, 1f, 1f, 0.08f)
+    val content = if (dark) Color(0f, 0f, 0f, 0.24f) else Color(1f, 1f, 1f, 0.2f)
+    val popover = if (dark) Color(18 / 255f, 18 / 255f, 18 / 255f, 0.8f) else Color(252 / 255f, 252 / 255f, 252 / 255f, 0.78f)
+    val fill = if (dark) Color(1f, 1f, 1f, 0.06f) else Color(0f, 0f, 0f, 0.045f)
+    val hairline = if (dark) Color(1f, 1f, 1f, 0.09f) else Color(0f, 0f, 0f, 0.08f)
+    val control = if (dark) Color(1f, 1f, 1f, 0.09f) else Color(1f, 1f, 1f, 0.5f)
+    return base.copy(
+        bg = content, chrome = chrome, raised = popover, key = fill, keyHi = control, tile = fill, high = control,
+        rule = hairline, card = content, cardHi = control, field = fill, line = hairline, lineHi = hairline,
+        track = fill, glass = chrome,
+    )
+}
+
+/** Ren's theme: Light or Dark, following the system unless [dark] says otherwise, and Glass's veils when [glass]. */
 @Composable
-public fun RenTheme(dark: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
-    val p = if (dark) DarkPalette else LightPalette
+public fun RenTheme(dark: Boolean = isSystemInDarkTheme(), glass: Boolean = false, content: @Composable () -> Unit) {
+    val p = when {
+        glass -> glassPalette(dark)
+        dark -> DarkPalette
+        else -> LightPalette
+    }
     val scheme = (if (dark) darkColorScheme() else lightColorScheme()).copy(
         primary = p.accent, onPrimary = p.accentInk, primaryContainer = p.accentSoft, onPrimaryContainer = p.ink,
         secondary = p.ink, onSecondary = p.accentInk, tertiary = p.ok, onTertiary = p.accentInk,

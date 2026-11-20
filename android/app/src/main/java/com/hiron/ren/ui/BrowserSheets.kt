@@ -38,6 +38,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.BookmarkAdd
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.ContentCopy
@@ -477,7 +478,8 @@ private fun sslErrorLabel(primaryError: Int): String = when (primaryError) {
 }
 
 /**
- * Sheet for long-pressed links and images inside a tab's page.
+ * Sheet for long-pressed links and images inside a tab's page. [addContext] (kind, title, URL), given while the Context
+ * widget's account is ready, adds the link or image to Ren's context, as ren desktop's page context menu does.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -485,6 +487,7 @@ internal fun ContextMenuSheet(
     target: ContextMenuTarget,
     tab: BrowserTab,
     browser: Browser,
+    addContext: ((kind: String, title: String, url: String) -> Unit)?,
     onDismiss: () -> Unit,
 ) {
     val p = LocalPalette.current
@@ -515,6 +518,21 @@ internal fun ContextMenuSheet(
                 Text(headerUrl, style = Type.mono, color = p.muted, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
             Rule(Modifier.padding(vertical = 6.dp, horizontal = 8.dp), color = p.line)
+            if (addContext != null) {
+                if (linkUrl != null) {
+                    SheetActionRow(Icons.Outlined.BookmarkAdd, "Add link to Ren context") {
+                        addContext("link", target.linkText?.trim()?.takeIf(String::isNotEmpty) ?: linkUrl, linkUrl)
+                        onDismiss()
+                    }
+                }
+                if (imageUrl != null) {
+                    SheetActionRow(Icons.Outlined.BookmarkAdd, "Add image to Ren context") {
+                        addContext("image", tab.title.ifEmpty { imageUrl }, imageUrl)
+                        onDismiss()
+                    }
+                }
+                Rule(Modifier.padding(vertical = 6.dp, horizontal = 8.dp), color = p.line)
+            }
             if (linkUrl != null) {
                 SheetActionRow(Icons.Outlined.Add, "Open in new tab") {
                     val _ = browser.open(linkUrl, select = true, incognito = tab.incognito)
