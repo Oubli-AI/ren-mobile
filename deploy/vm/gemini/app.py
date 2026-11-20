@@ -37,6 +37,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from pydantic_core import to_jsonable_python
 from strands import tool
 from strands.bidi import BidiAgent
+from strands.bidi.models.google import GoogleGeminiLiveModel
 from strands.bidi.types.io import InputStream, OutputStream
 from strands.bidi.types.agent import BidiAgentInput
 from strands.bidi.types.events import BidiOutputEvent
@@ -47,10 +48,10 @@ from strands.models import Model
 from strands.models.gemini import GeminiModel
 from strands.models.routing import ModelRouter, RoutingCandidate
 from strands.multiagent.spec import Fixed
-from strands.tools.mcp import MCPClient, MCPServerConfig
+from strands.tools.mcp import MCPClient, MCPServerConfig, ToolFilters
 from strands.types.agent import AgentInput
 from strands.types.interrupt import InterruptResponse, InterruptResponseContent
-from strands.types.tools import ToolContext
+from strands.types.tools import AgentTool, ToolContext
 from strands.vended_tools import (
     edit,
     graph,
@@ -77,7 +78,6 @@ from agent.api.core.brave_tools import brave_tools
 from agent.api.core.web_tools import web_tools
 from agent.api.core.xai_model import XAIStatePruner
 
-from live_model import RenGeminiLiveModel
 from providers import ProviderName, build_model, list_provider_models, provider_api_key, provider_default_model, reasoning_efforts
 
 VOICE_AGENT = "agent_2901m620nzwrev2r7ekqpydcxe25"
@@ -116,6 +116,29 @@ SERVERS: dict[str, MCPServerConfig] = {
         "prefix": "",
     },
 }
+
+# Strands' Gemini Live model validates each tool's input schema as a genai `Schema` (`_format_tools_for_live_api`):
+# `$schema`, `$ref` and `$defs` fail there and `additionalProperties` reaches the Live API, which refuses the session
+# with 1007. Tools whose schema carries them (swarm, graph, some MCP tools) stay off voice.
+UNDECLARABLE_SCHEMA_KEYS = frozenset({"additionalProperties", "$schema", "$ref", "$defs"})
+
+
+def gemini_live_undeclarable(tool: AgentTool, **_: object) -> bool:
+    """Whether Strands cannot declare this tool to Gemini Live (also an MCPClient ``tool_filters`` callable)."""
+
+    def clean(value: object) -> bool:
+        if isinstance(value, dict):
+            return not UNDECLARABLE_SCHEMA_KEYS & value.keys() and all(clean(item) for item in value.values())
+        if isinstance(value, list):
+            return all(clean(item) for item in value)
+        return True
+
+    return not clean(tool.tool_spec["inputSchema"]["json"])
+
+
+#: A server config's tool_filters are regexes; MCPClient's own also take a callable.
+VOICE_TOOL_FILTERS: ToolFilters = {"rejected": [gemini_live_undeclarable]}
+
 
 elevenlabs = AsyncElevenLabs(api_key=os.environ["ELEVENLABS_API_KEY"])
 
@@ -224,28 +247,35 @@ async def voice(
     await websocket.accept()
     helper = text_model(provider, model or provider_default_model(provider), effort)
     agent = BidiAgent(
-        model=RenGeminiLiveModel(model_id=VOICE_MODEL, voice=VOICE),
+        model=GoogleGeminiLiveModel(model_id=VOICE_MODEL, voice=VOICE),
         system_prompt=await instructions(VOICE_AGENT, variables(websocket, text_only=False)) + dreaming.JOURNAL_DIRECTIVE,
         tools=[
-            *MCPClient.load_servers(SERVERS, continue_on_error=True),
-            programmatic_tool_caller,
-            shell,
-            read,
-            write,
-            edit,
-            make_web_fetch(model=helper),
-            python_repl,
-            http_request,
-            notebook,
-            sleep,
-            # swarm and graph stay out: Strands 1.64.0 sends their schemas to Gemini Live as `additional_properties`,
-            # which the Live API refuses with 1007.
-            make_subagent(model=Fixed(helper)),
-            make_mcp_router(servers=SERVERS),
-            *brave_tools(),
-            *web_tools(),
-            *MemoryManager(stores=dreaming.agent_memory(user_id, MEMORY_FOLDER), injection=False).tools,
-            end_conversation,
+            *(MCPClient(
+                url=config["url"],
+                headers={key: os.path.expandvars(value) for key, value in config.get("headers", {}).items()},
+                prefix=config["prefix"],
+                tool_filters=VOICE_TOOL_FILTERS,
+                continue_on_error=True,
+            ) for config in SERVERS.values()),
+            # swarm and graph are left out: their schemas carry `additionalProperties` (see gemini_live_undeclarable).
+            *(value for value in (
+                programmatic_tool_caller,
+                shell,
+                read,
+                write,
+                edit,
+                make_web_fetch(model=helper),
+                python_repl,
+                http_request,
+                notebook,
+                sleep,
+                make_subagent(model=Fixed(helper)),
+                make_mcp_router(servers=SERVERS),
+                *brave_tools(),
+                *web_tools(),
+                *MemoryManager(stores=dreaming.agent_memory(user_id, MEMORY_FOLDER), injection=False).tools,
+                end_conversation,
+            ) if not gemini_live_undeclarable(value)),
         ],
     )
     try:
