@@ -72,7 +72,7 @@ public object Notifications {
         NotificationCompat.Builder(context, APPROVALS)
             .setSmallIcon(R.drawable.ic_ren)
             .setColor(context.getColor(R.color.ren_accent))
-            .setContentTitle("Ren needs your OK: ${request.action.label}")
+            .setContentTitle("Ren needs your OK: ${request.label}")
             .setContentText(request.details)
             .setStyle(NotificationCompat.BigTextStyle().bigText(request.details))
             .setCategory(NotificationCompat.CATEGORY_REMINDER)

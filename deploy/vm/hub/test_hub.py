@@ -69,6 +69,11 @@ def phone() -> FastMCP[None]:
         """The phone browser's tabs."""
         return ["ren://home"]
 
+    @side.tool
+    def vault_list() -> dict[str, list[str]]:
+        """The vault's items."""
+        return {"items": ["Chase"]}
+
     return side
 
 
@@ -107,7 +112,7 @@ async def test_attached_sides_are_listed_and_called_through_the_hub(monkeypatch:
 
         async with attached(port, "phone", phone()), attached(port, "desktop", desktop()):
             # The phone's tools keep their names; the desktop's are under desktop_.
-            assert await names(port) == {"hub_peers", "device_status", "browser_tabs", "desktop_browser_open"}
+            assert await names(port) == {"hub_peers", "device_status", "browser_tabs", "vault_list", "desktop_browser_open"}
             async with Client(f"http://127.0.0.1:{port}/mcp") as client:
                 assert (await client.call_tool("hub_peers")).data == {"phone": True, "desktop": True, "local": False}
                 assert (await client.call_tool("device_status")).data == {"battery": 81}
@@ -134,12 +139,13 @@ async def test_the_users_computer_is_served_under_local_on_both_endpoints(monkey
 
 
 @pytest.mark.anyio
-async def test_the_agents_endpoint_serves_the_phones_browser_and_the_desktop_only(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_the_agents_endpoint_serves_the_phones_browser_and_vault_and_the_desktop_only(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(hub_app, "PING_SECONDS", 0.1)
     async with running_hub() as port, attached(port, "phone", phone()), attached(port, "desktop", desktop()):
         async with Client(f"http://127.0.0.1:{port}/agents/mcp") as client:
-            assert {tool.name for tool in await client.list_tools()} == {"hub_peers", "browser_tabs", "desktop_browser_open"}
+            assert {tool.name for tool in await client.list_tools()} == {"hub_peers", "browser_tabs", "vault_list", "desktop_browser_open"}
             assert (await client.call_tool("browser_tabs")).data == ["ren://home"]
+            assert (await client.call_tool("vault_list")).data == {"items": ["Chase"]}
             assert (await client.call_tool("desktop_browser_open", {"url": "https://example.com"})).data == "opened https://example.com"
             # The phone's own tools are the agents' client tools on the phone, not this endpoint's.
             refused = await client.call_tool("device_status", raise_on_error=False)

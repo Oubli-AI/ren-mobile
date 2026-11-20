@@ -1,9 +1,12 @@
 package com.hiron.ren.mcp
 
+import android.net.Uri
 import android.util.Base64
 import com.hiron.ren.browser.Addresses
 import com.hiron.ren.browser.Browser
 import com.hiron.ren.browser.SearchLevel
+import com.hiron.ren.core.Vault
+import com.hiron.ren.core.VaultItem
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import io.modelcontextprotocol.kotlin.sdk.types.ImageContent
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
@@ -29,9 +32,15 @@ import org.json.JSONTokener
  * Ren's browser as MCP tools: its tabs, navigation, and reading and acting on the page in a tab. A page is read the
  * way ren desktop's browser tools read one: its title and address, up to [TEXT_LIMIT] characters of text and up to
  * [ELEMENT_LIMIT] interactive elements, each with a `ref` that `browser_click` and `browser_type` take. Refs belong to
- * the page as it was last read; a navigation makes them stale.
+ * the page as it was last read; a navigation makes them stale. `browser_type` types a vault item's field, as
+ * [VaultTools] sends one: the page has to be on one of the item's sites, and the field never reads back.
  */
-internal class BrowserTools(private val browser: Browser, private val level: () -> SearchLevel) {
+internal class BrowserTools(
+    private val browser: Browser,
+    private val level: () -> SearchLevel,
+    private val vault: Vault,
+    private val consent: suspend (VaultItem, String) -> Boolean,
+) {
     val tools: List<Tool> = listOf(
         tool("browser_tabs", "The tabs of the browser in the Ren app on the user's phone, the one they are looking at: id, address, title, and which is active. Use the browser_ tools for anything on the web, as the user would.", readOnly = true),
         tool("browser_open", "Open a new tab on an address or a search and make it active. Returns the tab.", false, listOf("url"),
@@ -46,8 +55,9 @@ internal class BrowserTools(private val browser: Browser, private val level: () 
         tool("browser_read", "Read a tab's page: title, address, text, and its links, buttons and fields with a ref for each.", true, emptyList(),
             "tab" to str(TAB), "offset" to int("Skip this many elements, to page through a long page (default 0)")),
         tool("browser_click", "Click an element of the page last read.", false, listOf("ref"), "ref" to int(REF), "tab" to str(TAB), openWorld = true),
-        tool("browser_type", "Type into a field of the page last read.", false, listOf("ref", "text"),
-            "ref" to int(REF), "text" to str("The text to put in the field"), "submit" to bool("Submit the field's form after typing"), "tab" to str(TAB), openWorld = true),
+        tool("browser_type", "Type into a field of the page last read: text, or a field of an item in the user's vault (vault_list), which the phone types itself, only on the item's sites, without you seeing it.", false, listOf("ref"),
+            "ref" to int(REF), "text" to str("The text to put in the field"), "item" to str("A vault item's name, to type its field instead of text"),
+            "field" to str("The vault item's field to type, like password or number"), "submit" to bool("Submit the field's form after typing"), "tab" to str(TAB), openWorld = true),
         tool("browser_scroll", "Scroll a tab's page by one screen.", false, listOf("direction"), "direction" to enum("down", "up"), "tab" to str(TAB)),
         tool("browser_screenshot", "A picture of the active tab's page as it is on screen.", readOnly = true),
     )
@@ -76,7 +86,7 @@ internal class BrowserTools(private val browser: Browser, private val level: () 
         "browser_close" -> tab(input).let { browser.close(it); ok(tabs()) }
         "browser_read" -> read(tab(input), input.optInt("offset", 0))
         "browser_click" -> click(tab(input), input.getInt("ref"))
-        "browser_type" -> act(tab(input), "type(${input.getInt("ref")}, ${JSONObject.quote(input.getString("text"))}, ${input.optBoolean("submit", false)})")
+        "browser_type" -> type(tab(input), input)
         "browser_scroll" -> act(tab(input), "scroll(${if (input.getString("direction") == "up") -1 else 1})", navigates = false)
         "browser_screenshot" -> screenshot()
         else -> CallToolResult.error("Unknown browser tool $name.")
@@ -148,8 +158,25 @@ internal class BrowserTools(private val browser: Browser, private val level: () 
         return if (browser.tap(id, point.getDouble("x").toFloat(), point.getDouble("y").toFloat())) settled(id) else act(id, "click($ref)")
     }
 
-    private fun screenshot(): CallToolResult {
+    /** Types the input's text, or the vault item's field after [consent], marking the field so it never reads back. */
+    private suspend fun type(id: String, input: JSONObject): CallToolResult {
+        val ref = input.getInt("ref")
+        val submit = input.optBoolean("submit", false)
+        val name = input.optString("item").ifEmpty { return act(id, "type($ref, ${JSONObject.quote(input.getString("text"))}, $submit, null)") }
+        val item = vault.find(name) ?: return CallToolResult.error("No vault item $name. Call vault_list for the items.")
+        val field = input.optString("field").ifEmpty { item.fields.singleOrNull()?.first.orEmpty() }
+        val value = item.value(field) ?: return CallToolResult.error("${item.name} has no field \"$field\"; it has ${item.fields.joinToString { it.first }}.")
+        val url = browser.state.value.tabs.firstOrNull { it.id == id }?.url.orEmpty()
+        if (!item.allows(url)) return CallToolResult.error("${item.name} may only be typed on https pages of ${item.sites.joinToString().ifEmpty { "no site yet" }}.")
+        if (!consent(item, "Type ${item.name} › $field on ${Uri.parse(url).host}")) return CallToolResult.error("The user didn't allow it.")
+        return act(id, "type($ref, ${JSONObject.quote(value)}, $submit, ${JSONArray(item.sites)})")
+    }
+
+    private suspend fun screenshot(): CallToolResult {
         val id = browser.state.value.active ?: return CallToolResult.error("No tab is open.")
+        if (browser.evaluate(id, "$PAGE_SCRIPT; ren.holdsSecret()") == "true") {
+            return CallToolResult.error("A field on this page holds a value from the vault, so there's no picture of it. Read the page instead.")
+        }
         val png = browser.capture(id) ?: return CallToolResult.error("The active tab has no page on screen. Open Ren's browser on a page first.")
         return CallToolResult(content = listOf(ImageContent(Base64.encodeToString(png, Base64.NO_WRAP), "image/png"), TextContent(browser.state.value.current?.url.orEmpty())))
     }
@@ -186,13 +213,14 @@ internal class BrowserTools(private val browser: Browser, private val level: () 
         /**
          * What the tools run in the page: `ren.read` lists the visible interactive elements and keeps them as the
          * page's refs; `ren.point` says where a ref is on screen (as fractions of the viewport), and `ren.click`,
-         * `ren.type` and `ren.scroll` act on a ref and say whether they could.
+         * `ren.type` and `ren.scroll` act on a ref and say whether they could. A field typed from the vault is marked
+         * `data-ren-secret`: it reads back without its value, and `ren.holdsSecret` says whether one still has it.
          */
         internal val PAGE_SCRIPT = """
             window.ren = window.ren || {
               refs: [],
               seen(e) { const r = e.getBoundingClientRect(), s = getComputedStyle(e); return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none'; },
-              label(e) { return (e.innerText || e.value || e.placeholder || e.getAttribute('aria-label') || e.title || '').trim().replace(/\s+/g, ' ').slice(0, 80); },
+              label(e) { return (e.innerText || (e.dataset.renSecret || e.type === 'password' ? '' : e.value) || e.placeholder || e.getAttribute('aria-label') || e.title || '').trim().replace(/\s+/g, ' ').slice(0, 80); },
               read(offset, textLimit, limit) {
                 const all = [...document.querySelectorAll('a[href],button,input:not([type=hidden]),textarea,select,[role=button],[role=link],[contenteditable=true]')].filter(this.seen);
                 this.refs = all.slice(offset, offset + limit);
@@ -217,9 +245,14 @@ internal class BrowserTools(private val browser: Browser, private val level: () 
                 e.scrollIntoView({ block: 'center' }); e.click();
                 return JSON.stringify({ ok: true });
               },
-              type(ref, text, submit) {
+              type(ref, text, submit, sites) {
                 const e = this.target(ref);
                 if (!e) return JSON.stringify({ ok: false, error: 'No element ' + ref + ' on the page as it is now. Read the page again.' });
+                if (sites) {
+                  const h = location.hostname;
+                  if (location.protocol !== 'https:' || !sites.some(s => h === s || h.endsWith('.' + s))) return JSON.stringify({ ok: false, error: 'The page left the vault item\'s sites.' });
+                  e.dataset.renSecret = '1';
+                }
                 e.scrollIntoView({ block: 'center' }); e.focus();
                 if (e.isContentEditable) e.textContent = text;
                 else {
@@ -230,6 +263,7 @@ internal class BrowserTools(private val browser: Browser, private val level: () 
                 if (submit) { if (e.form) e.form.requestSubmit(); else e.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, bubbles: true })); }
                 return JSON.stringify({ ok: true });
               },
+              holdsSecret() { return [...document.querySelectorAll('[data-ren-secret]')].some(e => e.isConnected && (e.value || e.textContent)); },
               scroll(direction) { window.scrollBy({ top: direction * window.innerHeight * 0.85, behavior: 'instant' }); return JSON.stringify({ ok: true }); },
             }
         """.trimIndent()

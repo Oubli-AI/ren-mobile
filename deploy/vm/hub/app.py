@@ -13,8 +13,8 @@ says which sides are attached. Caddy puts the hub at
 ``https://rivet.ron-ai.dev/hub/`` behind the bearer token; the agents on the VM reach it at ``http://hub:8300/mcp``.
 
 ``/agents/mcp`` is the same hub for the ElevenLabs agents, which already run the phone's own tools as client tools on
-the phone: it serves what they lack, the phone's browser (``browser_*``), ren desktop (``desktop_*``) and the user's
-computer (``local_*``).
+the phone: it serves what they lack, the phone's browser (``browser_*``) and vault (``vault_*``), ren desktop
+(``desktop_*``) and the user's computer (``local_*``).
 """
 
 from __future__ import annotations
@@ -71,8 +71,8 @@ class Attached(ClientTransport):
 hub: FastMCP[None] = FastMCP(
     "ren-hub",
     instructions=(
-        "Ren's phone, desktop and the user's computer. Tools without a prefix run on the phone (its phone tools and its "
-        "browser's `browser_*` tools); tools under `desktop_` run in ren desktop; tools under `local_` are Desktop "
+        "Ren's phone, desktop and the user's computer. Tools without a prefix run on the phone (its phone tools, its "
+        "browser's `browser_*` tools and the user's vault, `vault_*`); tools under `desktop_` run in ren desktop; tools under `local_` are Desktop "
         "Commander on the user's own computer (files, terminal, processes). Call hub_peers to see which are attached."
     ),
 )
@@ -94,16 +94,16 @@ def session(peer: Peer) -> Client[Attached] | Client[FastMCPTransport]:
 
 
 class Only(Transform):
-    """Keeps the tools whose names start with a prefix; the others are neither listed nor callable."""
+    """Keeps the tools whose names start with one of the prefixes; the others are neither listed nor callable."""
 
-    def __init__(self, prefix: str) -> None:
-        self.prefix = prefix
+    def __init__(self, *prefixes: str) -> None:
+        self.prefixes = prefixes
 
     async def list_tools(self, tools: Sequence[Tool]) -> Sequence[Tool]:
-        return [tool for tool in tools if tool.name.startswith(self.prefix)]
+        return [tool for tool in tools if tool.name.startswith(self.prefixes)]
 
     async def get_tool(self, name: str, call_next: GetToolNext, *, version: VersionSpec | None = None) -> Tool | None:
-        return await call_next(name, version=version) if name.startswith(self.prefix) else None
+        return await call_next(name, version=version) if name.startswith(self.prefixes) else None
 
 
 def hub_peers() -> dict[Peer, bool]:
@@ -116,17 +116,18 @@ hub.add_provider(ProxyProvider(lambda: session("desktop"), cache_ttl=0), namespa
 hub.add_provider(ProxyProvider(lambda: session("local"), cache_ttl=0), namespace="local")
 hub.tool(hub_peers, annotations={"readOnlyHint": True})
 
-#: The hub as the ElevenLabs agents see it: the phone's browser, ren desktop and the user's computer.
+#: The hub as the ElevenLabs agents see it: the phone's browser and vault, ren desktop and the user's computer.
 agents: FastMCP[None] = FastMCP(
     "ren-hub",
     instructions=(
-        "Ren's browsers and the user's computer. `browser_*` tools drive the browser in the ren app on the phone; tools "
+        "Ren's browsers and the user's computer. `browser_*` tools drive the browser in the ren app on the phone, and "
+        "`vault_*` tools use the user's vault there without showing its values; tools "
         "under `desktop_` run in ren desktop (its browser and Ren's agent there); tools under `local_` are Desktop "
         "Commander on the user's own computer. Call hub_peers to see which are attached."
     ),
 )
 phone_browser = ProxyProvider(lambda: session("phone"), cache_ttl=0)
-phone_browser.add_transform(Only("browser_"))
+phone_browser.add_transform(Only("browser_", "vault_"))
 agents.add_provider(phone_browser)
 agents.add_provider(ProxyProvider(lambda: session("desktop"), cache_ttl=0), namespace="desktop")
 agents.add_provider(ProxyProvider(lambda: session("local"), cache_ttl=0), namespace="local")

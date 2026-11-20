@@ -24,6 +24,7 @@ import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.Fingerprint
 import androidx.compose.material.icons.outlined.GetApp
+import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.MusicNote
 import androidx.compose.material.icons.outlined.ShoppingCart
 import androidx.compose.material.icons.outlined.TouchApp
@@ -99,24 +100,24 @@ public fun ApprovalSheet(request: ApprovalRequest, onAnswer: (String, ApprovalAn
             Eyebrow("Needs your OK", Modifier.padding(top = 10.dp), tone = Tone.Amber)
             Spacer(Modifier.height(22.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(iconFor(request.action), contentDescription = null, tint = p.ink2, modifier = Modifier.size(18.dp))
+                Icon(request.action?.let(::iconFor) ?: Icons.Outlined.Key, contentDescription = null, tint = p.ink2, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(10.dp))
-                Text("Ren wants to: ${request.action.label}", style = Type.title, color = p.ink2)
+                Text("Ren wants to: ${request.label}", style = Type.title, color = p.ink2)
             }
             Spacer(Modifier.height(10.dp))
-            Text(request.details.ifBlank { request.action.label }, style = Headline, color = p.ink)
+            Text(request.details.ifBlank { request.label }, style = Headline, color = p.ink)
             Spacer(Modifier.height(20.dp))
             Rule(color = p.line)
             Row(
                 Modifier.fillMaxWidth().heightIn(min = 56.dp).toggleable(always, role = Role.Switch) { always = it }.padding(vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Always allow: ${request.action.label}", style = Type.title, color = p.ink, modifier = Modifier.weight(1f))
+                Text("Always allow: ${request.label}", style = Type.title, color = p.ink, modifier = Modifier.weight(1f))
                 Spacer(Modifier.width(16.dp))
                 RenToggle(always, null)
             }
             Text(
-                "Ren won't ask again before this. You can change it in Settings › Permissions.",
+                "Ren won't ask again before this. You can change it in Settings › ${if (request.vaultItem != null) "Vault" else "Permissions"}.",
                 style = Type.cardBody, color = p.ink2, modifier = Modifier.padding(bottom = 4.dp),
             )
             error?.let { InfoStrip(it, Modifier.padding(top = 14.dp), icon = Icons.Outlined.WarningAmber, tone = Tone.Red) }
@@ -159,14 +160,15 @@ private fun DrawScope.glassEdge(color: Color) {
     )
 }
 
-private fun authenticate(activity: FragmentActivity, onOk: () -> Unit, onError: (String) -> Unit) {
+/** Asks for biometrics or the device credential under [title]; [onError] says why it didn't pass. */
+internal fun authenticate(activity: FragmentActivity, onOk: () -> Unit, onError: (String) -> Unit, title: String = "Approve Ren's action") {
     val authenticators = if (Build.VERSION.SDK_INT >= 30) {
         BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
     } else {
         BiometricManager.Authenticators.BIOMETRIC_WEAK or BiometricManager.Authenticators.DEVICE_CREDENTIAL
     }
     if (BiometricManager.from(activity).canAuthenticate(authenticators) != BiometricManager.BIOMETRIC_SUCCESS) {
-        onError("Set a screen lock on this phone to approve Ren's actions.")
+        onError("Set a screen lock on this phone first.")
         return
     }
     val prompt = BiometricPrompt(
@@ -180,7 +182,7 @@ private fun authenticate(activity: FragmentActivity, onOk: () -> Unit, onError: 
     )
     prompt.authenticate(
         BiometricPrompt.PromptInfo.Builder()
-            .setTitle("Approve Ren's action")
+            .setTitle(title)
             .setAllowedAuthenticators(authenticators)
             .build(),
     )

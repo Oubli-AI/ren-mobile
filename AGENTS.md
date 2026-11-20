@@ -180,6 +180,22 @@ What the overhaul added, on the branch `claude/project-thread-tnj6xo` (PR #14) a
   Keys: `GOOGLE_API_KEY` and `ELEVENLABS_TOOLS_API_KEY` in `gemini.env`. Lyria 3.5 costs $0.08 a song with no free tier;
   `lyria-realtime-exp` is experimental and not on Google's pricing page (2026-11-20). Not run live past the Gemini
   voice list and one Gemini speech.
+- **Vault** (2026-11-20, owner: logins, cards, bank accounts and API tokens the agents use without seeing;
+  `core/Vault.kt`, `mcp/VaultTools.kt`, `ui/VaultSettings.kt`): Settings › Vault keeps items on the phone, sealed in
+  `files/vault.bin` with AES-GCM under an Android Keystore key (`KeystoreCipher`); opening an item takes biometrics or
+  the screen lock. Each item has a kind (login, card, bank account, API token, other), fields, the domains it may go to
+  (a domain covers its subdomains) and "Ask me before each use". It works the way strands_tools' `http_request` uses
+  `auth_env_var` with `HTTP_REQUEST_TOKEN_CONFIG`: an agent names an item, and the phone resolves the value itself
+  and sends it only to the item's sites. `vault_list` gives names, kinds, sites and field names; `vault_request` sends
+  an https request from the phone with a field as a bearer, a header, a query parameter or basic auth, without
+  following redirects (as Strands Shell injects credentials only on the original request); `browser_type` takes
+  `item` and `field` and types the value on an https page of the item's sites, marking the field so `browser_read`
+  never shows it and `browser_screenshot` refuses while it holds one. A use asks on the approval sheet unless the
+  item is always allowed (the sheet's "Always allow" sets that). Every phone tool answer, as a client tool or over the
+  hub, leaves with every vault value of five characters or more replaced by `[vault: item › field]`
+  (`Vault.scrub`, digits found with spaces or dashes too). The tools are on the phone's MCP server, so every
+  provider's agents reach them through the hub; `/hub/agents/mcp` serves `vault_*` beside `browser_*`. Nothing is
+  synced or backed up (the backup rules exclude every file), so a lost phone loses the vault. Not run live.
 - **Ren drives the browser in view**: while a turn uses a `browser_*` tool, the agent panel takes the lower half of
   the screen, so the page Ren works on stays visible above it, as ren desktop's panel sits beside its browser.
 - **Reasoning**: the VM's `/gemini/text` sends Strands' `reasoningText` stream events as `{"reasoning": …}`, and

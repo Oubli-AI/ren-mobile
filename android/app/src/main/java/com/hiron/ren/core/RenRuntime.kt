@@ -22,6 +22,7 @@ import com.hiron.ren.device.RenNotificationListener
 import com.hiron.ren.device.ReminderStore
 import com.hiron.ren.device.ReminderStoreFile
 import com.hiron.ren.device.Reminders
+import com.hiron.ren.device.ToolResult
 import com.hiron.ren.mcp.HubLink
 import com.hiron.ren.mcp.PhoneMcpServer
 import com.hiron.ren.service.Notifications
@@ -47,7 +48,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import mozilla.components.lib.publicsuffixlist.PublicSuffixList
 import okhttp3.OkHttpClient
+import org.json.JSONObject
 import java.io.File
+import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
 public class RenApp : Application() {
@@ -96,6 +99,9 @@ public class RenRuntime(private val app: Context) {
 
     public val reminders: Reminders = Reminders(app, ReminderStore(File(app.filesDir, ReminderStoreFile)))
     public val tools: DeviceTools = DeviceTools(app, reminders) { visible }
+
+    /** The user's logins, cards, bank accounts and API tokens, which the agents use without seeing. */
+    public val vault: Vault = Vault(File(app.filesDir, "vault.bin"), KeystoreCipher())
 
     /** Approvals the agents are waiting on, by request id. */
     private val pending = ConcurrentHashMap<String, CompletableDeferred<ApprovalAnswer>>()
@@ -237,7 +243,7 @@ public class RenRuntime(private val app: Context) {
     /** Result thumbnails and images, cached in memory only. */
     public val images: ImageLoader = ImageLoader(http)
 
-    private val elevenLabs = RenAgent(app, settings, tools::run, ::approve, ::update, { _robot.tryEmit(it) }, scope, braveSearch)
+    private val elevenLabs = RenAgent(app, settings, ::runTool, ::approve, ::update, { _robot.tryEmit(it) }, scope, braveSearch)
     /** Gemini, NVIDIA NIM, Mistral and Telnyx in Strands on the workspace VM. */
     public val strands: StrandsAgent = StrandsAgent(app, settings, http, ::update, { _robot.tryEmit(it) }, scope)
 
@@ -275,7 +281,10 @@ public class RenRuntime(private val app: Context) {
         level = { settings.searchLevel },
         approve = { input -> AgentTools.askApproval(input.opt("action_type") as? String, input.opt("details") as? String, ::approve) },
         search = braveSearch?.let { brave -> { name, input -> SearchTools.call(name, PhoneMcpServer.parameters(input), brave, ::update) } },
-        run = tools::run,
+        vault = vault,
+        consent = ::useVault,
+        http = http,
+        run = ::runTool,
     )
 
     /** The phone's link to Ren's hub, where it serves [phoneServer] and reaches ren desktop. */
@@ -291,10 +300,22 @@ public class RenRuntime(private val app: Context) {
     /** Answers a waiting approval; "Always allow" grants its action to every session from now on. */
     public fun answer(id: String, answer: ApprovalAnswer) {
         val request = state.value.approvals.firstOrNull { it.id == id } ?: return
-        if (answer.approved && answer.remember) settings.grant(request.action, true)
+        if (answer.approved && answer.remember) {
+            request.action?.let { settings.grant(it, true) }
+            request.vaultItem?.let(vault::allow)
+        }
         pending[id]?.complete(answer)
         note("approval", RenStore.answer(request, answer))
     }
+
+    /** A phone tool's answer with every vault value taken out. */
+    private suspend fun runTool(name: String, input: JSONObject): ToolResult = tools.run(name, input).let { result ->
+        if (result.data == null || result.data == JSONObject.NULL) result else result.copy(data = vault.scrub(result.data.toString()))
+    }
+
+    /** Whether a tool may use [item] for what [details] says: at once when the user lets it, else when they approve. */
+    private suspend fun useVault(item: VaultItem, details: String): Boolean =
+        !item.ask || approve(ApprovalRequest(UUID.randomUUID().toString(), null, details, item.id, item.name)).approved
 
     /**
      * Shows [request] on the approval sheet (and as a notification while Ren is in the background) and waits for
