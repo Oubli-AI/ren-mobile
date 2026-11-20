@@ -19,6 +19,8 @@ import { favorites, reportAccount, saveFavorites } from "../host"
 import { phoneOAuth } from "../oauth"
 import { Shell, followTabs } from "../shell"
 import { applyTheme } from "../theme"
+import { PickerFooter } from "./picker"
+import { ResearchDepth } from "./research-depth"
 import { Vibe } from "../vibe/Vibe"
 import "../page.css"
 import "@/index.css"
@@ -134,7 +136,13 @@ function Content() {
   }
   if (url?.startsWith(READ)) return <ArticleReaderPage key={url} href={url} />
   const research = parseResearchUrl(url)
-  if (research) return <DeepResearchPage key={userId} sessionId={research.sessionId} />
+  if (research) {
+    return (
+      <PickerFooter.Provider value={<ResearchDepth />}>
+        <DeepResearchPage key={userId} sessionId={research.sessionId} />
+      </PickerFooter.Provider>
+    )
+  }
   const documents = parseDocumentsLibraryUrl(url)
   if (documents) return <DocumentsPage key={userId} documentId={documents.documentId} />
   if (shown === "vibe") return <Vibe />
