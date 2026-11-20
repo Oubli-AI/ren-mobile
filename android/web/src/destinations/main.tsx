@@ -5,7 +5,8 @@
  * for Research, Documents, a story's reader and the pages Execute opens, by the page its tab's address names
  * (MainContent in App.tsx), with the sign-in page behind `#signin` and the interests interview behind `#onboarding` or,
  * as App.tsx does, for a signed-in account that hasn't finished it, all under what BrowserLayout lays over ren's pages
- * (the agent panel, the music deck; `Shell`). The app hears which account is signed in (`reportAccount`), for the
+ * (the agent panel, the music deck; `Shell`). Vibe opens on the phone's studio (src/vibe), with ren desktop's Vibe agent
+ * beside it. The app hears which account is signed in (`reportAccount`), for the
  * Context widget; the interview and interest graph follow that account (`useAccountProfileSync`), so one taken on the
  * desktop counts here.
  *
@@ -18,6 +19,7 @@ import { favorites, reportAccount, saveFavorites } from "../host"
 import { phoneOAuth } from "../oauth"
 import { Shell, followTabs } from "../shell"
 import { applyTheme } from "../theme"
+import { Vibe } from "../vibe/Vibe"
 import "../page.css"
 import "@/index.css"
 import { StrictMode, useEffect, useState } from "react"
@@ -120,6 +122,7 @@ function Destinations() {
 function Content() {
   const url = useTabStore((state) => state.tabs.find((it) => it.id === state.activeTabId)?.url)
   const userId = useAuthStore((state) => state.user?.id)
+  const shown = useNavigationStore((state) => state.activeTab)
   if (url === "ron://projects" || url === "ron://projects/") return <ProjectsIndexPage key={userId} />
   const project = url?.match(/^ron:\/\/project\/([^/?#]+)(?:\/docs\/([^/?#]+))?\/?$/)
   const projectKey = project?.[1]
@@ -134,6 +137,7 @@ function Content() {
   if (research) return <DeepResearchPage key={userId} sessionId={research.sessionId} />
   const documents = parseDocumentsLibraryUrl(url)
   if (documents) return <DocumentsPage key={userId} documentId={documents.documentId} />
+  if (shown === "vibe") return <Vibe />
   return <HomePage />
 }
 

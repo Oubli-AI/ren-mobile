@@ -1,0 +1,5 @@
+ElevenLabs UI (https://github.com/elevenlabs/ui, MIT) at 3a28ebab197f8cfa599934f52db12ad1396e54f4: the registry items
+orb, audio-player, waveform and voice-picker, unmodified, as `npx shadcn add https://ui.elevenlabs.io/r/<name>.json`
+installs them to components/ui/. Their imports of "@/lib/utils" and "@/components/ui/{button,badge,command,popover,
+dropdown-menu}" resolve to ren's shadcn files in src/ren; "@/components/ui/orb" and "@/components/ui/audio-player" to
+these (vite.config.ts, tsconfig.ren.json). npm run check:ren checks them against SHA256SUMS.

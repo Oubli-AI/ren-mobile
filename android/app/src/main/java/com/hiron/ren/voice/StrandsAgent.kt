@@ -3,12 +3,14 @@ package com.hiron.ren.voice
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.media.MediaPlayer
 import android.util.Base64
 import androidx.core.content.ContextCompat
 import com.hiron.ren.BuildConfig
 import com.hiron.ren.core.Activity
 import com.hiron.ren.core.ChatMessage
 import com.hiron.ren.core.RenState
+import com.hiron.ren.core.RenVoice
 import com.hiron.ren.core.RenStore
 import com.hiron.ren.core.RobotCommand
 import com.hiron.ren.core.RobotDirector
@@ -28,6 +30,7 @@ import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import okio.ByteString.Companion.toByteString
 import org.json.JSONObject
+import java.io.File
 import java.io.IOException
 import java.util.UUID
 
@@ -56,6 +59,7 @@ public class StrandsAgent(
     private var generation = 0
     private var socket: WebSocket? = null
     private val audio = GeminiAudio(scope)
+    private var speaker: MediaPlayer? = null
 
     // The harness session the VM keeps this chat in. Every text session opens it by this id, so one that starts
     // again (the socket dropped, the app came back) resumes the chat from the VM's snapshot, as the harness documents.
@@ -95,6 +99,8 @@ public class StrandsAgent(
         val ending = socket
         socket = null
         audio.stop()
+        speaker?.release()
+        speaker = null
         robot(RobotCommand("quiet", emptyList()))
         if (mode == AgentMode.Voice) robot(RobotDirector.voice(VoiceTurn.None))
         mode = null
@@ -146,6 +152,7 @@ public class StrandsAgent(
             .addQueryParameter("effort", settings.effort(provider))
             .addQueryParameter("user_id", settings.userId)
             .apply { settings.workFolder?.let { addQueryParameter("work", it) } }
+            .apply { voice(mode)?.let { addQueryParameter("voice", it.id).addQueryParameter("voice_provider", it.provider) } }
             .apply { settings.permissionVariables().forEach { (name, value) -> addQueryParameter(name, value) } }
             .build()
     }
@@ -159,6 +166,7 @@ public class StrandsAgent(
             val event = runCatching { JSONObject(text) }.getOrNull() ?: return
             if (mode == AgentMode.Voice) sound(gen, event)
             onMain(gen) {
+                if (event.has("speech")) speak(event.optString("speech"))
                 if (event.optString("type") == "bidi_transcript_block" && event.optString("role") == "user") ScreenOperator.resume()
                 update { GeminiEvents.apply(it, event) }
             }
@@ -177,6 +185,24 @@ public class StrandsAgent(
                 stop()
                 failed(COULD_NOT_REACH)
             }
+        }
+    }
+
+    /**
+     * Ren's voice from Vibe: Gemini Live talks in it when it can; otherwise the VM reads each typed reply in it
+     * (`speech` events), since Live speaks only Google's studio voices.
+     */
+    private fun voice(mode: AgentMode): RenVoice? = settings.renVoice?.takeIf { it.live == (mode == AgentMode.Voice) }
+
+    /** Plays a typed reply the VM read aloud in Ren's voice. */
+    private fun speak(speech: String) {
+        val file = File(context.cacheDir, "ren-voice")
+        file.writeBytes(Base64.decode(speech, Base64.DEFAULT))
+        speaker?.release()
+        speaker = MediaPlayer().apply {
+            setDataSource(file.path)
+            setOnPreparedListener { it.start() }
+            prepareAsync()
         }
     }
 
