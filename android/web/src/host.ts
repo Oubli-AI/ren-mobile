@@ -194,12 +194,12 @@ export async function favorites(): Promise<Favorite[] | null> {
   return answer?.type === "favorites" ? answer.favorites : null
 }
 
-/** Gives the app the favorite links as the page left them. */
 /** Ask Ren from a page: the app opens its agent panel with [attachments] as cards in the composer and sends [text] when there is any. */
 export function askRen(text: string, attachments: PromptAttachment[]) {
   host?.postMessage(JSON.stringify({ type: "ask", text, attachments }))
 }
 
+/** Gives the app the favorite links as the page left them. */
 export function saveFavorites(list: Favorite[]) {
   host?.postMessage(JSON.stringify({ type: "favorites", favorites: list }))
 }
