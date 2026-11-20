@@ -35,6 +35,7 @@ import os
 import re
 from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import uvicorn
 from elevenlabs import AsyncElevenLabs
@@ -146,7 +147,10 @@ def gemini_live_undeclarable(tool: AgentTool, **_: object) -> bool:
 VOICE_TOOL_FILTERS: ToolFilters = {"rejected": [gemini_live_undeclarable]}
 
 
-elevenlabs = AsyncElevenLabs(api_key=os.environ["ELEVENLABS_API_KEY"])
+#: The agents' prompts come from their ElevenLabs agents when ELEVENLABS_API_KEY is set; without it, from
+#: PROMPTS_DIR/<agent id>.md, a copy of each agent's system prompt (owner, 2026-11-20: ElevenLabs is not in use).
+elevenlabs = AsyncElevenLabs(api_key=key) if (key := os.environ.get("ELEVENLABS_API_KEY")) else None
+PROMPTS_DIR = Path(os.environ.get("PROMPTS_DIR", "/opt/gemini/prompts"))
 
 
 @asynccontextmanager
@@ -171,11 +175,15 @@ dreaming.dream_model = dream_model
 
 
 async def instructions(agent_id: str, values: Mapping[str, str]) -> str:
-    """The agent's prompt from ElevenLabs with its `{{variables}}` filled in."""
-    config = (await elevenlabs.conversational_ai.agents.get(agent_id)).conversation_config.agent
-    if config is None or config.prompt is None or config.prompt.prompt is None:
-        raise RuntimeError(f"{agent_id} has no prompt")
-    return re.sub(r"\{\{(\w+)\}\}", lambda found: values.get(found.group(1), found.group(0)), config.prompt.prompt)
+    """The agent's prompt (from ElevenLabs, or else its copy in PROMPTS_DIR) with its `{{variables}}` filled in."""
+    if elevenlabs is None:
+        prompt = (PROMPTS_DIR / f"{agent_id}.md").read_text(encoding="utf-8")
+    else:
+        config = (await elevenlabs.conversational_ai.agents.get(agent_id)).conversation_config.agent
+        if config is None or config.prompt is None or config.prompt.prompt is None:
+            raise RuntimeError(f"{agent_id} has no prompt")
+        prompt = config.prompt.prompt
+    return re.sub(r"\{\{(\w+)\}\}", lambda found: values.get(found.group(1), found.group(0)), prompt)
 
 
 def work_prompt(folder: str | None) -> str:

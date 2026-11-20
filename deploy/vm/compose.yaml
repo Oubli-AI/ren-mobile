@@ -108,6 +108,8 @@ services:
     volumes:
       - laptop_home:/config
       - x11:/tmp/.X11-unix
+      # The agents' prompts when elevenlabs.env has no ELEVENLABS_API_KEY: gemini-prompts/<agent id>.md.
+      - ./gemini-prompts:/opt/gemini/prompts:ro
 
   # Ren's hub: one MCP server joining the phone and ren desktop, at https://rivet.ron-ai.dev/hub/.
   hub:
