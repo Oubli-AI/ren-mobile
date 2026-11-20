@@ -15,7 +15,7 @@ RUN git clone --filter=blob:none --no-checkout https://github.com/Oubli-AI/ren.g
 # ren's config makes its session folder when it is imported; it goes in the agents' home on the shared volume, as do
 # the second brain and the journals (ren's `local` storage).
 ENV PYTHONPATH=/opt/ren SESSION_STORAGE_DIR=/config/emrys-gemini/ren PANEL_STORAGE=local PANEL_STORAGE_DIR=/config/emrys-gemini/storage
-COPY app.py providers.py live_model.py mistral_model.py media_capabilities.py context_windows.py /opt/gemini/
+COPY app.py providers.py mistral_model.py media_capabilities.py context_windows.py /opt/gemini/
 USER 1000:1000
 WORKDIR /config/workspace
 EXPOSE 8100
