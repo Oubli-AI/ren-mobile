@@ -45,6 +45,7 @@ import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.PhoneInTalk
 import androidx.compose.material.icons.outlined.QueryStats
 import androidx.compose.material.icons.outlined.RecordVoiceOver
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.TouchApp
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -601,6 +602,8 @@ private fun CallAnswering(runtime: RenRuntime, refresh: Int) {
 
 private fun carrierLabel(style: CarrierStyle) = if (style == CarrierStyle.Verizon) "Verizon" else "standard"
 
+private const val SEARCH_ENGINE_ROLE = "android.app.role.SEARCH_ENGINE"
+
 private data class Access(val icon: ImageVector, val title: String, val why: String)
 
 @Composable
@@ -625,6 +628,14 @@ private fun Permissions(context: Context, refresh: Int, onChanged: () -> Unit) {
         val browser = remember(refresh) { context.holdsBrowserRole() }
         PermissionRow(Access(Icons.Outlined.Language, "Default browser", "Open links from every app in Ren"), browser) {
             context.browserRoleIntent()?.let { role.launch(it) }
+        }
+        // Android's search engine role (RoleManager.ROLE_SEARCH_ENGINE, Android SDK 37.2), only on phones that have it.
+        val searchRole = SEARCH_ENGINE_ROLE.takeIf { roles?.isRoleAvailable(it) == true }
+        if (roles != null && searchRole != null) {
+            val search = remember(refresh) { roles.isRoleHeld(searchRole) }
+            PermissionRow(Access(Icons.Outlined.Search, "Default search engine", "Search from every app with Ren"), search) {
+                role.launch(roles.createRequestRoleIntent(searchRole))
+            }
         }
         val usage = remember(refresh) { AppUsage(context).allowed() }
         PermissionRow(Access(Icons.Outlined.QueryStats, "App usage", "Which apps you use, for your ren context"), usage) {

@@ -109,6 +109,18 @@
                 <category android:name="android.intent.category.APP_BROWSER" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
+            <!-- Ren's search answers other apps' web searches (Intent.ACTION_WEB_SEARCH, the query in SearchManager.QUERY);
+                 Android's app picker lets the user make Ren the default for them with "Always". -->
+            <intent-filter>
+                <action android:name="android.intent.action.WEB_SEARCH" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <!-- "Search with Ren" in every app's text selection menu (Intent.ACTION_PROCESS_TEXT). -->
+            <intent-filter android:label="@string/search_with_ren">
+                <action android:name="android.intent.action.PROCESS_TEXT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
             <meta-data
                 android:name="android.app.shortcuts"
                 android:resource="@xml/shortcuts" />

@@ -152,6 +152,16 @@ What the overhaul added, on the branch `claude/project-thread-tnj6xo` (PR #14) a
   `APP_BROWSER`, so Android offers Ren for the browser role; a link from another app opens in a new tab in front.
   Onboarding's step 4 and Settings › What Ren can use › Default browser ask for the role
   (`RoleManager.createRequestRoleIntent(ROLE_BROWSER)`); on the emulator Ren took the role and a link opened in it.
+- **Ren as a search engine** (2026-11-20): other apps' web searches (`Intent.ACTION_WEB_SEARCH`, the query in
+  `SearchManager.QUERY`) and "Search with Ren" in every app's text selection menu (`ACTION_PROCESS_TEXT`) open the
+  query in a new tab with the chosen engine at the chosen level; Android's app picker makes Ren the default for web
+  searches with "Always". Settings › What Ren can use shows "Default search engine" only on phones that have
+  Android's search engine role (`android.app.role.SEARCH_ENGINE`, Android SDK 37.2, whose requirements neither the
+  reference nor AOSP's `roles.xml` publish). An OpenSearch description isn't served: ren's search page is bundled in
+  the app and its backend needs the workspace token, so no other browser can load it. The home-screen search bar
+  (`widget_search.xml`, `RenWidgets.ACTION_SEARCH`) is the logotype, Home's "Ask me anything. I dare you." and the
+  voice key: the bar opens Home with the address bar taking the typing, the logotype opens Home, the voice key talks
+  to Ren.
 - **Ren drives the browser in view**: while a turn uses a `browser_*` tool, the agent panel takes the lower half of
   the screen, so the page Ren works on stays visible above it, as ren desktop's panel sits beside its browser.
 - **Reasoning**: the VM's `/gemini/text` sends Strands' `reasoningText` stream events as `{"reasoning": …}`, and
@@ -582,7 +592,7 @@ cd deploy/vm/hub && uvx --python 3.12 --with fastmcp==3.4.0 --with mcp==1.26.0 -
   `AgentTools.words`). The stage is in the agent panel; a page that fails says why with Retry. Run the emulator with
   `-gpu host`: the robot is WebGL.
 - **Launcher** (`res/`, `widget/RenWidgets.kt`): adaptive and themed logotype icon, splash and notification icon;
-  shortcuts Talk to Ren, Ask Ren, Catch me up, My day; a search-bar widget (4×1) that opens the composer and a
+  shortcuts Talk to Ren, Ask Ren, Catch me up, My day; a search-bar widget (4×1) that opens Ren's search and a
   panel widget (4×2) with the last reply and how many approvals wait.
 - **Default assistant** (`voice/`): a `VoiceInteractionService` overlay over any app with speech-to-text and a keyboard
   fallback, sending to the text agent; locked out on a secured lock screen.
