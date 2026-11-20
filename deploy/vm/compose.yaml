@@ -7,6 +7,9 @@ services:
       - "443:443"
       - "443:443/udp"
     env_file: computer.env
+    environment:
+      REN_HOST: ${REN_HOST:-rivet.ron-ai.dev}
+      REN_HOOKS_HOST: ${REN_HOOKS_HOST:-hooks.oubliai.com}
     volumes:
       - ./conf:/etc/caddy
       - caddy_data:/data
@@ -28,7 +31,7 @@ services:
     environment:
       PUID: "1000"
       PGID: "1000"
-      SELKIES_ALLOWED_ORIGINS: "https://desktop.rivet.ron-ai.dev"
+      SELKIES_ALLOWED_ORIGINS: "https://desktop.${REN_HOST:-rivet.ron-ai.dev}"
     volumes:
       - laptop_home:/config
       - x11:/tmp/.X11-unix

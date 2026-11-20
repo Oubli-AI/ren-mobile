@@ -7,6 +7,12 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+// The workspace VM's host, where Caddy serves ren's backend, the hub and the agents (deploy/vm's REN_HOST):
+// `workspaceHost` in ren.local.properties, or REN_WORKSPACE_HOST, or else the owner's domain.
+val workspaceHost: String = Properties().apply {
+    rootProject.file("ren.local.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
+}.getProperty("workspaceHost") ?: System.getenv("REN_WORKSPACE_HOST")?.takeIf { it.isNotBlank() } ?: "rivet.ron-ai.dev"
+
 android {
     namespace = "com.hiron.ren"
     compileSdk = 36
@@ -17,8 +23,8 @@ android {
         targetSdk = 36
         // Phones only: the ElevenLabs SDK's WebRTC library is ~12 MB per ABI, and the x86/armv7 copies were 34 MB.
         ndk { abiFilters += "arm64-v8a" }
-        versionCode = 13
-        versionName = "0.5.0"
+        versionCode = 14
+        versionName = "0.5.1"
         // Ready-to-use defaults from ren.local.properties (never committed), or else from the build machine's
         // environment (REN_ANSWERING_NUMBER and the rest, a cloud environment's secrets); they stay editable in Settings.
         val local = Properties().apply {
@@ -32,6 +38,7 @@ android {
         buildConfigField("String", "DEFAULT_BRAVE_SEARCH_KEY", baked("braveSearchKey", "REN_BRAVE_SEARCH_KEY"))
         buildConfigField("String", "DEFAULT_BRAVE_ANSWERS_KEY", baked("braveAnswersKey", "REN_BRAVE_ANSWERS_KEY"))
         buildConfigField("String", "DEFAULT_GEMINI_TOKEN", baked("geminiToken", "REN_GEMINI_TOKEN"))
+        buildConfigField("String", "WORKSPACE_HOST", "\"$workspaceHost\"")
         // The agents' seven Brave search tools (client tools and on the hub), off unless `braveSearchTools=true`.
         buildConfigField("boolean", "BRAVE_SEARCH_TOOLS", (local.getProperty("braveSearchTools") == "true").toString())
     }
@@ -116,6 +123,9 @@ val webBuild = tasks.register<Exec>("webBuild") {
     dependsOn(webInstall)
     workingDir = web.asFile
     commandLine("npm", "run", "build")
+    // The pages call ren's backend on the workspace host; Vite lets the environment override web/.env.
+    environment("VITE_API_BASE_URL", "https://$workspaceHost")
+    inputs.property("workspaceHost", workspaceHost)
     inputs.dir(web.dir("src"))
     inputs.dir(web.dir("scripts"))
     inputs.files(

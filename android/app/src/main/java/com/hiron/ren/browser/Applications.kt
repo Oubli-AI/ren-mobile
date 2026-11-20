@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.core.content.FileProvider
+import com.hiron.ren.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -75,7 +76,7 @@ public class Applications(private val context: Context, private val http: OkHttp
 
     public companion object {
         /** ren desktop's backend on the workspace VM, which the app's pages call too (`VITE_API_BASE_URL`). */
-        public const val API: String = "https://rivet.ron-ai.dev"
+        public val API: String = "https://${BuildConfig.WORKSPACE_HOST}"
         private const val APK = "application/vnd.android.package-archive"
 
         public fun parse(json: String): List<RenApplication> {
