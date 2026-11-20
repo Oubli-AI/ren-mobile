@@ -1,4 +1,6 @@
-rivet.ron-ai.dev {
+# The hosts come from REN_HOST and REN_HOOKS_HOST (compose passes them from deploy/vm/.env), defaulting to the
+# owner's domains; any names whose DNS points at this server work, such as <ip-with-dashes>.sslip.io.
+{$REN_HOST:rivet.ron-ai.dev} {
 	@computer path /computer/*
 	handle @computer {
 		@token header Authorization "Bearer {$EMRYS_COMPUTER_TOKEN}"
@@ -62,14 +64,14 @@ rivet.ron-ai.dev {
 	}
 }
 
-desktop.rivet.ron-ai.dev {
+desktop.{$REN_HOST:rivet.ron-ai.dev} {
 	reverse_proxy laptop:3000
 }
 
-code.rivet.ron-ai.dev {
+code.{$REN_HOST:rivet.ron-ai.dev} {
 	reverse_proxy code:3000
 }
 
-hooks.oubliai.com {
+{$REN_HOOKS_HOST:hooks.oubliai.com} {
 	reverse_proxy hooks:8090
 }

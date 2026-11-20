@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.util.Base64
 import androidx.core.content.ContextCompat
+import com.hiron.ren.BuildConfig
 import com.hiron.ren.core.Activity
 import com.hiron.ren.core.ChatMessage
 import com.hiron.ren.core.RenState
@@ -235,7 +236,7 @@ public class StrandsAgent(
 
     public companion object {
         /** The Strands service on the workspace VM, behind Caddy's bearer token. */
-        public const val SERVICE: String = "https://rivet.ron-ai.dev/gemini"
+        public val SERVICE: String = "https://${BuildConfig.WORKSPACE_HOST}/gemini"
         public const val ENDED_BY_WORKSPACE: String = "The agents on the workspace ended the conversation: "
         private const val NORMAL_CLOSE = 1000
         public const val COULD_NOT_REACH: String = "Couldn't reach the agents on the workspace. Check your connection and try again."

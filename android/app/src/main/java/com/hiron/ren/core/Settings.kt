@@ -193,6 +193,6 @@ public class Settings(context: Context) {
         public const val AUTO: String = "auto"
 
         /** Ren's hub on the owner's workspace VM. */
-        public const val DEFAULT_HUB_URL: String = "wss://rivet.ron-ai.dev/hub"
+        public val DEFAULT_HUB_URL: String = "wss://${BuildConfig.WORKSPACE_HOST}/hub"
     }
 }
