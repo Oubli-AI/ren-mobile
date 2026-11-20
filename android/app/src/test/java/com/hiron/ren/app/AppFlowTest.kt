@@ -30,6 +30,10 @@ import com.hiron.ren.testing.shot
 import com.hiron.ren.testing.windowRoots
 import com.hiron.ren.browser.Addresses
 import com.hiron.ren.browser.SearchLevel
+import com.hiron.ren.widget.RenWidgets
+import android.app.SearchManager
+import android.content.Intent
+import androidx.compose.ui.test.assertIsFocused
 import com.hiron.ren.ui.ADDRESS_HINT
 import com.hiron.ren.ui.ADDRESS_TAG
 import com.hiron.ren.ui.ASK_REN_TAG
@@ -52,6 +56,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.util.ReflectionHelpers
 
 private const val CRASHING = "Ren's robot keeps crashing on this phone."
 private const val NOT_LOADED = "Ren's robot didn't load (error 404)."
@@ -329,6 +334,38 @@ class AppFlowTest {
         assertEquals("ren://search?q=best%20ramen%20in%20reno&level=medium", runtime.browser.state.value.current?.url)
         // The bar reads as the query.
         compose.onNodeWithText("best ramen in reno").assertIsDisplayed()
+    }
+
+    /** What another app hands Ren: a web search (Intent.ACTION_WEB_SEARCH) or selected text ("Search with Ren"). */
+    @Test
+    fun aWebSearchOrSelectedTextFromAnotherAppOpensRensSearchInANewTab() {
+        skipOnboarding()
+        val browser = compose.activity.ren.browser
+        deliver(Intent(Intent.ACTION_WEB_SEARCH).putExtra(SearchManager.QUERY, "best ramen in reno"))
+        assertEquals(2, browser.state.value.tabs.size)
+        assertEquals("ren://search?q=best%20ramen%20in%20reno&level=low", browser.state.value.current?.url)
+
+        deliver(Intent(Intent.ACTION_PROCESS_TEXT).setType("text/plain").putExtra(Intent.EXTRA_PROCESS_TEXT, "Great Basin"))
+        assertEquals(3, browser.state.value.tabs.size)
+        assertEquals("ren://search?q=Great%20Basin&level=low", browser.state.value.current?.url)
+    }
+
+    /** The search widget opens Home with the address bar taking the typing; Home is reused, not opened again. */
+    @Test
+    fun theSearchWidgetOpensHomeReadyToType() {
+        skipOnboarding()
+        val browser = compose.activity.ren.browser
+        deliver(Intent(RenWidgets.ACTION_SEARCH))
+        assertEquals(1, browser.state.value.tabs.size)
+        compose.onNodeWithTag(ADDRESS_TAG).assertIsFocused()
+        shot("10-search-widget-opened")
+    }
+
+    private fun deliver(intent: Intent) {
+        compose.runOnUiThread {
+            val _ = ReflectionHelpers.callInstanceMethod<Unit>(compose.activity, "onNewIntent", ReflectionHelpers.ClassParameter.from(Intent::class.java, intent))
+        }
+        compose.waitForIdle()
     }
 
     @Test

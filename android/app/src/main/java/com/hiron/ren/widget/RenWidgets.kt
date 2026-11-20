@@ -22,7 +22,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
-/** The 4x1 bar: ask, or tap the voice key to talk. */
+/** The 4x1 search bar: search with Ren, or tap the voice key to talk. */
 public class SearchWidget : AppWidgetProvider() {
     override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray): Unit = RenWidgets.render(context, manager, ids, panel = false)
 }
@@ -39,6 +39,7 @@ public object RenWidgets {
     public const val ACTION_LISTEN: String = "com.hiron.ren.action.LISTEN"
     public const val ACTION_TYPE: String = "com.hiron.ren.action.TYPE"
     public const val ACTION_QUICK: String = "com.hiron.ren.action.QUICK"
+    public const val ACTION_SEARCH: String = "com.hiron.ren.action.SEARCH"
 
     /** Keeps every placed widget in step with the runtime. */
     public fun follow(context: Context, runtime: RenRuntime) {
@@ -71,13 +72,12 @@ public object RenWidgets {
             snap.waiting > 0 -> R.color.ren_amber to "${snap.waiting} waiting"
             else -> R.color.ren_ok to "Ready"
         }
-        val dot = context.getColor(colour)
-        views.setInt(R.id.status, "setColorFilter", dot)
-        // Widgets can't take typing, so the bar opens the composer in the app.
-        views.setOnClickPendingIntent(R.id.ask, open(context, ACTION_TYPE, 1))
+        // Widgets can't take typing, so the search bar opens Ren's search, and the panel's bar the composer, in the app.
+        views.setOnClickPendingIntent(R.id.ask, if (panel) open(context, ACTION_TYPE, 1) else open(context, ACTION_SEARCH, 3))
         views.setOnClickPendingIntent(R.id.head, open(context, null, 0))
         views.setOnClickPendingIntent(R.id.mic, open(context, ACTION_LISTEN, 2))
         if (panel) {
+            views.setInt(R.id.status, "setColorFilter", context.getColor(colour))
             views.setTextViewText(R.id.status_text, label)
             views.setTextViewText(
                 R.id.last,

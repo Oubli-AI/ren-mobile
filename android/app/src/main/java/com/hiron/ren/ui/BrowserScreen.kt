@@ -141,10 +141,11 @@ public enum class Page { Activity, Settings }
 /**
  * The browser: the toolbar with the address bar and Ask Ren, the active tab (Ren's home page or a web page), and the
  * bottom bar with back, forward, search, the tabs and the menu. The bottom bar steps aside while the keyboard is up.
+ * Each new [searchRequests] (the search widget) puts the address bar in editing, with the keyboard up.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-public fun BrowserScreen(runtime: RenRuntime, waiting: Int, onAskRen: () -> Unit, onOpen: (Page) -> Unit) {
+public fun BrowserScreen(runtime: RenRuntime, waiting: Int, searchRequests: Int = 0, onAskRen: () -> Unit, onOpen: (Page) -> Unit) {
     val p = LocalPalette.current
     val browser = runtime.browser
     val state by browser.state.collectAsStateWithLifecycle()
@@ -173,6 +174,9 @@ public fun BrowserScreen(runtime: RenRuntime, waiting: Int, onAskRen: () -> Unit
         browser.go(typed, runtime.settings.searchLevel)
     }
 
+    LaunchedEffect(searchRequests) {
+        if (searchRequests > 0) startEditing()
+    }
     Uploads(browser)
     BackHandler(fullscreen != null) { browser.exitFullscreen() }
     BackHandler(fullscreen == null && findState.active) { browser.clearFind() }

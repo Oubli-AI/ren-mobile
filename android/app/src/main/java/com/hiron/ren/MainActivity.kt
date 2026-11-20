@@ -2,6 +2,7 @@ package com.hiron.ren
 
 import android.Manifest
 import android.app.Activity
+import android.app.SearchManager
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -80,6 +81,7 @@ public class MainActivity : FragmentActivity() {
     private var focusRequests by mutableIntStateOf(0)
     private var homeRequests by mutableIntStateOf(0)
     private var linkRequests by mutableIntStateOf(0)
+    private var searchRequests by mutableIntStateOf(0)
     private var pendingWebPermissions: CompletableDeferred<Map<String, Boolean>>? = null
 
     private val webPermissions = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { results ->
@@ -104,7 +106,7 @@ public class MainActivity : FragmentActivity() {
         enableEdgeToEdge()
         // A recreated activity (rotation, theme change) must not replay the request that first opened it.
         if (savedInstanceState == null) handle(intent)
-        setContent { RenTheme { CompositionLocalProvider(LocalImages provides ren.images) { RenAppUi(ren, listenRequests, focusRequests, homeRequests, linkRequests) } } }
+        setContent { RenTheme { CompositionLocalProvider(LocalImages provides ren.images) { RenAppUi(ren, listenRequests, focusRequests, homeRequests, linkRequests, searchRequests) } } }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -151,9 +153,10 @@ public class MainActivity : FragmentActivity() {
     }
 
     /**
-     * Opened as the assistant (long-press Home/Power), from a widget, a launcher shortcut, the assistant overlay or
-     * another app's web link: talk, type, run a quick key, allow the overlay's microphone, or open the link in a tab. A quick key carries only its fixed
-     * name, so another app can at most ask Ren one of those read-only questions.
+     * Opened as the assistant (long-press Home/Power), from a widget, a launcher shortcut, the assistant overlay, or
+     * another app's web link, web search or selected text: talk, type, run a quick key, allow the overlay's microphone,
+     * open the link in a tab, or search. A quick key carries only its fixed name, so another app can at most ask Ren
+     * one of those read-only questions.
      */
     private fun handle(intent: Intent?) {
         when (intent?.action) {
@@ -169,7 +172,24 @@ public class MainActivity : FragmentActivity() {
                 val _ = ren.browser.open(it.toString())
                 linkRequests++
             }
+            RenWidgets.ACTION_SEARCH -> search(null)
+            Intent.ACTION_WEB_SEARCH -> search(intent.getStringExtra(SearchManager.QUERY))
+            Intent.ACTION_PROCESS_TEXT -> search(intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)?.toString())
             else -> if (intent?.getBooleanExtra(LISTEN, false) == true) listenRequests++
+        }
+    }
+
+    /** Searches [query] in a new tab, in front; with nothing to search, Home takes the typing with the keyboard up. */
+    private fun search(query: String?) {
+        if (query.isNullOrBlank()) {
+            if (ren.browser.state.value.current?.home != true) {
+                val _ = ren.browser.open()
+            }
+            searchRequests++
+        } else {
+            val _ = ren.browser.open()
+            ren.browser.go(query, ren.settings.searchLevel)
+            linkRequests++
         }
     }
 
@@ -179,7 +199,7 @@ public class MainActivity : FragmentActivity() {
 }
 
 @Composable
-private fun RenAppUi(runtime: RenRuntime, listenRequests: Int, focusRequests: Int, homeRequests: Int, linkRequests: Int) {
+private fun RenAppUi(runtime: RenRuntime, listenRequests: Int, focusRequests: Int, homeRequests: Int, linkRequests: Int, searchRequests: Int) {
     val state by runtime.state.collectAsStateWithLifecycle()
     var panel by rememberSaveable { mutableStateOf(false) }
     var page by rememberSaveable { mutableStateOf<Page?>(null) }
@@ -213,9 +233,9 @@ private fun RenAppUi(runtime: RenRuntime, listenRequests: Int, focusRequests: In
     LaunchedEffect(opens) {
         if (opens > 0) panel = true
     }
-    // An opened link shows its tab: the panel and any page over the browser close.
-    LaunchedEffect(linkRequests) {
-        if (linkRequests > 0) {
+    // An opened link or a search shows its tab: the panel and any page over the browser close.
+    LaunchedEffect(linkRequests, searchRequests) {
+        if (linkRequests > 0 || searchRequests > 0) {
             panel = false
             page = null
         }
@@ -234,7 +254,7 @@ private fun RenAppUi(runtime: RenRuntime, listenRequests: Int, focusRequests: In
     }
     Box(Modifier.fillMaxSize()) {
         if (onboarded) {
-            BrowserScreen(runtime, waiting = state.approvals.size, onAskRen = { panel = true }, onOpen = { page = it })
+            BrowserScreen(runtime, waiting = state.approvals.size, searchRequests = searchRequests, onAskRen = { panel = true }, onOpen = { page = it })
             ContextOverlay(runtime)
             // While Ren drives the browser in this turn, the panel takes the lower half, so the page it works on stays in view.
             val browsing = state.messages.lastOrNull()?.takeIf { !it.fromUser }?.parts.orEmpty().any { it is ToolStep && it.name.startsWith(BROWSER_TOOLS) }

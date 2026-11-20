@@ -17,8 +17,10 @@
     <string name="widget_key_myday">My day</string>
     <string name="widget_key_texts">Texts</string>
     <string name="widget_key_calls">Calls</string>
-    <string name="widget_search_label">Ren bar</string>
-    <string name="widget_search_description">Ask Ren, or tap the voice key to talk.</string>
+    <string name="widget_search_label">Ren search</string>
+    <string name="widget_search_description">Search with Ren, or tap the voice key to talk to Ren.</string>
+    <string name="widget_search_hint">Ask me anything. I dare you.</string>
+    <string name="search_with_ren">Search with Ren</string>
     <string name="widget_panel_label">Ren panel</string>
     <string name="widget_panel_description">Ren\'s status and latest reply, the ask bar and quick keys.</string>
     <string name="shortcut_talk">Talk to Ren</string>

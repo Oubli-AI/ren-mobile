@@ -233,17 +233,27 @@ class LauncherArtTest {
     }
 
     @Test
-    fun theAskBarOpensTheComposer() {
+    fun theSearchBarOpensRensSearchAndThePanelsBarTheComposer() {
         val snap = WidgetSnapshot("", 0)
         for (panel in listOf(false, true)) {
             val root = render(RenWidgets.views(context, snap, panel), 360f, if (panel) 200f else 72f, if (panel) "widget-panel" else "widget-search")
-            assertEquals(context.getString(R.string.widget_ask), root.findViewById<TextView>(R.id.ask).text.toString())
+            val hint = if (panel) R.string.widget_ask else R.string.widget_search_hint
+            assertEquals(context.getString(hint), root.findViewById<TextView>(R.id.ask).text.toString())
             root.findViewById<View>(R.id.ask).performClick()
             val started = shadowOf(context as android.app.Application).nextStartedActivity
-            assertEquals(RenWidgets.ACTION_TYPE, started.action)
+            assertEquals(if (panel) RenWidgets.ACTION_TYPE else RenWidgets.ACTION_SEARCH, started.action)
             assertEquals(MainActivity::class.java.name, started.component?.className)
         }
-        assertEquals("Ask Ren", context.getString(R.string.widget_ask))
+        assertEquals("Ask me anything. I dare you.", context.getString(R.string.widget_search_hint))
+    }
+
+    /** The search bar in Dark, on the same wallpaper, at its usual and its smallest width. */
+    @Test
+    @Config(qualifiers = "+night")
+    fun theSearchBarInDark() {
+        val snap = WidgetSnapshot("", 0)
+        val _ = render(RenWidgets.views(context, snap, panel = false), 360f, 72f, "widget-search-dark")
+        val _ = render(RenWidgets.views(context, snap, panel = false), 250f, 64f, "widget-search-dark-narrow")
     }
 
     @Test

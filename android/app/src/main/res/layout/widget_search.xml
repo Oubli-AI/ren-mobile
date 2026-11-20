@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Ren's search bar for the home screen: search or ask, or tap the voice key to talk. -->
+<!-- Ren's search bar for the home screen, after Home's search box: the ren. logotype, the invitation to search, and the
+     voice key. The bar opens Ren's search with the keyboard up; the logotype opens Home; the voice key talks to Ren. -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
@@ -8,21 +10,48 @@
     <LinearLayout
         android:id="@+id/bar"
         android:layout_width="match_parent"
-        android:layout_height="56dp"
+        android:layout_height="60dp"
         android:layout_gravity="center_vertical"
-        android:background="@drawable/widget_bar_bg"
+        android:background="@drawable/widget_search_bg"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingStart="8dp"
-        android:paddingEnd="4dp">
+        android:paddingStart="20dp"
+        android:paddingEnd="8dp">
 
-        <ImageView
+        <!-- The logotype: letters in ink, the full stop in volt, as in the app's header. The launcher inflates widgets
+             with the platform's own views, so both layers take android:tint, not AppCompat's. -->
+        <FrameLayout
             android:id="@+id/head"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:contentDescription="@string/app_name"
-            android:padding="5dp"
-            android:src="@drawable/ren_mark" />
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:contentDescription="@string/app_name">
+
+            <ImageView
+                android:layout_width="44dp"
+                android:layout_height="16.2dp"
+                android:layout_gravity="center_vertical"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ren_logotype"
+                android:tint="@color/ren_ink"
+                tools:ignore="UseAppTint" />
+
+            <ImageView
+                android:layout_width="44dp"
+                android:layout_height="16.2dp"
+                android:layout_gravity="center_vertical"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ren_logotype_dot"
+                android:tint="@color/ren_accent"
+                tools:ignore="UseAppTint" />
+        </FrameLayout>
+
+        <!-- A hairline between the mark and the field. RemoteViews can't inflate a plain View, so it is an ImageView. -->
+        <ImageView
+            android:layout_width="1dp"
+            android:layout_height="24dp"
+            android:layout_marginStart="16dp"
+            android:background="@color/ren_edge"
+            android:importantForAccessibility="no" />
 
         <TextView
             android:id="@+id/ask"
@@ -33,24 +62,16 @@
             android:fontFamily="@font/inter_ui"
             android:gravity="center_vertical"
             android:maxLines="1"
-            android:paddingStart="12dp"
+            android:paddingStart="14dp"
             android:paddingEnd="8dp"
-            android:text="@string/widget_ask"
+            android:text="@string/widget_search_hint"
             android:textColor="@color/ren_muted"
             android:textSize="15sp" />
 
-        <ImageView
-            android:id="@+id/status"
-            android:layout_width="6dp"
-            android:layout_height="6dp"
-            android:layout_marginEnd="12dp"
-            android:importantForAccessibility="no"
-            android:src="@drawable/widget_dot" />
-
         <FrameLayout
             android:id="@+id/mic"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
             android:background="@drawable/widget_mic_bg"
             android:contentDescription="@string/widget_talk">
 
