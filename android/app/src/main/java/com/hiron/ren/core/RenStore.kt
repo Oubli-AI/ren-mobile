@@ -74,7 +74,7 @@ public object RenStore {
 
     /** The activity line for one answer. */
     public fun answer(request: ApprovalRequest, answer: ApprovalAnswer): String = when {
-        answer.approved && answer.remember -> "Always allowed: ${request.action.label}"
+        answer.approved && answer.remember -> "Always allowed: ${request.label}"
         answer.approved -> "Approved: ${request.details}"
         else -> "Declined: ${request.details}"
     }

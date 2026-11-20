@@ -2,6 +2,8 @@ package com.hiron.ren.mcp
 
 import com.hiron.ren.browser.Browser
 import com.hiron.ren.browser.SearchLevel
+import com.hiron.ren.core.Vault
+import com.hiron.ren.core.VaultItem
 import com.hiron.ren.device.ToolResult
 import io.modelcontextprotocol.kotlin.sdk.server.Server
 import io.modelcontextprotocol.kotlin.sdk.server.ServerOptions
@@ -9,15 +11,19 @@ import io.modelcontextprotocol.kotlin.sdk.types.CallToolRequest
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import io.modelcontextprotocol.kotlin.sdk.types.Implementation
 import io.modelcontextprotocol.kotlin.sdk.types.ServerCapabilities
+import io.modelcontextprotocol.kotlin.sdk.types.TextContent
+import io.modelcontextprotocol.kotlin.sdk.types.Tool
 import io.modelcontextprotocol.kotlin.sdk.types.error
 import io.modelcontextprotocol.kotlin.sdk.types.success
+import okhttp3.OkHttpClient
 import org.json.JSONObject
 
 /**
- * Ren's phone as one MCP server: the phone tools, `request_approval`, the search tools and the browser's tools. The
- * device tools go to [run], the same function the client tools use; `request_approval` goes to [approve] and the search
- * tools to [search] (served only with one), which answer what the agent is told or why the call failed; the `browser_*`
- * tools drive [browser].
+ * Ren's phone as one MCP server: the phone tools, `request_approval`, the search tools, the browser's tools and the
+ * vault's. The device tools go to [run], the same function the client tools use; `request_approval` goes to [approve]
+ * and the search tools to [search] (served only with one), which answer what the agent is told or why the call failed;
+ * the `browser_*` tools drive [browser], and they and the `vault_*` tools use [vault]'s items, each use after
+ * [consent]. Every answer leaves with the vault's values taken out ([Vault.scrub]).
  * [version] is the app's version name, reported in `initialize`.
  */
 public class PhoneMcpServer(
@@ -26,6 +32,9 @@ public class PhoneMcpServer(
     private val level: () -> SearchLevel,
     private val approve: suspend (JSONObject) -> Result<String>,
     private val search: (suspend (String, JSONObject) -> Result<String>)?,
+    private val vault: Vault,
+    private val consent: suspend (VaultItem, String) -> Boolean,
+    private val http: OkHttpClient,
     private val run: suspend (String, JSONObject) -> ToolResult,
 ) {
     public fun build(): Server {
@@ -33,13 +42,19 @@ public class PhoneMcpServer(
             serverInfo = Implementation(name = "ren-phone", version = version, title = "Ren phone"),
             options = ServerOptions(capabilities = ServerCapabilities(tools = ServerCapabilities.Tools(listChanged = false))),
         )
-        PhoneTools.all.forEach { tool -> server.addTool(tool) { request -> answer(run(tool.name, input(request))) } }
-        server.addTool(PhoneTools.approval) { request -> answer(approve(input(request))) }
-        search?.let { search -> PhoneTools.searches.forEach { tool -> server.addTool(tool) { request -> answer(search(tool.name, input(request))) } } }
-        val pages = BrowserTools(browser, level)
-        pages.tools.forEach { tool -> server.addTool(tool) { request -> pages.call(tool.name, input(request)) } }
+        fun add(tool: Tool, handle: suspend (JSONObject) -> CallToolResult) = server.addTool(tool) { request -> scrubbed(handle(input(request))) }
+        PhoneTools.all.forEach { tool -> add(tool) { answer(run(tool.name, it)) } }
+        add(PhoneTools.approval) { answer(approve(it)) }
+        search?.let { search -> PhoneTools.searches.forEach { tool -> add(tool) { answer(search(tool.name, it)) } } }
+        val pages = BrowserTools(browser, level, vault, consent)
+        pages.tools.forEach { tool -> add(tool) { pages.call(tool.name, it) } }
+        val safe = VaultTools(vault, http, consent)
+        safe.tools.forEach { tool -> add(tool) { safe.call(tool.name, it) } }
         return server
     }
+
+    private fun scrubbed(result: CallToolResult): CallToolResult =
+        result.copy(content = result.content.map { if (it is TextContent) TextContent(vault.scrub(it.text)) else it })
 
     public companion object {
         /** The MCP arguments as the JSON object [com.hiron.ren.device.DeviceTools] reads; both sides are plain JSON. */

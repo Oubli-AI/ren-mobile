@@ -139,13 +139,15 @@ public fun SettingsScreen(runtime: RenRuntime, onOpen: (String) -> Unit = {}) {
 
         Section(4, "Permissions") { AgentPermissions(runtime, refresh) }
 
-        Section(5, "Call answering") { CallAnswering(runtime, refresh) }
+        Section(5, "Vault") { VaultSettings(runtime.vault) }
 
-        Section(6, "What Ren can use") { Permissions(context, refresh) { refresh++ } }
+        Section(6, "Call answering") { CallAnswering(runtime, refresh) }
 
-        Section(7, "Remote tools") { RemoteTools(runtime, refresh) }
+        Section(7, "What Ren can use") { Permissions(context, refresh) { refresh++ } }
 
-        Section(8, "About") { About() }
+        Section(8, "Remote tools") { RemoteTools(runtime, refresh) }
+
+        Section(9, "About") { About() }
     }
 }
 
