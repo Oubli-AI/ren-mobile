@@ -1,5 +1,6 @@
 {
-  /* ren desktop's search page (src/ren, unmodified), checked with ren desktop's own compiler options. The app's own
+  /* ren desktop's search page (src/ren, unmodified) and ElevenLabs UI's components (src/elevenlabs, unmodified, written
+     for shadcn's strict defaults), checked with ren desktop's own compiler options. The app's own
      code is checked harder in tsconfig.app.json and sees these through their types. */
   "compilerOptions": {
     "composite": true,
@@ -28,7 +29,14 @@
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
-    "paths": { "@/*": ["./src/ren/*"], "@catalyst/*": ["./src/ren/components/catalyst/*"] }
+    "paths": {
+      "@/components/ui/orb": ["./src/elevenlabs/components/ui/orb"],
+      "@/components/ui/audio-player": ["./src/elevenlabs/components/ui/audio-player"],
+      "@/components/ui/waveform": ["./src/elevenlabs/components/ui/waveform"],
+      "@/components/ui/voice-picker": ["./src/elevenlabs/components/ui/voice-picker"],
+      "@/*": ["./src/ren/*"],
+      "@catalyst/*": ["./src/ren/components/catalyst/*"]
+    }
   },
-  "include": ["src/ren", "src/data/*.json"]
+  "include": ["src/ren", "src/elevenlabs", "src/data/*.json"]
 }

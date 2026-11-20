@@ -10,6 +10,7 @@ import com.hiron.ren.device.CarrierStyle
 import com.hiron.ren.device.ForwardMode
 import com.hiron.ren.ui.ThemeChoice
 import com.hiron.ren.voice.Provider
+import org.json.JSONObject
 import java.util.UUID
 
 /** This phone's settings, and the permissions the user granted the agents ("Always allow"). */
@@ -179,6 +180,11 @@ public class Settings(context: Context) {
         get() = prefs.getString("work_folder", null)
         set(value) = prefs.edit().putString("work_folder", value?.trim()?.ifEmpty { null }).apply()
 
+    /** The voice Ren speaks in with the Strands agents, chosen in Vibe; null is the agents' own. */
+    public var renVoice: RenVoice?
+        get() = prefs.getString("ren_voice", null)?.let { runCatching { RenVoice.of(JSONObject(it)) }.getOrNull() }
+        set(value) = prefs.edit().putString("ren_voice", value?.json()?.toString()).apply()
+
     /** The bearer token for the workspace VM: the Strands agents, Ren's hub and Ren's search. */
     public var geminiToken: String
         get() = prefs.getString("gemini_token", null) ?: BuildConfig.DEFAULT_GEMINI_TOKEN
@@ -208,5 +214,25 @@ public class Settings(context: Context) {
 
         /** Ren's hub on the owner's workspace VM. */
         public val DEFAULT_HUB_URL: String = "wss://${BuildConfig.WORKSPACE_HOST}/hub"
+    }
+}
+
+/**
+ * A voice from Vibe's studio (`deploy/vm/gemini/studio.py`): one of Gemini's or ElevenLabs' voices, built in or designed.
+ * Gemini Live speaks only Google's studio voices, so a designed Gemini voice (`voice_…`) or an ElevenLabs voice reads
+ * Ren's typed replies aloud instead.
+ */
+public data class RenVoice(val provider: String, val id: String, val name: String) {
+    /** Gemini Live can talk in it. */
+    public val live: Boolean get() = provider == "gemini" && !id.startsWith("voice_")
+
+    public fun json(): JSONObject = JSONObject().put("provider", provider).put("id", id).put("name", name)
+
+    public companion object {
+        public fun of(json: JSONObject): RenVoice? {
+            val provider = json.optString("provider")
+            val id = json.optString("id")
+            return if ((provider == "gemini" || provider == "elevenlabs") && id.isNotEmpty()) RenVoice(provider, id, json.optString("name", id)) else null
+        }
     }
 }

@@ -1,5 +1,5 @@
-// Verifies that ren desktop's files under src/ren and src/data are the ones their SHA256SUMS record (see
-// src/ren/SOURCE.txt).
+// Verifies that the copied files under src/ren and src/data (ren desktop's) and src/elevenlabs (ElevenLabs UI's) are the
+// ones their SHA256SUMS record (see each SOURCE.txt).
 import { createHash } from "node:crypto"
 import { readFileSync, readdirSync } from "node:fs"
 import path from "node:path"
@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url"
 const src = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../src")
 
 const problems = []
-for (const folder of ["ren", "data"]) {
+for (const folder of ["ren", "data", "elevenlabs"]) {
   const root = path.join(src, folder)
   const recorded = new Map(
     readFileSync(path.join(root, "SHA256SUMS"), "utf8")
@@ -25,10 +25,10 @@ for (const folder of ["ren", "data"]) {
     .filter((name) => name !== "SHA256SUMS" && name !== "SOURCE.txt")
   for (const name of present) {
     const hash = createHash("sha256").update(readFileSync(path.join(root, name))).digest("hex")
-    if (recorded.get(name) !== hash) problems.push(`src/${folder}/${name} differs from ren desktop's file`)
+    if (recorded.get(name) !== hash) problems.push(`src/${folder}/${name} differs from its source`)
   }
   for (const name of recorded.keys()) if (!present.includes(name)) problems.push(`src/${folder}/${name} is missing`)
-  if (problems.length === 0) console.log(`src/${folder}: ${present.length} files match ren desktop`)
+  if (problems.length === 0) console.log(`src/${folder}: ${present.length} files match their source`)
 }
 if (problems.length > 0) {
   console.error(problems.join("\n"))

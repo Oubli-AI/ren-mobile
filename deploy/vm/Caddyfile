@@ -9,10 +9,24 @@
 		}
 		respond 401
 	}
+	# The Strands agents and Vibe's studio. Vibe is one of the app's bundled pages, so its requests take the token as
+	# ren's pages do (X-Ren-Token, the cookie for its music WebSocket and audio), and its preflight goes straight through.
 	@gemini path /gemini/*
 	handle @gemini {
 		@token header Authorization "Bearer {$EMRYS_GEMINI_TOKEN}"
+		@page header X-Ren-Token {$EMRYS_GEMINI_TOKEN}
+		@cookie header Cookie *ren_token={$EMRYS_GEMINI_TOKEN}*
+		@preflight method OPTIONS
 		handle @token {
+			reverse_proxy gemini:8100
+		}
+		handle @page {
+			reverse_proxy gemini:8100
+		}
+		handle @cookie {
+			reverse_proxy gemini:8100
+		}
+		handle @preflight {
 			reverse_proxy gemini:8100
 		}
 		respond 401

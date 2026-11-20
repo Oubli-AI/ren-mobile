@@ -16,9 +16,13 @@ import { useAuthStore } from "@/stores/authStore"
 import type { Favorite } from "@/stores/favoritesStore"
 import { useOnboardingStore } from "@/stores/onboardingStore"
 
+/** The voice Ren speaks in, chosen in Vibe and kept by the app. */
+export interface RenVoice { provider: "gemini" | "elevenlabs"; id: string; name: string }
+
 /** What the app answers: `{"type":"token","token":…}`, `{"type":"favorites","favorites":[…]}` or `{"type":"theme","theme":…}`. */
 type Answer =
   | { type: "token"; token: string }
+  | { type: "vibe"; user: string; voice: RenVoice | null }
   | { type: "favorites"; favorites: Favorite[] }
   | { type: "theme"; theme: ThemeName }
   | { type: "oauth-redirect"; url: string }
@@ -176,6 +180,15 @@ function answerOf(data: string): Answer | null {
     const favorites: unknown[] = message.favorites
     return { type: "favorites", favorites: favorites.filter(isFavorite) }
   }
+  if (message.type === "vibe" && "user" in message && typeof message.user === "string") {
+    const voice = "voice" in message ? record(message.voice) : null
+    const provider = voice?.["provider"]
+    return {
+      type: "vibe",
+      user: message.user,
+      voice: voice !== null && (provider === "gemini" || provider === "elevenlabs") ? { provider, id: text(voice, "id"), name: text(voice, "name") } : null,
+    }
+  }
   if (message.type === "oauth-redirect" && "url" in message && typeof message.url === "string") return { type: "oauth-redirect", url: message.url }
   if (message.type === "theme" && "theme" in message) {
     const theme = THEME_OPTIONS.find((it) => it.id === message.theme)
@@ -241,6 +254,17 @@ export async function theme(): Promise<ThemeName | null> {
 export async function oauthRedirect(): Promise<string | null> {
   const answer = await ask("oauth-redirect")
   return answer?.type === "oauth-redirect" ? answer.url : null
+}
+
+/** Who Vibe's library belongs to (the app's install id, as the agents know the user) and Ren's voice; null outside the app. */
+export async function vibe(): Promise<{ user: string; voice: RenVoice | null } | null> {
+  const answer = await ask("vibe")
+  return answer?.type === "vibe" ? { user: answer.user, voice: answer.voice } : null
+}
+
+/** Makes [voice] Ren's voice: the app keeps it for the agents' next conversation. */
+export function setRenVoice(voice: RenVoice) {
+  host?.postMessage(JSON.stringify({ type: "ren-voice", voice }))
 }
 
 /** Opens a social sign-in's provider page in the phone's browser. */

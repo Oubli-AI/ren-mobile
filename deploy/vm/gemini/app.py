@@ -24,6 +24,13 @@ works there through the hub's `local_*` tools, Desktop Commander on that compute
 coding agent works in a terminal. Every agent has those tools whenever the computer is attached; work mode says to use
 them.
 
+Ren's voice, chosen in Vibe: Live talks in it (`voice`) when it is one of Google's studio voices; any other (a designed
+Gemini voice, an ElevenLabs voice) reads each typed reply aloud (`voice` and `voice_provider` on `/gemini/text`, sent as
+`{"speech": <base64>, "mime": …}` after the turn), since Live speaks only the studio voices.
+
+Vibe: `/gemini/vibe/*` is Vibe's studio (`studio.py`) for the app's Vibe page: the user's library, what to make in it,
+the voices, and Lyria RealTime on ren's own music session. Both agents have the same studio as tools.
+
 Memory is ren desktop's own (`agent/api/core/dreaming.py` in the image's copy of ren): both agents search the user's
 second brain and keep a journal in the folder `phone`, and the dream files the journal into the brain once the user
 has been idle. The text agent's turns are journaled and what it remembers is injected before each turn, as the SDK
@@ -31,6 +38,7 @@ does both; the voice agent, a `BidiAgent`, has the two tools.
 """
 
 import asyncio
+import base64
 import os
 import re
 from collections.abc import AsyncIterator, Mapping
@@ -39,7 +47,10 @@ from pathlib import Path
 
 import uvicorn
 from elevenlabs import AsyncElevenLabs
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from pydantic import BaseModel
 from pydantic_core import to_jsonable_python
 from strands import tool
 from strands.bidi import BidiAgent
@@ -80,10 +91,12 @@ from strands_harness.models import EFFORT_LEVELS
 from strands_harness.tools.programmatic_tool_caller import programmatic_tool_caller
 
 from agent.api.core import dreaming
+from agent.api.core.live_music import LiveMusicSession, validate_config, validate_prompts
 from agent.api.core.brave_tools import brave_tools
 from agent.api.core.web_tools import web_tools
 from agent.api.core.xai_model import XAIStatePruner
 
+import studio
 from providers import ProviderName, build_model, list_provider_models, provider_api_key, provider_default_model, reasoning_efforts
 
 VOICE_AGENT = "agent_2901m620nzwrev2r7ekqpydcxe25"
@@ -161,6 +174,8 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(lifespan=lifespan)
+# Vibe (ren://vibe) is one of the app's bundled pages, which call from that origin with the workspace token.
+app.add_middleware(CORSMiddleware, allow_origins=[os.environ.get("CORS_ORIGINS", "https://appassets.androidplatform.net")], allow_methods=["*"], allow_headers=["*"])
 
 
 def dream_model() -> ModelRouter:
@@ -280,11 +295,12 @@ async def voice(
     model: str | None = None,
     effort: str = "auto",
     work: str | None = None,
+    voice: str = VOICE,
 ) -> None:
     await websocket.accept()
     helper = text_model(provider, model or provider_default_model(provider), effort)
     agent = BidiAgent(
-        model=GoogleGeminiLiveModel(model_id=VOICE_MODEL, voice=VOICE),
+        model=GoogleGeminiLiveModel(model_id=VOICE_MODEL, voice=voice),
         system_prompt=await instructions(VOICE_AGENT, variables(websocket, text_only=False)) + work_prompt(work) + dreaming.JOURNAL_DIRECTIVE,
         tools=[
             *(MCPClient(
@@ -311,6 +327,7 @@ async def voice(
                 *brave_tools(),
                 *web_tools(),
                 *MemoryManager(stores=dreaming.agent_memory(user_id, MEMORY_FOLDER), injection=False).tools,
+                *studio.VibeTools(user_id).tools,
                 end_conversation,
             ) if not gemini_live_undeclarable(value)),
         ],
@@ -330,6 +347,8 @@ async def text(
     model: str | None = None,
     effort: str = "auto",
     work: str | None = None,
+    voice: str | None = None,
+    voice_provider: studio.Provider = "gemini",
 ) -> None:
     await websocket.accept()
     chosen = model or provider_default_model(provider)
@@ -337,7 +356,7 @@ async def text(
         model=f"google/{chosen}" if provider == "gemini" else text_model(provider, chosen, effort),
         effort=harness_effort(effort) if provider == "gemini" else "auto",
         instructions=await instructions(TEXT_AGENT, variables(websocket, text_only=True)) + work_prompt(work) + dreaming.JOURNAL_DIRECTIVE,
-        tools=[python_repl, http_request, notebook, sleep, stop, handoff_to_user, swarm, graph, make_mcp_router(servers=SERVERS), *brave_tools(), *web_tools()],
+        tools=[python_repl, http_request, notebook, sleep, stop, handoff_to_user, swarm, graph, make_mcp_router(servers=SERVERS), *brave_tools(), *web_tools(), *studio.VibeTools(user_id).tools],
         builtin_tools=GEMINI_BUILTINS if provider == "gemini" else None,
         mcp_servers=SERVERS,
         session={"id": conversation, "dir": f"{HOME}/sessions"},
@@ -376,6 +395,11 @@ async def text(
                             await websocket.send_json(
                                 {"stop_reason": event["result"].stop_reason, "interrupts": [str(interrupt.reason) for interrupt in pending]}
                             )
+                            reply = str(event["result"]).strip()
+                            if voice and reply:
+                                # Ren's voice is one the user chose in Vibe that Gemini Live can't speak: the reply is read in it.
+                                spoken, mime = await studio.speech(voice_provider, reply, voice)
+                                await websocket.send_json({"speech": base64.b64encode(spoken).decode("ascii"), "mime": mime})
                 except WebSocketDisconnect:
                     raise
                 except Exception as error:
@@ -384,6 +408,95 @@ async def text(
                     await websocket.send_json({"error": f"{type(error).__name__}: {error}"})
     except WebSocketDisconnect:
         pass
+
+
+class Make(BaseModel):
+    """What Vibe asks the studio to make (`studio.create`)."""
+
+    user_id: str
+    kind: studio.Kind
+    provider: studio.Provider
+    prompt: str
+    title: str = ""
+    voice: str = ""
+    style: str = ""
+    seconds: float | None = None
+
+
+@app.get("/gemini/vibe/library")
+async def vibe_library(user_id: str) -> list[studio.Item]:
+    return studio.library(user_id)
+
+
+@app.post("/gemini/vibe/library")
+async def vibe_make(make: Make) -> studio.Item:
+    try:
+        return await studio.create(make.user_id, make.kind, make.provider, make.prompt, make.title, make.voice, make.style, make.seconds)
+    except ValueError as error:
+        raise HTTPException(400, str(error)) from error
+    except Exception as error:
+        # The provider's own refusal (a quota, a key, a filtered prompt), as it said it.
+        raise HTTPException(502, f"{type(error).__name__}: {error}") from error
+
+
+@app.get("/gemini/vibe/library/{item}")
+async def vibe_audio(user_id: str, item: str) -> FileResponse:
+    try:
+        path, record = studio.audio(user_id, item)
+    except (FileNotFoundError, ValueError) as error:
+        raise HTTPException(404, "Not in the library") from error
+    return FileResponse(path, media_type=record.mime)
+
+
+@app.delete("/gemini/vibe/library/{item}")
+async def vibe_forget(user_id: str, item: str) -> None:
+    try:
+        studio.forget(user_id, item)
+    except (FileNotFoundError, ValueError) as error:
+        raise HTTPException(404, "Not in the library") from error
+
+
+@app.get("/gemini/vibe/voices")
+async def vibe_voices(user_id: str, provider: studio.Provider) -> list[studio.Voice]:
+    try:
+        return await studio.voices(provider, user_id)
+    except Exception as error:
+        raise HTTPException(502, f"{type(error).__name__}: {error}") from error
+
+
+@app.websocket("/gemini/vibe/music")
+async def vibe_music(websocket: WebSocket, user_id: str) -> None:
+    """Lyria RealTime for Vibe, on ren's own session: the page sends `{"prompts": [...]}`, `{"config": {...}}`,
+    `{"action": "play" | "pause" | "stop" | "reset_context"}` or `{"save": <title>}` and gets ren's `music_*` frames,
+    the audio as `music_audio_delta` (48 kHz stereo PCM16), and `{"type": "vibe_saved", "item": ...}` for a kept take."""
+    await websocket.accept()
+    session = LiveMusicSession(websocket.send_json)
+    try:
+        while True:
+            asked = await websocket.receive_json()
+            try:
+                if "prompts" in asked:
+                    await session.set_weighted_prompts(validate_prompts(asked["prompts"]))
+                    # As ren's music_set_weighted_prompts does: the first prompts on an idle stream play at once.
+                    if session.playback == "idle":
+                        await session.playback_control("play")
+                elif "config" in asked:
+                    await session.set_music_generation_config(validate_config(asked["config"]))
+                elif "action" in asked:
+                    await session.playback_control(asked["action"])
+                elif "save" in asked:
+                    prompt = ", ".join(prompt["text"] for prompt in session.prompts)
+                    item = studio.keep(user_id, "music", "gemini", prompt, asked["save"], bytes(session.recorder.wav()), "audio/wav")
+                    session.recorder.clear()
+                    await websocket.send_json({"type": "vibe_saved", "item": item.model_dump()})
+            except WebSocketDisconnect:
+                raise
+            except Exception as error:
+                await websocket.send_json({"type": "music_error", "message": f"{type(error).__name__}: {error}"})
+    except WebSocketDisconnect:
+        pass
+    finally:
+        await session.close()
 
 
 if __name__ == "__main__":

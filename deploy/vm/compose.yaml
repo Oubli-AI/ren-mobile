@@ -93,7 +93,9 @@ services:
     restart: unless-stopped
     env_file:
       - elevenlabs.env
-      # The model keys, and TAVILY_API_KEY, EXA_API_KEY, BRIGHTDATA_API_KEY and OLOSTEP_API_KEY for ren's web tools.
+      # The model keys, TAVILY_API_KEY, EXA_API_KEY, BRIGHTDATA_API_KEY and OLOSTEP_API_KEY for ren's web tools, and
+      # ELEVENLABS_TOOLS_API_KEY for Vibe's ElevenLabs tools (studio.py; not ELEVENLABS_API_KEY, which reads the
+      # ElevenLabs agents' prompts).
       - gemini.env
       # The Brave keys, for ren's Brave tools while RON_BRAVE_TOOLS=1.
       - search.env

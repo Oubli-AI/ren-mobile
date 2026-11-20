@@ -60,6 +60,7 @@ import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import com.hiron.ren.MainActivity
 import com.hiron.ren.R
+import com.hiron.ren.core.RenVoice
 import com.hiron.ren.core.Settings
 import com.hiron.ren.ui.ThemeChoice
 import kotlinx.coroutines.CoroutineScope
@@ -1121,8 +1122,8 @@ public class Browser internal constructor(
         }
         if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
             // Ren's pages ask for the workspace token their requests carry, the theme and the favorites, give back the
-            // favorites Discover changed and say which ren account they are signed in to; no other origin reaches this
-            // listener.
+            // favorites Discover changed and say which ren account they are signed in to; Vibe asks whose library it
+            // shows and sets Ren's voice. No other origin reaches this listener.
             WebViewCompat.addWebMessageListener(webView, "RenHost", setOf("https://$ORIGIN_HOST")) { _, message, _, isMainFrame, reply ->
                 val asked = message.data?.let { runCatching { JSONObject(it) }.getOrNull() }
                 if (isMainFrame && asked != null) {
@@ -1142,6 +1143,11 @@ public class Browser internal constructor(
                         "favorites" -> asked.optJSONArray("favorites")?.let { favorites.replace(Favorites.parse(it)) }
                             ?: reply.postMessage(JSONObject().put("type", "favorites").put("favorites", JSONArray(Favorites.json(favorites.list.value))).toString())
                         "account" -> accountReported(RenAccount.parse(asked))
+                        "vibe" -> reply.postMessage(
+                            JSONObject().put("type", "vibe").put("user", browserSettings?.userId.orEmpty())
+                                .put("voice", browserSettings?.renVoice?.json() ?: JSONObject.NULL).toString(),
+                        )
+                        "ren-voice" -> asked.optJSONObject("voice")?.let(RenVoice::of)?.let { browserSettings?.renVoice = it }
                     }
                 }
             }

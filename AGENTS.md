@@ -162,6 +162,22 @@ What the overhaul added, on the branch `claude/project-thread-tnj6xo` (PR #14) a
   (`widget_search.xml`, `RenWidgets.ACTION_SEARCH`) is the logotype, Home's "Ask me anything. I dare you." and the
   voice key: the bar opens Home with the address bar taking the typing, the logotype opens Home, the voice key talks
   to Ren.
+- **Vibe's studio** (2026-11-20, owner: Google's realtime music and voice design, and the ElevenLabs tools, not the
+  ElevenLabs agents, in Vibe; everything made is kept there; a designed voice can be Ren's voice): `ren://vibe` opens
+  on the studio (`src/vibe/Vibe.tsx`), with ren desktop's Vibe agent (`SuperAgentInterface`) as its last tab. Live music
+  is Lyria RealTime (`lyria-realtime-exp`) on ren's own `LiveMusicSession` over `/gemini/vibe/music`, played by ren's
+  music sink; Song is Lyria 3.5 (ren's `lyria_generate`) or ElevenLabs Music; Sound is ElevenLabs sound effects; Speech
+  is Gemini 3.8 Flash TTS or ElevenLabs `eleven_v3`; Voice designs a voice with Gemini's Voices API or ElevenLabs'
+  text-to-voice (`deploy/vm/gemini/studio.py`, `/gemini/vibe/*`). The library is kept per user (the install id) under
+  `/config/emrys-gemini/vibe` on the server, and the Strands agents on every provider have the same studio as tools
+  (`vibe_create`, `vibe_voices`, `vibe_library`), so what they make shows in Vibe. The prompt is ren's `PromptInput`; the
+  music, voices and library use ElevenLabs UI's Waveform, Orb, VoicePicker and AudioPlayer, unmodified in
+  `src/elevenlabs` (hash-checked with ren's files). Any voice there can be Ren's voice (`Settings.renVoice`): Gemini
+  Live talks in Google's 30 studio voices, and refuses designed ones (1007 "Replicated voice is not supported for this
+  model", seen live 2026-11-20), so a designed or ElevenLabs voice reads the Strands text agent's replies aloud instead.
+  Keys: `GOOGLE_API_KEY` and `ELEVENLABS_TOOLS_API_KEY` in `gemini.env`. Lyria 3.5 costs $0.08 a song with no free tier;
+  `lyria-realtime-exp` is experimental and not on Google's pricing page (2026-11-20). Not run live past the Gemini
+  voice list and one Gemini speech.
 - **Ren drives the browser in view**: while a turn uses a `browser_*` tool, the agent panel takes the lower half of
   the screen, so the page Ren works on stays visible above it, as ren desktop's panel sits beside its browser.
 - **Reasoning**: the VM's `/gemini/text` sends Strands' `reasoningText` stream events as `{"reasoning": …}`, and
