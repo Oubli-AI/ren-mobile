@@ -1,10 +1,10 @@
-ren desktop's pages and components, unmodified: github.com/Oubli-AI/ren (was ImRonAI/TheBrowser) at ab77c6f (main,
-pull 46; with pulls 31, 32 and 38: the Context Agent's drafted replies, twice-daily reviews with OpenCode, people, the
+ren desktop's pages and components, unmodified: github.com/Oubli-AI/ren (was ImRonAI/TheBrowser) at eeccec3 (main,
+pull 48, Squad: Deep Research renamed, with the outcome picked before a run; with pulls 31, 32 and 38: the Context Agent's drafted replies, twice-daily reviews with OpenCode, people, the
 calls and texts in its [phone] turn, and its [notification] turn; and the agent panel, Live Music and the reader).
 
   pages/SearchResultsPage.tsx                               ren's search results
   pages/HomePage.tsx, OnboardingPage.tsx, SignInPage.tsx    Discover and the destinations, the interview, sign-in
-  pages/DeepResearchPage.tsx                                Research
+  pages/DeepResearchPage.tsx                                Squad
   pages/DocumentsPage.tsx, ProjectsIndexPage.tsx,
   ProjectHomePage.tsx, layouts/AuthPageLayout.tsx           Projects and Documents
   components/interests/InterestsWidget.tsx, ContextBridge   the Context widget and what feeds its Context Agent

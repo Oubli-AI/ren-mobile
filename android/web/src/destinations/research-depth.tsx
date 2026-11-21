@@ -2,7 +2,7 @@ import { DEPTH_METADATA } from "@/lib/deep-research-api"
 import { useDeepResearchStore } from "@/stores/deepResearchStore"
 import { cn } from "@/utils/cn"
 
-/** Deep Research's depth, kept in ren's store as the hero's own control keeps it, drawn as the picker's reasoning row is. */
+/** Squad's depth, kept in ren's store as the hero's own control keeps it, drawn as the picker's reasoning row is. */
 export function ResearchDepth() {
   const depths = useDeepResearchStore((state) => state.depths)
   const depth = useDeepResearchStore((state) => state.preferredDepth)
