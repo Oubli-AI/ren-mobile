@@ -24,6 +24,10 @@ subagent tool and `web_fetch` run their children on the text model, since the Li
 The instructions are the ElevenLabs agents' own prompts, read when the conversation opens and filled in the way
 ElevenLabs fills its dynamic variables.
 
+Every agent has the accounts the user connected in Ren (Settings › Connections): ren's `/connections/mcp` serves the
+user's Vercel, Netlify, GitHub, GitLab, Supabase and Bitbucket tools, and a tool that changes something asks on the
+phone first.
+
 Work mode: with `work` (a folder on the user's own computer) the instructions end with `work_prompt`, and the agent
 works there through the hub's `local_*` tools, Desktop Commander on that computer (`deploy/local/computer.py`), as a
 coding agent works in a terminal. Every agent has those tools whenever the computer is attached; work mode says to use
@@ -143,6 +147,14 @@ SERVERS: dict[str, MCPServerConfig] = {
         "prefix": "",
     },
 }
+
+
+
+def servers(user_id: str) -> dict[str, MCPServerConfig]:
+    """SERVERS and the accounts the user connected in Ren (Vercel, Netlify, GitHub, GitLab, Supabase, Bitbucket), which
+    ren serves per user at /connections/mcp, each provider's tools under its name; a change asks the user first."""
+    return {**SERVERS, "ren-connections": {"url": "http://ren:8765/connections/mcp/", "headers": {"X-Ren-User": user_id}, "prefix": ""}}
+
 
 # Strands' Gemini Live model validates each tool's input schema as a genai `Schema` (`_format_tools_for_live_api`):
 # `$schema`, `$ref` and `$defs` fail there and `additionalProperties` reaches the Live API, which refuses the session
@@ -305,7 +317,7 @@ async def voice(
                 prefix=config["prefix"],
                 tool_filters=VOICE_TOOL_FILTERS,
                 continue_on_error=True,
-            ) for config in SERVERS.values()),
+            ) for config in servers(user_id).values()),
             # swarm and graph are left out: their schemas carry `additionalProperties` (see gemini_live_undeclarable).
             *(value for value in (
                 programmatic_tool_caller,
@@ -319,7 +331,7 @@ async def voice(
                 notebook,
                 sleep,
                 make_subagent(model=Fixed(helper)),
-                make_mcp_router(servers=SERVERS),
+                make_mcp_router(servers=servers(user_id)),
                 *brave_tools(),
                 *web_tools(),
                 *dreaming.agent_memory_tools(user_id, MEMORY_FOLDER),
@@ -355,9 +367,9 @@ async def text(
         # A CLI keeps its own conversation (a stateful model), which the Agent refuses a context manager for.
         context_manager=None if isinstance(built, CliModel) else "auto",
         instructions=await instructions(TEXT_AGENT, variables(websocket, text_only=True)) + work_prompt(work) + dreaming.MEMORY_PROTOCOL,
-        tools=[python_repl, http_request, notebook, sleep, stop, handoff_to_user, swarm, graph, make_mcp_router(servers=SERVERS), *brave_tools(), *web_tools(), *studio.VibeTools(user_id).tools],
+        tools=[python_repl, http_request, notebook, sleep, stop, handoff_to_user, swarm, graph, make_mcp_router(servers=servers(user_id)), *brave_tools(), *web_tools(), *studio.VibeTools(user_id).tools],
         builtin_tools=GEMINI_BUILTINS if provider == "gemini" else None,
-        mcp_servers=SERVERS,
+        mcp_servers=servers(user_id),
         session={"id": conversation, "dir": f"{HOME}/sessions"},
         memory=dreaming.brain_memory(user_id, MEMORY_FOLDER),
     )

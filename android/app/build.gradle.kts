@@ -23,8 +23,8 @@ android {
         targetSdk = 36
         // Phones only: the ElevenLabs SDK's WebRTC library is ~12 MB per ABI, and the x86/armv7 copies were 34 MB.
         ndk { abiFilters += "arm64-v8a" }
-        versionCode = 18
-        versionName = "0.5.5"
+        versionCode = 20
+        versionName = "0.5.7"
         // Ready-to-use defaults from ren.local.properties (never committed), or else from the build machine's
         // environment (REN_ANSWERING_NUMBER and the rest, a cloud environment's secrets); they stay editable in Settings.
         val local = Properties().apply {
