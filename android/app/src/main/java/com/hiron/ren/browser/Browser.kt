@@ -256,6 +256,9 @@ public class Browser internal constructor(
     /** The ren account one of Ren's pages is signed in to, whenever it reports it. */
     public var accountReported: (RenAccount) -> Unit = {}
 
+    /** An Android app of the account's Applications to install, by id: Install on the Squad run that built it. */
+    public var installApplication: (id: String) -> Unit = {}
+
     /** Shows the system's file picker for a page's upload field; set by the activity while it is on screen. */
     public var fileChooser: ((ValueCallback<Array<Uri>>, WebChromeClient.FileChooserParams) -> Boolean)? = null
 
@@ -1383,6 +1386,11 @@ public class Browser internal constructor(
             return when (requestUrl.scheme?.lowercase(Locale.ROOT)) {
                 "http", "https" -> {
                     if (request.isForMainFrame) {
+                        // Install on one of Ren's pages links to the app's APK on ren: Android's installer, as on Home.
+                        Applications.apkId(requestUrl)?.takeIf { view.url?.startsWith(PAGES) == true }?.let {
+                            installApplication(it)
+                            return true
+                        }
                         val raw = requestUrl.toString()
                         val stripped = if (browserSettings?.stripTrackingParams != false) {
                             ContentBlocker.stripTrackingParameters(raw)

@@ -79,6 +79,11 @@ public class Applications(private val context: Context, private val http: OkHttp
         public val API: String = "https://${BuildConfig.WORKSPACE_HOST}"
         private const val APK = "application/vnd.android.package-archive"
 
+        /** The app's id when [url] is its APK on ren (`/context/applications/<id>/apk`), which Install on a Squad run links to. */
+        public fun apkId(url: Uri): String? = url.pathSegments.takeIf {
+            "${url.scheme}://${url.authority}" == API && it.size == 4 && it[0] == "context" && it[1] == "applications" && it[3] == "apk"
+        }?.get(2)
+
         public fun parse(json: String): List<RenApplication> {
             val items = JSONObject(json).optJSONArray("applications") ?: return emptyList()
             return (0 until items.length()).mapNotNull { index ->
