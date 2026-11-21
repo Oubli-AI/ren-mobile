@@ -40,7 +40,8 @@ const MAX_COLUMN_WIDTH = 320
 
 const text = (value: unknown): string => (typeof value === 'string' ? value : '')
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
-const isFormula = (value: unknown): value is string => typeof value === 'string' && value.startsWith('=')
+/** Whether a cell is a formula: text that starts with "=". */
+export const isFormula = (value: unknown): value is string => typeof value === 'string' && value.startsWith('=')
 
 /** "A" for 0, "Z" for 25, "AA" for 26. */
 export function columnLetter(index: number): string {
@@ -202,6 +203,85 @@ export function gridDisplay(grid: Grid): GridDisplaySheet[] {
     const shown = (value: GridCell | undefined) => (value === null || value === undefined ? '' : typeof value === 'boolean' ? String(value).toUpperCase() : String(value))
     return { name: sheet.name, rows: sheet.rows.map((row) => Array.from({ length: width }, (_, c) => shown(row[c]))) }
   })
+}
+
+/**
+ * What a column holds, after AppSheet's column types (https://support.google.com/appsheet/answer/10106435). It decides
+ * how a row's card and detail show a cell, what a tap on it does and which input a form gives it.
+ */
+export type ColumnType =
+  | 'text' | 'longtext' | 'number' | 'price' | 'percent' | 'date' | 'datetime' | 'time' | 'yesno' | 'enum'
+  | 'email' | 'phone' | 'url' | 'image' | 'address' | 'latlong'
+
+/** A sheet's column: its header, its type, and an enum's values in the order they first appear. */
+export interface GridColumn { name: string; type: ColumnType; options: string[] }
+
+const TEXT_TYPES: readonly (readonly [ColumnType, RegExp])[] = [
+  ['email', /^[^\s@]+@[^\s@]+\.[^\s@]+$/],
+  ['image', /^https?:\/\/\S+\.(?:png|jpe?g|gif|webp|avif|svg)(?:[?#]\S*)?$/i],
+  ['url', /^https?:\/\/\S+$/i],
+  ['date', /^\d{4}-\d{2}-\d{2}$/],
+  ['datetime', /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2})?$/],
+  ['time', /^\d{1,2}:\d{2}(?::\d{2})?$/],
+  ['latlong', /^-?\d{1,2}(?:\.\d+)?,\s*-?\d{1,3}(?:\.\d+)?$/],
+  // With its country code, or as North America writes one, the form AppSheet recognizes.
+  ['phone', /^(?:\+\d[\d\s().-]{6,18}|\(?\d{3}\)?[\s.-]\d{3}[\s.-]\d{4})$/],
+]
+
+/** A column of numbers by its Excel number format: a share, an amount of money, a date or a time. */
+function numberType(format: string | undefined): ColumnType {
+  if (!format) return 'number'
+  if (format.includes('%')) return 'percent'
+  // "[$-409]" names a locale, as a date's format does; "[$€-407]" and a bare "$" are money.
+  if (/[$€£¥]/.test(format.replace(/\[\$-[^\]]*\]/g, ''))) return 'price'
+  // Text in quotes and brackets is not a date code.
+  const codes = format.replace(/"[^"]*"|\[[^\]]*\]/g, '').toLowerCase()
+  const day = /[yd]/.test(codes)
+  const hour = /[hs]/.test(codes)
+  return day && hour ? 'datetime' : day ? 'date' : hour ? 'time' : 'number'
+}
+
+/**
+ * A sheet's columns, typed from its header and its cells the way AppSheet reads a sheet: `values` gives each cell's
+ * value where a spreadsheet has calculated the sheet (a formula's result), and a column of numbers is typed by its
+ * number format. A column named for an address is one, as in AppSheet.
+ */
+export function gridColumns(sheet: GridSheet, values?: readonly (readonly GridCell[])[]): GridColumn[] {
+  const [header = [], ...rows] = sheet.rows
+  const width = Math.max(0, ...sheet.rows.map((row) => row.length))
+  return Array.from({ length: width }, (_, c) => {
+    const name = String(header[c] ?? '').trim() || columnLetter(c)
+    const held = rows.map((row, r) => (isFormula(row[c]) ? values?.[r + 1]?.[c] ?? null : row[c] ?? null)).filter((value) => value !== null && value !== '')
+    const texts = held.filter((value) => typeof value === 'string')
+    const distinct = [...new Set(texts)]
+    const all = (type: string) => held.length > 0 && held.every((value) => typeof value === type)
+    const type: ColumnType = all('boolean') ? 'yesno'
+      : all('number') ? numberType(sheet.formats?.[columnLetter(c)])
+      : !all('string') ? 'text'
+      : TEXT_TYPES.find(([, pattern]) => texts.every((value) => pattern.test(value)))?.[0]
+        ?? (/address/i.test(name) ? 'address'
+          : texts.some((value) => value.length > 120 || value.includes('\n')) ? 'longtext'
+          // A few values that repeat are choices.
+          : distinct.length < texts.length && distinct.length <= Math.max(2, texts.length / 2) ? 'enum'
+          : 'text')
+    return { name, type, options: type === 'enum' ? distinct : [] }
+  })
+}
+
+const DAY = 86_400_000
+/** 1970-01-01 as a spreadsheet counts days, from 1899-12-30. */
+const EPOCH = 25_569
+
+/** A date, a time or both as a spreadsheet keeps one, in days with a time as a part of a day, from what an input gives ("2026-11-21", "09:30", "2026-11-21T09:30"). */
+export function temporalSerial(type: 'date' | 'datetime' | 'time', text: string): number | null {
+  const ms = Date.parse(type === 'time' ? `1970-01-01T${text}Z` : type === 'date' ? `${text}T00:00Z` : `${text.replace(' ', 'T')}Z`)
+  return Number.isFinite(ms) ? ms / DAY + (type === 'time' ? 0 : EPOCH) : null
+}
+
+/** What an input takes for a date, a time or both that a spreadsheet keeps as a number. */
+export function temporalText(type: 'date' | 'datetime' | 'time', serial: number): string {
+  const iso = new Date(Math.round((type === 'time' ? serial % 1 : serial - EPOCH) * DAY)).toISOString()
+  return type === 'date' ? iso.slice(0, 10) : type === 'time' ? iso.slice(11, 16) : iso.slice(0, 16)
 }
 
 /** A sheet as CSV (RFC 4180): a cell with a comma, a quote or a line break is quoted. */

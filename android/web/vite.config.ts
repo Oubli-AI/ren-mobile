@@ -6,9 +6,9 @@ import { defineConfig, type Plugin } from "vite"
 
 // What the pages carry that a phone never loads stays out of the APK, which a sideload keeps under 20 MB.
 // Univer's document layout (the spreadsheet's cells are laid out by it) loads a hyphenation pattern for each of 77
-// languages beside the English it holds, about 1 MB compressed, and only for a document with automatic hyphenation
-// on, which a sheet's cells never have: each of those imports gets an empty module, so asking for one hyphenates
-// nothing.
+// languages beside the English it holds, about 1 MB compressed, when a document with automatic hyphenation on holds
+// text it reads as that language: each of those imports gets an empty module, so asking for one logs "Invalid
+// hyphenation pattern" and breaks lines without hyphens.
 const withoutHyphenationPatterns: Plugin = {
   name: "ren:without-hyphenation-patterns",
   enforce: "pre",

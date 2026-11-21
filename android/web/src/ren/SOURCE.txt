@@ -1,5 +1,6 @@
-ren desktop's pages and components, unmodified: github.com/Oubli-AI/ren (was ImRonAI/TheBrowser) at 50aef8f (main,
-pull 56, spreadsheets in pages and Squad's DataGrid outcome; with pull 54, Squad's Web App, Website and Mobile App
+ren desktop's pages and components, unmodified: github.com/Oubli-AI/ren (was ImRonAI/TheBrowser) at 4841e40 (main,
+pull 60, a spreadsheet's rows as cards, a row and a form, after AppSheet; with pull 56, spreadsheets in pages and
+Squad's DataGrid outcome; with pull 54, Squad's Web App, Website and Mobile App
 outcomes and the app a run built on its page; with pull 48, Squad:
 Deep Research renamed, with the outcome picked before a run; with pulls 31, 32 and 38: the Context Agent's drafted replies, twice-daily reviews with OpenCode, people, the
 calls and texts in its [phone] turn, and its [notification] turn; and the agent panel, Live Music and the reader).
