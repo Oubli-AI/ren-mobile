@@ -9,7 +9,7 @@
  * It shows only for a signed-in ren account that finished the interview, on either device: the same account, context,
  * interview and interest graph as ren desktop's. The page tells the app what to make room for (`layout`): nothing, the orb, the orb with a finished
  * run's or a dream's notice, or the open panel, which the dream's review takes too: the phone's own (DreamReview), which
- * shows each topic's text before and after the dream.
+ * shows each topic as it reads now and as the dream would write it, for the user to approve.
  */
 import { askRen, onApp, reportAccount, tell } from "../host"
 import { applyTheme } from "../theme"
@@ -81,7 +81,6 @@ function Widget() {
   const notice = useContextAgentStore((state) => runNotifications(state.runs).length > 0 || state.dream !== null)
   const dream = useContextAgentStore((state) => state.dream)
   const reviewing = useContextAgentStore((state) => state.dream !== null && state.reviewingDream)
-  const userId = useContextAgentStore((state) => state.userId)
   // The interview and interest graph follow the account, so an interview taken on the desktop counts here.
   useAccountProfileSync()
   const profileReady = useAccountProfileReady()
@@ -95,7 +94,7 @@ function Widget() {
       <ContextBridge />
       <AskRenBridge />
       <InterestsWidget />
-      {reviewing && dream && <DreamReview key={dream.version} dream={dream} userId={userId} />}
+      {reviewing && dream && <DreamReview key={dream.version} dream={dream} />}
     </AgentUiProvider>
   )
 }
