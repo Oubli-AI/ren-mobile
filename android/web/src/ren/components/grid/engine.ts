@@ -6,7 +6,7 @@
  * tables and Excel import and export are in Univer's paid packages (https://docs.univer.ai/server/license.md), so
  * they are not here: a grid's Excel file is written by Ren's backend.
  */
-import { LocaleType, mergeLocales, Univer, UniverInstanceType, type IWorkbookData } from '@univerjs/core'
+import { CellValueType, LocaleType, mergeLocales, Univer, UniverInstanceType, type IWorkbookData } from '@univerjs/core'
 import { FUniver } from '@univerjs/core/facade'
 import { UniverDataValidationPlugin } from '@univerjs/data-validation'
 import DataValidationEnUS from '@univerjs/data-validation/locale/en-US'
@@ -18,7 +18,7 @@ import { UniverFormulaEnginePlugin } from '@univerjs/engine-formula'
 import { UniverRenderEnginePlugin } from '@univerjs/engine-render'
 import { UniverFindReplaceMobileUIPlugin } from '@univerjs/find-replace'
 import FindReplaceEnUS from '@univerjs/find-replace/locale/en-US'
-import { UniverSheetsPlugin } from '@univerjs/sheets'
+import { AUTO_FILL_APPLY_TYPE, UniverSheetsPlugin } from '@univerjs/sheets'
 import { UniverSheetsConditionalFormattingPlugin } from '@univerjs/sheets-conditional-formatting'
 import { UniverSheetsConditionalFormattingMobileUIPlugin } from '@univerjs/sheets-conditional-formatting-ui'
 import SheetsConditionalFormattingUIEnUS from '@univerjs/sheets-conditional-formatting-ui/locale/en-US'
@@ -75,7 +75,7 @@ import '@univerjs/find-replace/lib/index.css'
 import '@univerjs/sheets-table-ui/lib/index.css'
 import '@univerjs/sheets-hyper-link-ui/lib/index.css'
 
-import type { SheetReading } from '@/lib/grid'
+import type { GridCell, SheetReading } from '@/lib/grid'
 
 /** Univer's palette with ren's volt (`blurple` in tailwind.config.ts) as its brand scale. */
 const THEME = {
@@ -98,6 +98,14 @@ export interface GridReading { workbook: IWorkbookData; sheets: SheetReading[]; 
 
 export interface GridEngine {
   read: () => Promise<GridReading>
+  /** Bring the sheet at `sheet` into view. */
+  show: (sheet: number) => void
+  /**
+   * Change the row at `row` of the sheet at `sheet`: `cells` go over it, where a cell left undefined keeps what it
+   * holds. With `fill` the row above is filled down into it first, as dragging that row's corner does, so a new row
+   * has the formulas and the formats of the rows above. null removes the row.
+   */
+  write: (sheet: number, row: number, cells: readonly (GridCell | undefined)[] | null, fill?: boolean) => Promise<void>
   dispose: () => void
 }
 
@@ -164,10 +172,43 @@ export function openGrid(container: HTMLElement, workbook: Partial<IWorkbookData
         // A sheet's last row and column with content are -1 while it is empty.
         sheets: sheets.map((sheet) => {
           const range = sheet.getRange(0, 0, Math.max(1, sheet.getLastRow() + 1), Math.max(1, sheet.getLastColumn() + 1))
-          return { name: sheet.getSheetName(), formulas: range.getFormulas(), values: range.getRawValues(), formats: range.getNumberFormats(), display: range.getDisplayValues() }
+          const cells = range.getCellDatas()
+          return {
+            name: sheet.getSheetName(),
+            formulas: range.getFormulas(),
+            // A boolean the spreadsheet wrote or calculated is kept as 1 or 0 with the boolean type.
+            values: range.getRawValues().map((row, r) => row.map((value, c) => (cells[r]?.[c]?.t === CellValueType.BOOLEAN ? value === 1 || value === true : value))),
+            formats: range.getNumberFormats(),
+            display: range.getDisplayValues(),
+          }
         }),
         active: Math.max(0, sheets.findIndex((sheet) => sheet.getSheetId() === opened.getActiveSheet().getSheetId())),
       }
+    },
+    show: (index) => {
+      const sheet = opened.getSheets()[index]
+      if (sheet) opened.setActiveSheet(sheet)
+    },
+    write: async (index, row, cells, fill = false) => {
+      await rendered
+      const sheet = opened.getSheets()[index]
+      if (!sheet) return
+      if (!cells) {
+        sheet.deleteRow(row)
+        return
+      }
+      if (row >= sheet.getMaxRows()) sheet.insertRowAfter(sheet.getMaxRows() - 1)
+      if (fill) {
+        const width = sheet.getLastColumn() + 1
+        await sheet.getRange(row - 1, 0, 1, width).autoFill(sheet.getRange(row - 1, 0, 2, width), AUTO_FILL_APPLY_TYPE.COPY)
+      }
+      cells.forEach((cell, c) => {
+        if (cell === undefined) return
+        const range = sheet.getRange(row, c)
+        if (cell === null) range.clearContent()
+        // Text stays the text it is: left to the spreadsheet, "2026-11-21" would become a number in a date format.
+        else range.setValue(typeof cell === 'string' && !cell.startsWith('=') ? { v: cell, t: CellValueType.STRING, f: null, si: null, p: null } : cell)
+      })
     },
     dispose: () => univer.dispose(),
   }
