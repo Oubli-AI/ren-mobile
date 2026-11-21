@@ -221,18 +221,20 @@ What the overhaul added, on the branch `claude/project-thread-tnj6xo` (PR #14) a
 - **Claude Code and Antigravity CLI, the main text agents** (2026-11-21, owner: their CLIs on the server, signed in
   with his accounts, all native tools kept, each a Strands model passed to `create_harness`, reasoning, tools and output
   streamed whole to the panel): Settings › Agents › Claude Code (the default) and Antigravity. `deploy/vm/gemini/cli_models.py`
-  is a custom model provider per CLI, driving Claude Code in its headless stream-json mode (`claude -p`) and Antigravity
-  as an Agent Client Protocol server (`agy acp`), one process per conversation and per subagent. The CLI keeps its own conversation, so the model is stateful
+  is a custom model provider per CLI, driving Claude Code through Anthropic's Claude Agent SDK (`claude-agent-sdk`
+  0.2.187, which bundles Claude Code 2.1.330) and Antigravity as an Agent Client Protocol server (`agy acp`), one
+  process per conversation and per subagent. The CLI keeps its own conversation, so the model is stateful
   (`capabilities.stateful`; Strands sends only the new turn and keeps the CLI's session id in `model_state`, saved with
   the session); `create_harness` gets `context_manager=None`, which a stateful model requires. The CLI's native tools
   (Claude Code's Bash, Read, Edit, WebSearch, Agent and the rest; Antigravity's run_command and the rest) run inside the
   CLI and reach the phone as `{"native_tool": …}` (Strands passes them on as raw `{"event": …}` chunks, as ren's xAI
   model does xAI's server-side tools); the agent's own tools (the hub's, ren's, the harness's) reach the CLI as one MCP
-  server, `ren` (`cli_bridge.py`, stdio, relaying to the loopback-only `/bridge/<token>`), and a call there ends the
-  model's message with a Strands `toolUse`, so Strands runs it and its result answers the CLI. Claude Code 2.1.330 (npm)
-  runs with `--permission-mode bypassPermissions`, summarized thinking and the agent's instructions after its own system
-  prompt (`--append-system-prompt-file`); models are its aliases, efforts low to ultracode; it signs in with
-  `CLAUDE_CODE_OAUTH_TOKEN` (`claude setup-token`) in `gemini.env`. Antigravity 1.5.13 (the release's `antigravity`
+  server, `ren`, and a call there ends the model's message with a Strands `toolUse`, so Strands runs it and its result
+  answers the CLI. For Claude Code `ren` is the SDK's in-process server (`create_sdk_mcp_server`); it runs with
+  `permission_mode="bypassPermissions"`, summarized adaptive thinking, partial messages, and the agent's instructions
+  appended to the `claude_code` system prompt preset; models are its aliases, efforts low to max (the SDK's
+  `EffortLevel`); it signs in with `CLAUDE_CODE_OAUTH_TOKEN` (`claude setup-token`) in `gemini.env`. For Antigravity
+  `ren` is `cli_bridge.py` (stdio, relaying to the loopback-only `/bridge/<token>`). Antigravity 1.5.13 (the release's `antigravity`
   binary as `agy`) runs as `agy acp` (ACP v1 over stdio), because its headless `-p` stream-json carries the model's
   thinking only as `thinking_tokens` (its headless docs; the verbosity setting, `high` showing "every tool call,
   command, and thought in full", is the terminal view's), while ACP streams the thinking as `agent_thought_chunk`, which
@@ -245,9 +247,10 @@ What the overhaul added, on the branch `claude/project-thread-tnj6xo` (PR #14) a
   `thought_level` option. It signs in with the owner's
   Google account (owner's choice, 2026-11-21, after Google's FAQ: wrapping `agy` "is not supported under consumer
   plans"), kept under `/config/.gemini`. Every step in the panel now opens to the tool's whole input and output, for
-  every Strands provider. Checked offline (2026-11-21): mypy, and both models through `create_harness` against stand-in
-  CLIs speaking Claude Code's documented stream-json and ACP, with a Strands tool called through the bridge, thinking
-  streamed as reasoning, and a conversation resumed in a new process. Not run live: ACP's config option ids and values
+  every Strands provider. Checked offline (2026-11-21): mypy, and both models through `create_harness`, with
+  the SDK's bundled Claude Code against a local stand-in for Anthropic's Messages API and a stand-in `agy` speaking
+  ACP, with native tools streamed, a Strands tool called through `ren`, thinking streamed as reasoning, and a
+  conversation resumed in a new process. Not run live: ACP's config option ids and values
   are read from the session, since Antigravity's docs name only the pickers (Model; Thinking level Low to Max).
 - **Connections** (2026-11-21, owner: Vercel, Netlify, GitHub, GitLab, Supabase and Bitbucket for every agent, with
   sign-in; `core/Connections.kt`, `ui/ConnectionsSettings.kt`, ren's `core/connections.py`): Settings › Connections
@@ -670,7 +673,7 @@ cd android && python3 tools/build_icon.py --check
 JAVA_HOME=<JDK 21> ./gradlew testDebugUnitTest lintDebug assembleRelease   # builds android/web first (npm ci, npm run build)
 cd android/web && npm run build && npm test   # the pages alone: hash checks, tsc, Vite, then Playwright on the robot
 uvx --python 3.12 --with fastmcp==4.1.0 --with elevenlabs==2.75.0 mypy --config-file deploy/vm/computer/mypy.ini   # the VM's Python
-uvx --python 3.12 --with "strands-agents[bidi,bidi-google,gemini,mistral,openai,web-fetch]==1.64.0" --with strands-harness==0.4.0 --with mistralai==2.10.1 --with openai==2.50.0 --with fastapi==0.162.0 --with uvicorn==0.54.0 --with elevenlabs==2.75.0 mypy --config-file deploy/vm/gemini/mypy.ini
+uvx --python 3.12 --with "strands-agents[bidi,bidi-google,gemini,mistral,openai,web-fetch]==1.64.0" --with strands-harness==0.4.0 --with mistralai==2.10.1 --with openai==2.50.0 --with fastapi==0.162.0 --with uvicorn==0.54.0 --with elevenlabs==2.75.0 --with claude-agent-sdk==0.2.187 mypy --config-file deploy/vm/gemini/mypy.ini
 uvx --python 3.12 --with fastmcp==3.4.0 --with mcp==1.26.0 --with uvicorn==0.54.0 --with websockets==15.0.1 mypy --config-file deploy/vm/hub/mypy.ini
 cd deploy/vm/hub && uvx --python 3.12 --with fastmcp==3.4.0 --with mcp==1.26.0 --with uvicorn==0.54.0 --with websockets==15.0.1 --with pytest --with anyio pytest test_hub.py
 ```

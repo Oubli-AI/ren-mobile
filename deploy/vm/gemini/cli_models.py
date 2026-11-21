@@ -1,8 +1,8 @@
 """Claude Code and Antigravity CLI as Strands model providers, so each one is a text agent `create_harness` makes.
 
 Each is a custom model provider (Strands' docs, "Custom Model Providers"): a `Model` whose `stream` drives the CLI (Claude
-Code in its headless stream-json mode, https://code.claude.com/docs/en/headless; Antigravity as an Agent Client Protocol
-server, https://antigravity.google/docs/ide/extensions/acp) and yields Strands' stream events.
+Code through Anthropic's Claude Agent SDK, https://code.claude.com/docs/en/agent-sdk/python; Antigravity as an Agent
+Client Protocol server, https://antigravity.google/docs/ide/extensions/acp) and yields Strands' stream events.
 
 - The CLI keeps the conversation itself (its session, resumed by id), so the model is stateful: Strands sets
   `capabilities.stateful` "only for a provider that keeps state server-side" (`strands/models/model.py`), sends only the
@@ -12,9 +12,10 @@ server, https://antigravity.google/docs/ide/extensions/acp) and yields Strands' 
   those no toolUse/toolResult ("They have no toolUse/toolResult equivalent (the agent never runs them)",
   `strands/models/anthropic.py`), so each goes out as a raw chunk `{"nativeTool": …}`, which Strands' `process_stream`
   passes on as `{"event": chunk}`, the way ren's xAI model sends xAI's server-side tools (`{"xai": …}`).
-- The agent's own tools, the ones `create_harness` gives it, reach the CLI as one MCP server, `ren` (`cli_bridge.py`, a
-  stdio relay to `/bridge/<token>` here). A call there ends the message with that `toolUse`, as the custom provider docs'
-  Tool Support says, Strands runs the tool, and the `toolResult` in the next `stream` call is the CLI's answer.
+- The agent's own tools, the ones `create_harness` gives it, reach the CLI as one MCP server, `ren`: the SDK's in-process
+  server for Claude Code (`create_sdk_mcp_server`), and for Antigravity `cli_bridge.py`, a stdio relay to `/bridge/<token>`
+  here. A call there ends the message with that `toolUse`, as the custom provider docs' Tool Support says, Strands runs
+  the tool, and the `toolResult` in the next `stream` call is the CLI's answer.
 """
 
 from __future__ import annotations
@@ -28,11 +29,25 @@ import secrets
 import shutil
 import threading
 import uuid
-from collections.abc import AsyncGenerator, Iterator
+from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal, TypedDict, TypeVar
 
+from claude_agent_sdk import (
+    AssistantMessage,
+    ClaudeAgentOptions,
+    ClaudeSDKClient,
+    EffortLevel,
+    Message,
+    ResultMessage,
+    SdkMcpTool,
+    StreamEvent as ClaudeStreamEvent,
+    ToolResultBlock,
+    ToolUseBlock,
+    UserMessage,
+    create_sdk_mcp_server,
+)
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from strands.event_loop.streaming import process_stream
@@ -47,7 +62,7 @@ T = TypeVar("T", bound=BaseModel)
 type Json = dict[str, Json] | list[Json] | str | int | float | bool | None
 
 CliName = Literal["claude-code", "antigravity"]
-#: Where each conversation's CLI keeps its files here: Antigravity's workspace MCP config and Claude Code's instructions.
+#: Where each Antigravity conversation keeps its workspace MCP config.
 HOME = Path("/config/emrys-gemini/cli")
 #: The folder both CLIs work in, the agents' shared workspace (the image's WORKDIR).
 WORKSPACE = "/config/workspace"
@@ -59,9 +74,8 @@ DEFAULT_MODEL = "default"
 
 #: Claude Code's model aliases (https://code.claude.com/docs/en/model-config); `--model` also takes a model's full name.
 CLAUDE_MODELS = ("default", "best", "fable", "opus", "sonnet", "haiku", "opus[1m]", "sonnet[1m]", "opusplan")
-#: `--effort`: "Options: low, medium, high, xhigh, max, or ultracode. Available levels depend on the model."
-#: (https://code.claude.com/docs/en/cli-reference).
-CLAUDE_EFFORTS = ("low", "medium", "high", "xhigh", "max", "ultracode")
+#: The SDK's `effort` levels (`EffortLevel`).
+CLAUDE_EFFORTS: tuple[EffortLevel, ...] = ("low", "medium", "high", "xhigh", "max")
 #: Antigravity's reasoning effort: "low, medium, high, xhigh (only models that publish an xhigh variant), max (only models
 #: that publish a max variant)" (https://antigravity.google/docs/cli/commands/effort). Over ACP it is the session's
 #: `thought_level` option, matched by value or name.
@@ -154,12 +168,12 @@ def items_at(value: Json, *path: str | int) -> list[Json]:
     return found if isinstance(found, list) else []
 
 
-def flat(value: Json) -> str:
+def flat(value: object) -> str:
     """A tool's output as text: text as it is, a list of text blocks joined, anything else as JSON."""
     if isinstance(value, str):
         return value
     if isinstance(value, list):
-        return "\n".join(text_at(item, "text") if text_at(item, "type") == "text" else json.dumps(item) for item in value)
+        return "\n".join(str(item["text"]) if isinstance(item, dict) and item.get("type") == "text" else json.dumps(item) for item in value)
     return "" if value is None else json.dumps(value)
 
 
@@ -185,7 +199,7 @@ def bridge_result(result: ToolResult) -> BridgeResult:
 
 
 class Session:
-    """One running CLI process for one conversation, and the bridge its `ren` MCP server calls."""
+    """One running CLI for one conversation, and the agent's tools it calls."""
 
     def __init__(self, tools: list[ToolSpec]) -> None:
         self.token = secrets.token_urlsafe(24)
@@ -194,7 +208,7 @@ class Session:
         #: Antigravity's JSON-RPC request ids.
         self.ids = itertools.count(1)
         self.tools = tools
-        self.inbox: asyncio.Queue[Json | Call | Exited] = asyncio.Queue()
+        self.inbox: asyncio.Queue[Json | Message | Call | Exited] = asyncio.Queue()
         self.waiting: dict[str, Call] = {}
         #: The native tool calls under way, id to name, and to input where it comes after the call starts (ACP's `rawInput`).
         self.native: dict[str, str] = {}
@@ -202,6 +216,7 @@ class Session:
         self.busy = False
         self.folder = HOME / self.token
         self.process: asyncio.subprocess.Process | None = None
+        self.client: ClaudeSDKClient | None = None
         self.readers: list[asyncio.Task[None]] = []
         BRIDGES[self.token] = self
 
@@ -236,9 +251,28 @@ class Session:
         async for raw in process.stderr:
             stderr.append(raw.decode(errors="replace"))
 
+    def pump(self, messages: AsyncIterator[Message]) -> None:
+        """Puts the SDK's messages in the inbox, then the end of the CLI."""
+
+        async def read() -> None:
+            try:
+                async for message in messages:
+                    await self.inbox.put(message)
+                await self.inbox.put(Exited(0, ""))
+            except Exception as error:
+                await self.inbox.put(Exited(1, str(error)))
+
+        self.readers = [asyncio.create_task(read())]
+
+    async def call(self, name: str, arguments: dict[str, Json]) -> BridgeResult:
+        """One call from the CLI to the agent's tools, answered once Strands has run it."""
+        answer: asyncio.Future[BridgeResult] = asyncio.get_running_loop().create_future()
+        await self.inbox.put(Call(name, arguments, answer))
+        return await answer
+
     @property
     def running(self) -> bool:
-        return self.process is not None and self.process.returncode is None
+        return bool(self.readers) and not self.readers[0].done()
 
     async def send(self, line: dict[str, Json]) -> None:
         assert self.process is not None and self.process.stdin is not None
@@ -250,6 +284,8 @@ class Session:
         BRIDGES.pop(self.token, None)
         for call in self.waiting.values():
             call.answer.cancel()
+        if self.client is not None:
+            await self.client.disconnect()
         if self.running and self.process is not None:
             self.process.terminate()
             try:
@@ -282,10 +318,7 @@ async def bridge_tools(token: str, request: Request) -> list[BridgeTool]:
 @router.post("/bridge/{token}/call")
 async def bridge_call(token: str, call: BridgeCall, request: Request) -> BridgeResult:
     """One call from the CLI, answered once Strands has run the tool."""
-    session = bridge(token, request)
-    answer: asyncio.Future[BridgeResult] = asyncio.get_running_loop().create_future()
-    await session.inbox.put(Call(call.name, call.arguments, answer))
-    return await answer
+    return await bridge(token, request).call(call.name, call.arguments)
 
 
 class CliConfig(TypedDict):
@@ -320,19 +353,16 @@ class CliModel(Model, abc.ABC):
         return ModelInfo.merge(super().model_info, ModelInfo(capabilities=ModelCapabilities(stateful=True)))
 
     @abc.abstractmethod
-    def argv(self, session: Session, conversation: str | None, instructions: str | None) -> tuple[list[str], str]:
-        """The CLI's command line and working folder, resuming `conversation` when there is one."""
-
-    async def begin(self, session: Session, conversation: str | None) -> None:
-        """What the CLI needs once it has started, before the first turn (Antigravity's ACP session)."""
+    async def open(self, session: Session, conversation: str | None, instructions: str | None) -> None:
+        """Starts the CLI for `session`, resuming `conversation` when there is one."""
 
     @abc.abstractmethod
-    def user_line(self, session: Session, blocks: list[ContentBlock], instructions: str | None) -> dict[str, Json]:
-        """A user turn as the CLI reads it on stdin, `instructions` first on a new conversation."""
+    async def send(self, session: Session, blocks: list[ContentBlock], instructions: str | None) -> None:
+        """Sends a user turn, `instructions` first on a new conversation where the CLI has no system prompt of its own."""
 
     @abc.abstractmethod
-    def translate(self, line: Json, session: Session, state: dict[str, object], turn: Turn) -> Iterator[CliStreamEvent]:
-        """The Strands events for one line the CLI printed."""
+    def translate(self, item: Json | Message, session: Session, state: dict[str, object], turn: Turn) -> Iterator[CliStreamEvent]:
+        """The Strands events for one thing the CLI sent."""
 
     async def stream(
         self,
@@ -366,13 +396,12 @@ class CliModel(Model, abc.ABC):
                 session = Session(tools)
                 session.folder.mkdir(parents=True, exist_ok=True)
                 conversation = state.get("conversation")
-                argv, cwd = self.argv(session, conversation if isinstance(conversation, str) else None, system_prompt)
-                await session.start(argv, cwd)
-                await self.begin(session, conversation if isinstance(conversation, str) else None)
+                await self.open(session, conversation if isinstance(conversation, str) else None, system_prompt)
                 key = session.token
                 self.sessions[key] = session
                 state["process"] = key
-            await session.send(self.user_line(session, last, None if "conversation" in state else system_prompt))
+            await self.send(session, last, None if "conversation" in state else system_prompt)
+            session.busy = True
             state.setdefault("conversation", session.id)
         yield {"messageStart": {"role": "assistant"}}
         turn = Turn()
@@ -443,54 +472,52 @@ class Turn:
 
 
 class ClaudeCodeModel(CliModel):
-    """Claude Code (`claude -p`), signed in with the owner's Claude account (`CLAUDE_CODE_OAUTH_TOKEN`).
+    """Claude Code through the Claude Agent SDK (`claude-agent-sdk`, which ships Claude Code 2.1.330), signed in with
+    the owner's Claude account (`CLAUDE_CODE_OAUTH_TOKEN`).
 
-    The flags are the ones claude-agent-sdk 0.2.187 passes to the CLI it bundles (2.1.330): stream-json both ways with
-    `--verbose`, `--include-partial-messages` for the deltas, and `--thinking adaptive --thinking-display summarized`,
-    since Claude's thinking arrives as a signature only unless a display is asked for. The agent's instructions follow
-    Claude Code's own system prompt (`--append-system-prompt-file`). Its tools are its own default set plus the agent's,
-    as the MCP server `ren` (`--strict-mcp-config`: no other).
+    Its own tools and the agent's, as the SDK's in-process MCP server `ren` and no other (`strict_mcp_config`); the
+    agent's instructions after Claude Code's own system prompt (the `claude_code` preset's `append`); partial messages
+    for the deltas, and summarized adaptive thinking, since Claude's thinking arrives as a signature only unless a
+    display is asked for.
     """
 
     bridge_prefix = "mcp__ren__"
 
-    def argv(self, session: Session, conversation: str | None, instructions: str | None) -> tuple[list[str], str]:
-        mcp = {"mcpServers": {"ren": {"type": "stdio", **session.mcp_server()}}}
-        prompt = session.folder / "instructions.md"
-        prompt.write_text(instructions or "")
-        argv = [
-            "claude", "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "--include-partial-messages",
-            "--permission-mode", "bypassPermissions", "--thinking", "adaptive", "--thinking-display", "summarized",
-            "--mcp-config", json.dumps(mcp), "--strict-mcp-config",
-            "--append-system-prompt-file", str(prompt),
-            *(["--resume", conversation] if conversation else ["--session-id", session.id]),
-        ]
-        if self.config["model_id"] != DEFAULT_MODEL:
-            argv += ["--model", self.config["model_id"]]
-        if self.config["effort"]:
-            argv += ["--effort", self.config["effort"]]
-        return argv, WORKSPACE
+    async def open(self, session: Session, conversation: str | None, instructions: str | None) -> None:
+        tools = [SdkMcpTool(name=spec["name"], description=spec["description"], input_schema=spec["inputSchema"]["json"], handler=handler(session, spec["name"])) for spec in session.tools]
+        session.client = ClaudeSDKClient(ClaudeAgentOptions(
+            mcp_servers={"ren": create_sdk_mcp_server("ren", tools=tools)}, strict_mcp_config=True,
+            system_prompt={"type": "preset", "preset": "claude_code", "append": instructions or ""},
+            permission_mode="bypassPermissions", include_partial_messages=True, thinking={"type": "adaptive", "display": "summarized"},
+            resume=conversation, session_id=None if conversation else session.id, cwd=WORKSPACE,
+            model=None if self.config["model_id"] == DEFAULT_MODEL else self.config["model_id"],
+            effort=next((level for level in CLAUDE_EFFORTS if level == self.config["effort"]), None),
+        ))
+        await session.client.connect()
+        session.pump(session.client.receive_messages())
 
-    def user_line(self, session: Session, blocks: list[ContentBlock], instructions: str | None) -> dict[str, Json]:
-        # The instructions are the system prompt's (`--append-system-prompt-file`).
+    async def send(self, session: Session, blocks: list[ContentBlock], instructions: str | None) -> None:
         content: list[Json] = []
         for block in blocks:
             if "text" in block:
                 content.append({"type": "text", "text": block["text"]})
             elif "image" in block and "bytes" in block["image"]["source"]:
                 content.append({"type": "image", "source": {"type": "base64", "media_type": f"image/{block['image']['format']}", "data": encoded(block)}})
-        return {"type": "user", "message": {"role": "user", "content": content}, "parent_tool_use_id": None, "session_id": ""}
 
-    def translate(self, line: Json, session: Session, state: dict[str, object], turn: Turn) -> Iterator[CliStreamEvent]:
-        kind = text_at(line, "type")
-        if kind == "stream_event" and at(line, "parent_tool_use_id") is None:
-            event = at(line, "event")
-            index = int_at(event, "index")
-            match text_at(event, "type"):
-                case "content_block_start" if text_at(event, "content_block", "type") in ("text", "thinking"):
-                    yield turn.open(index, text_at(event, "content_block", "type"))
+        async def turn() -> AsyncIterator[dict[str, Json]]:
+            yield {"type": "user", "message": {"role": "user", "content": content}, "parent_tool_use_id": None}
+
+        assert session.client is not None
+        await session.client.query(turn())
+
+    def translate(self, item: Json | Message, session: Session, state: dict[str, object], turn: Turn) -> Iterator[CliStreamEvent]:
+        if isinstance(item, ClaudeStreamEvent) and item.parent_tool_use_id is None:
+            index = int_at(item.event, "index")
+            match text_at(item.event, "type"):
+                case "content_block_start" if text_at(item.event, "content_block", "type") in ("text", "thinking"):
+                    yield turn.open(index, text_at(item.event, "content_block", "type"))
                 case "content_block_delta" if index in turn.blocks:
-                    delta = at(event, "delta")
+                    delta = at(item.event, "delta")
                     match text_at(delta, "type"):
                         case "text_delta":
                             yield {"contentBlockDelta": {"delta": {"text": text_at(delta, "text")}}}
@@ -500,26 +527,36 @@ class ClaudeCodeModel(CliModel):
                             yield {"contentBlockDelta": {"delta": {"reasoningContent": {"signature": text_at(delta, "signature")}}}}
                 case "content_block_stop" if turn.blocks.pop(index, ""):
                     yield {"contentBlockStop": {}}
-        elif kind == "assistant":
-            for block in items_at(line, "message", "content"):
-                name = text_at(block, "name")
-                if text_at(block, "type") == "tool_use" and not name.startswith(self.bridge_prefix):
-                    session.native[text_at(block, "id")] = name
-                    yield {"nativeTool": {"id": text_at(block, "id"), "name": name, "input": json.dumps(at(block, "input")), "status": "running"}}
-        elif kind == "user":
-            for block in items_at(line, "message", "content"):
-                if text_at(block, "type") == "tool_result" and (name := session.native.pop(text_at(block, "tool_use_id"), "")):
-                    status: Literal["success", "error"] = "error" if at(block, "is_error") is True else "success"
-                    yield {"nativeTool": {"id": text_at(block, "tool_use_id"), "name": name, "output": flat(at(block, "content")), "status": status}}
-        elif kind == "result":
+        elif isinstance(item, AssistantMessage):
+            for block in item.content:
+                if isinstance(block, ToolUseBlock) and not block.name.startswith(self.bridge_prefix):
+                    session.native[block.id] = block.name
+                    yield {"nativeTool": {"id": block.id, "name": block.name, "input": json.dumps(block.input), "status": "running"}}
+        elif isinstance(item, UserMessage) and isinstance(item.content, list):
+            for result in item.content:
+                if isinstance(result, ToolResultBlock) and (name := session.native.pop(result.tool_use_id, "")):
+                    yield {"nativeTool": {"id": result.tool_use_id, "name": name, "output": flat(result.content), "status": "error" if result.is_error else "success"}}
+        elif isinstance(item, ResultMessage):
             turn.done = True
-            if text_at(line, "subtype") != "success" or at(line, "is_error") is True:
-                raise RuntimeError(text_at(line, "result") or text_at(line, "subtype"))
+            if item.is_error:
+                raise RuntimeError(item.result or item.subtype)
             yield from turn.close()
-            read, written = int_at(line, "usage", "cache_read_input_tokens"), int_at(line, "usage", "cache_creation_input_tokens")
-            used_in, used_out = int_at(line, "usage", "input_tokens") + read + written, int_at(line, "usage", "output_tokens")
-            yield {"metadata": {"usage": {"inputTokens": used_in, "outputTokens": used_out, "totalTokens": used_in + used_out, "cacheReadInputTokens": read, "cacheWriteInputTokens": written}, "metrics": {"latencyMs": int_at(line, "duration_ms")}}}
+            usage = item.usage or {}
+            read, written = int_at(usage, "cache_read_input_tokens"), int_at(usage, "cache_creation_input_tokens")
+            used_in, used_out = int_at(usage, "input_tokens") + read + written, int_at(usage, "output_tokens")
+            yield {"metadata": {"usage": {"inputTokens": used_in, "outputTokens": used_out, "totalTokens": used_in + used_out, "cacheReadInputTokens": read, "cacheWriteInputTokens": written}, "metrics": {"latencyMs": item.duration_ms}}}
             yield {"messageStop": {"stopReason": "end_turn"}}
+
+
+def handler(session: Session, name: str) -> Callable[[dict[str, Json]], Awaitable[dict[str, Json]]]:
+    """The SDK tool handler for one of the agent's tools: the call goes to Strands through the session."""
+
+    async def run(arguments: dict[str, Json]) -> dict[str, Json]:
+        result = await session.call(name, arguments)
+        content: list[Json] = [{"type": "text", "text": block.text} if block.type == "text" else {"type": "image", "data": block.data, "mimeType": block.mime_type} for block in result.content]
+        return {"content": content, "is_error": result.is_error}
+
+    return run
 
 
 class AntigravityModel(CliModel):
@@ -539,13 +576,11 @@ class AntigravityModel(CliModel):
 
     bridge_prefix = "mcp_ren_"
 
-    def argv(self, session: Session, conversation: str | None, instructions: str | None) -> tuple[list[str], str]:
+    async def open(self, session: Session, conversation: str | None, instructions: str | None) -> None:
         config = {"mcpServers": {"ren": {**session.mcp_server(), "timeoutSeconds": -1, "tools": {name: {"eager": True} for name in session.tool_names}}}}
         (session.folder / ".agents").mkdir(parents=True, exist_ok=True)
         (session.folder / ".agents" / "mcp_config.json").write_text(json.dumps(config))
-        return ["agy", "acp", "--dangerously-skip-permissions", "--add-dir", WORKSPACE], str(session.folder)
-
-    async def begin(self, session: Session, conversation: str | None) -> None:
+        await session.start(["agy", "acp", "--dangerously-skip-permissions", "--add-dir", WORKSPACE], str(session.folder))
         opened = await acp_session(session, conversation)
         model = None if self.config["model_id"] == DEFAULT_MODEL else self.config["model_id"]
         for category, wanted in (("model", model), ("thought_level", self.config["effort"])):
@@ -556,16 +591,18 @@ class AntigravityModel(CliModel):
                     raise ValueError(f"Antigravity offers no {category} {wanted!r}: {', '.join(values)}")
                 await acp_request(session, "session/set_config_option", {"sessionId": session.id, "configId": text_at(option, "id"), "value": value})
 
-    def user_line(self, session: Session, blocks: list[ContentBlock], instructions: str | None) -> dict[str, Json]:
+    async def send(self, session: Session, blocks: list[ContentBlock], instructions: str | None) -> None:
         prompt: list[Json] = [{"type": "text", "text": instructions}] if instructions else []
         for block in blocks:
             if "text" in block:
                 prompt.append({"type": "text", "text": block["text"]})
             elif "image" in block and "bytes" in block["image"]["source"]:
                 prompt.append({"type": "image", "mimeType": f"image/{block['image']['format']}", "data": encoded(block)})
-        return {"jsonrpc": "2.0", "id": next(session.ids), "method": "session/prompt", "params": {"sessionId": session.id, "prompt": prompt}}
+        await session.send({"jsonrpc": "2.0", "id": next(session.ids), "method": "session/prompt", "params": {"sessionId": session.id, "prompt": prompt}})
 
-    def translate(self, line: Json, session: Session, state: dict[str, object], turn: Turn) -> Iterator[CliStreamEvent]:
+    def translate(self, line: Json | Message, session: Session, state: dict[str, object], turn: Turn) -> Iterator[CliStreamEvent]:
+        if not isinstance(line, (dict, list, str, int, float, bool)) and line is not None:
+            return
         if at(line, "method") is None:
             # The answer to `session/prompt`, the only request open during a turn: the turn has ended.
             turn.done = True
@@ -613,7 +650,7 @@ async def acp_request(session: Session, method: str, params: dict[str, Json]) ->
         item = await session.inbox.get()
         if isinstance(item, Exited):
             raise RuntimeError(f"agy acp exited with code {item.code}: {item.stderr.strip()}")
-        if not isinstance(item, Call) and at(item, "id") == number and at(item, "method") is None:
+        if isinstance(item, (dict, list)) and at(item, "id") == number and at(item, "method") is None:
             if (error := at(item, "error")) is not None:
                 raise RuntimeError(f"agy acp {method}: {text_at(error, 'message') or flat(error)}")
             return at(item, "result")
