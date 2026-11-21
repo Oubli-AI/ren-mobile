@@ -22,7 +22,7 @@ ENV PYTHONPATH=/opt/ren SESSION_STORAGE_DIR=/config/emrys-gemini/ren
 RUN curl -fsSL -o /tmp/agy.tgz https://github.com/google-antigravity/antigravity-cli/releases/download/1.5.13/agy_cli_linux_x64.tar.gz \
     && echo "7fa9cc6df0d09562693d637c406a86c1b0f52ab3364714b1fd2d79cc6060d4b2  /tmp/agy.tgz" | sha256sum -c - \
     && tar -xzf /tmp/agy.tgz -C /usr/local/bin antigravity && mv /usr/local/bin/antigravity /usr/local/bin/agy && rm /tmp/agy.tgz
-COPY app.py providers.py studio.py cli_models.py cli_bridge.py mistral_model.py media_capabilities.py context_windows.py /opt/gemini/
+COPY app.py providers.py studio.py cli_models.py cli_auth.py cli_bridge.py mistral_model.py media_capabilities.py context_windows.py /opt/gemini/
 USER 1000:1000
 WORKDIR /config/workspace
 EXPOSE 8100

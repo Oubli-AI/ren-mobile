@@ -693,6 +693,10 @@ async def cli_models(name: CliName) -> list[dict[str, str]]:
     try:
         await session.start(["agy", "acp"], str(session.folder))
         option = config_option(await acp_session(session, None), "model")
+    except RuntimeError as error:
+        if "authentication required" in str(error).lower() or "-32000" in str(error):
+            return [{"id": DEFAULT_MODEL, "owned_by": "google", "provider": name}]
+        raise
     finally:
         await session.close()
     return [{"id": model_id, "owned_by": "google", "provider": name} for model_id in [DEFAULT_MODEL, *(text_at(choice, "value") for choice in choices(option))]]

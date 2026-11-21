@@ -163,11 +163,27 @@ public class RenRuntime(private val app: Context) {
         contextWidget.account.value.let { if (it.signedIn) it.userId else "" }.ifEmpty { settings.userId }
     }
 
+    /** Browser-driven sign-in for the CLI text providers (Claude Code and Antigravity) on the workspace server. */
+    public val cliAuth: CliAuth = CliAuth(http, { settings.geminiToken }, scope)
+
+    private val _settingsOpen = MutableSharedFlow<Boolean>(extraBufferCapacity = 4)
+
+    /** Asks the activity to close Settings (`false`) while signing in on a browser tab, then reopen it (`true`). */
+    public val settingsOpen: SharedFlow<Boolean> = _settingsOpen.asSharedFlow()
+
     /** The apps OpenCode built for the ren account, on Home. */
     public val applications: Applications = Applications(app, http) { settings.geminiToken }
 
     init {
         scope.launch(Dispatchers.IO) { publicSuffixList.prefetch().await() }
+        cliAuth.openAuthTab = { url, callbackPrefix, onCallback ->
+            val _ = browser.openAuthTab(url, callbackPrefix, onCallback)
+            val _ = _settingsOpen.tryEmit(false)
+        }
+        cliAuth.returnToSettings = {
+            val _ = _settingsOpen.tryEmit(true)
+        }
+        cliAuth.clearAuthCapture = browser::clearAuthCapture
         browser.visited = contextWidget::visit
         browser.accountReported = contextWidget::accountChanged
         browser.installApplication = { id ->

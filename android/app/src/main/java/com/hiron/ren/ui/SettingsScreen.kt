@@ -48,10 +48,12 @@ import androidx.compose.material.icons.outlined.RecordVoiceOver
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.TouchApp
 import androidx.compose.material.icons.outlined.WarningAmber
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -89,6 +91,7 @@ import com.hiron.ren.browser.BrowserDns
 import com.hiron.ren.browser.DnsMode
 import com.hiron.ren.browser.SearchEngine
 import com.hiron.ren.browser.SearchLevel
+import com.hiron.ren.core.CliAuthState
 import com.hiron.ren.core.PermAction
 import com.hiron.ren.core.PermissionGroups
 import com.hiron.ren.core.RenRuntime
@@ -350,6 +353,10 @@ private fun Agents(runtime: RenRuntime, refresh: Int) {
     val s = runtime.settings
     var provider by remember(refresh) { mutableStateOf(s.provider) }
     var voiceModel by remember(refresh) { mutableStateOf(s.voiceModel) }
+    val authState by runtime.cliAuth.state.collectAsStateWithLifecycle()
+    LaunchedEffect(provider, refresh) {
+        if (provider.cliAuth) runtime.cliAuth.refresh(provider)
+    }
     RenCard(padding = PaddingValues(0.dp)) {
         Column(Modifier.padding(horizontal = RowInset, vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -359,7 +366,8 @@ private fun Agents(runtime: RenRuntime, refresh: Int) {
                     runtime.choose(it)
                 }
             }
-            if (provider.strands != null) TextModelSetting(runtime, provider, refresh)
+            if (provider.cliAuth) CliProviderAuth(runtime, provider, authState)
+            if (provider.strands != null) TextModelSetting(runtime, provider, refresh + authState.revision)
             ResearchDepthSetting(runtime, refresh)
         }
         RowRule()
@@ -371,6 +379,111 @@ private fun Agents(runtime: RenRuntime, refresh: Int) {
     if (provider.strands != null) {
         InfoStrip("${provider.label} runs Ren's text agent in Strands, talks on Gemini 3.8 Live, and reaches the phone's tools through Remote tools, below.")
     }
+}
+
+/**
+ * One-tap browser sign-in for Claude Code and Antigravity CLI, shown immediately whenever either is chosen as the
+ * model provider. Opening the OAuth page in Ren's tab captures the redirect automatically with no copy-paste.
+ */
+@Composable
+private fun CliProviderAuth(runtime: RenRuntime, provider: Provider, auth: CliAuthState) {
+    val p = LocalPalette.current
+    val status = auth.statuses[provider]
+    val checking = provider in auth.checking
+    val starting = auth.starting == provider
+    val completing = auth.completing == provider
+    val pending = auth.pending?.takeIf { it.provider == provider }
+    var pasting by remember(provider) { mutableStateOf(false) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        val accountKind = if (provider == Provider.ClaudeCode) "Claude" else "Google"
+        val dotColor = when {
+            status?.signedIn == true -> p.ok
+            completing || starting -> p.accent
+            else -> p.amb
+        }
+        val headline = when {
+            completing -> "Finishing ${provider.label} sign-in…"
+            starting -> "Opening ${provider.label} sign-in…"
+            pending != null -> "Finish signing in to ${provider.label}"
+            status?.signedIn == true -> {
+                if (status.account.isNotBlank()) "Signed in · ${status.account}" else "Signed in"
+            }
+            checking -> "Checking ${provider.label} sign-in…"
+            else -> "Sign in with your $accountKind account"
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            SignalDot(dotColor, live = starting || completing)
+            Text(headline, style = Type.cardBody, color = p.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        when {
+            completing || starting -> Unit
+            pending != null -> {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Keycap("Continue sign-in", runtime.cliAuth::resumeInBrowser, tone = KeyTone.Accent)
+                    Keycap("Use Chrome", { runtime.browser.signInPage(pending.url, incognito = false) })
+                    Keycap("Paste code", { pasting = true })
+                    Keycap("Cancel", runtime.cliAuth::cancel)
+                }
+            }
+            status?.signedIn == true -> {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (status.method == "oauth_token") {
+                        Keycap("Sign in with account", { runtime.cliAuth.signIn(provider) })
+                    } else {
+                        Keycap("Sign out", { runtime.cliAuth.signOut(provider) }, enabled = !checking)
+                    }
+                }
+            }
+            else -> {
+                Keycap(
+                    "Sign in to ${provider.label}",
+                    { runtime.cliAuth.signIn(provider) },
+                    Modifier.fillMaxWidth(),
+                    tone = KeyTone.Accent,
+                )
+            }
+        }
+        auth.error?.let { InfoStrip(it, icon = Icons.Outlined.WarningAmber, tone = Tone.Red) }
+    }
+    if (pasting && pending != null) {
+        CliAuthCodeDialog(provider, onDismiss = { pasting = false }) { value ->
+            pasting = false
+            runtime.cliAuth.complete(value)
+        }
+    }
+}
+
+/** Fallback dialog for pasting a callback URL or authorization code if sign-in was completed in another browser. */
+@Composable
+private fun CliAuthCodeDialog(provider: Provider, onDismiss: () -> Unit, onSubmit: (String) -> Unit) {
+    val p = LocalPalette.current
+    var value by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = p.card,
+        title = { Text("Finish ${provider.label} sign-in", style = Type.headline, color = p.ink) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    "Paste the code or the full callback URL from the sign-in page.",
+                    style = Type.cardBody,
+                    color = p.ink2,
+                )
+                RecessedField(value, { value = it }, label = "Code or callback URL")
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { if (value.isNotBlank()) onSubmit(value.trim()) }) {
+                Text("Complete", style = Type.button, color = p.accent)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", style = Type.button, color = p.ink2)
+            }
+        },
+    )
 }
 
 /** How hard Ren's searches work, the level Home's chips set too: the address bar's and the agents' browser searches. */
