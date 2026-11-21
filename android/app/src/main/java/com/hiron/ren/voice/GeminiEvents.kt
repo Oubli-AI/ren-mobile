@@ -138,7 +138,7 @@ public object GeminiEvents {
     private fun native(state: RenState, tool: JSONObject): RenState {
         val id = tool.optString("id").ifEmpty { return state }
         val status = tool.optString("status")
-        if (status != "running") return finished(state, id, status == "error", tool.optString("output"))
+        if (status != "running") return finished(state, id, status == "error", tool.optString("output"), tool.optString("input"))
         val name = tool.optString("name").ifEmpty { return state }
         return RenStore.turn(state.copy(activity = Activity.Working)) { m ->
             if (m.parts.any { it is ToolStep && it.id == id }) m
@@ -146,9 +146,13 @@ public object GeminiEvents {
         }
     }
 
-    private fun finished(state: RenState, id: String, failed: Boolean, output: String): RenState = RenStore.turn(state) { m ->
+    /** A tool step's end; [input] replaces the step's when given (an ACP tool call may fill its input after it starts). */
+    private fun finished(state: RenState, id: String, failed: Boolean, output: String, input: String = ""): RenState = RenStore.turn(state) { m ->
         val at = m.parts.indexOfFirst { it is ToolStep && it.id == id }
-        if (at < 0) m else m.copy(parts = m.parts.replaced(at, (m.parts[at] as ToolStep).copy(state = if (failed) ToolState.Failed else ToolState.Done, output = output)))
+        if (at < 0) m else {
+            val step = m.parts[at] as ToolStep
+            m.copy(parts = m.parts.replaced(at, step.copy(state = if (failed) ToolState.Failed else ToolState.Done, output = output, input = input.ifEmpty { step.input })))
+        }
     }
 
     /** The turn is over; what `handoff_to_user` says to the user is Ren's reply. */

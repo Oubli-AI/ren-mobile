@@ -214,8 +214,8 @@ What the overhaul added, on the branch `claude/project-thread-tnj6xo` (PR #14) a
 - **Claude Code and Antigravity CLI, the main text agents** (2026-11-21, owner: their CLIs on the server, signed in
   with his accounts, all native tools kept, each a Strands model passed to `create_harness`, reasoning, tools and output
   streamed whole to the panel): Settings › Agents › Claude Code (the default) and Antigravity. `deploy/vm/gemini/cli_models.py`
-  is a custom model provider per CLI, driving it in its headless stream-json mode (`claude -p`, `agy -p`), one process
-  per conversation and per subagent. The CLI keeps its own conversation, so the model is stateful
+  is a custom model provider per CLI, driving Claude Code in its headless stream-json mode (`claude -p`) and Antigravity
+  as an Agent Client Protocol server (`agy acp`), one process per conversation and per subagent. The CLI keeps its own conversation, so the model is stateful
   (`capabilities.stateful`; Strands sends only the new turn and keeps the CLI's session id in `model_state`, saved with
   the session); `create_harness` gets `context_manager=None`, which a stateful model requires. The CLI's native tools
   (Claude Code's Bash, Read, Edit, WebSearch, Agent and the rest; Antigravity's run_command and the rest) run inside the
@@ -226,14 +226,22 @@ What the overhaul added, on the branch `claude/project-thread-tnj6xo` (PR #14) a
   runs with `--permission-mode bypassPermissions`, summarized thinking and the agent's instructions after its own system
   prompt (`--append-system-prompt-file`); models are its aliases, efforts low to ultracode; it signs in with
   `CLAUDE_CODE_OAUTH_TOKEN` (`claude setup-token`) in `gemini.env`. Antigravity 1.5.13 (the release's `antigravity`
-  binary as `agy`) runs in its own folder per process with `.agents/mcp_config.json` (every `ren` tool eager,
-  `timeoutSeconds: -1`), `--add-dir /config/workspace` and `--dangerously-skip-permissions` (headless soft-denies what
-  needs approval); it has no system prompt flag, so a new conversation's first message starts with the instructions; its
-  models are `agy models` (the slug carries the effort) and it streams no thinking text. It signs in with the owner's
+  binary as `agy`) runs as `agy acp` (ACP v1 over stdio), because its headless `-p` stream-json carries the model's
+  thinking only as `thinking_tokens` (its headless docs; the verbosity setting, `high` showing "every tool call,
+  command, and thought in full", is the terminal view's), while ACP streams the thinking as `agent_thought_chunk`, which
+  the panel shows as the chain of thought, each tool call with its `rawInput` and `rawOutput`, and takes images in a
+  prompt. Each process's session opens in its own folder with `.agents/mcp_config.json` (every `ren` tool eager,
+  `timeoutSeconds: -1`), with `--add-dir /config/workspace` and `--dangerously-skip-permissions` ("Auto-approve all
+  tool permission requests"); a later process resumes the conversation (`session/resume`). It has no system prompt
+  flag, so a new conversation's first message starts with the instructions. The model picker lists the values of the
+  model option ACP gives a new session, and the effort (low to max, its `--effort` levels) sets the session's
+  `thought_level` option. It signs in with the owner's
   Google account (owner's choice, 2026-11-21, after Google's FAQ: wrapping `agy` "is not supported under consumer
   plans"), kept under `/config/.gemini`. Every step in the panel now opens to the tool's whole input and output, for
   every Strands provider. Checked offline (2026-11-21): mypy, and both models through `create_harness` against stand-in
-  CLIs speaking each one's documented stream-json, with a Strands tool called through the bridge. Not run live.
+  CLIs speaking Claude Code's documented stream-json and ACP, with a Strands tool called through the bridge, thinking
+  streamed as reasoning, and a conversation resumed in a new process. Not run live: ACP's config option ids and values
+  are read from the session, since Antigravity's docs name only the pickers (Model; Thinking level Low to Max).
 - **Connections** (2026-11-21, owner: Vercel, Netlify, GitHub, GitLab, Supabase and Bitbucket for every agent, with
   sign-in; `core/Connections.kt`, `ui/ConnectionsSettings.kt`, ren's `core/connections.py`): Settings › Connections
   lists the six. Each is the provider's official hosted MCP server: Vercel `https://mcp.vercel.com` (OAuth; Ren

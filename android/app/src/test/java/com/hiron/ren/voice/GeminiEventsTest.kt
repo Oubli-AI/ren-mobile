@@ -136,4 +136,14 @@ class GeminiEventsTest {
         assertEquals("No such file", read.output)
         assertEquals("Two files.", (reply as Reply).text)
     }
+
+    @Test
+    fun aToolsInputThatComesAfterItStartsShowsWhenItEnds() {
+        val state = replay(
+            """{"native_tool": {"id": "t1", "name": "run_command", "input": "", "status": "running"}}""",
+            """{"native_tool": {"id": "t1", "name": "run_command", "input": "{\"CommandLine\": \"echo hi\"}", "output": "hi", "status": "success"}}""",
+            """{"stop_reason": "end_turn", "interrupts": []}""",
+        )
+        assertEquals(ToolStep("t1", "run_command", "native", ToolState.Done, input = "{\"CommandLine\": \"echo hi\"}", output = "hi"), state.messages.single().parts.single())
+    }
 }

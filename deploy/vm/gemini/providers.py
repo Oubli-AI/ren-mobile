@@ -36,7 +36,7 @@ from typing import Literal
 
 from strands.models import Model
 
-from cli_models import CLAUDE_EFFORTS, DEFAULT_MODEL
+from cli_models import ANTIGRAVITY_EFFORTS, CLAUDE_EFFORTS, DEFAULT_MODEL
 
 ProviderName = Literal["nim", "mistral", "gemini", "telnyx", "xai", "claude-code", "antigravity"]
 PROVIDERS: tuple[ProviderName, ...] = ("nim", "mistral", "gemini", "telnyx", "xai", "claude-code", "antigravity")
@@ -268,11 +268,12 @@ def reasoning_efforts(provider: ProviderName, model_id: str) -> tuple[str, ...]:
     support all values; unsupported values are rejected with a 400 error", ``ChatCompletionRequest``), so its models
     offer Auto only: the model's own default effort.
     """
-    if provider in ("telnyx", "antigravity"):
-        # Antigravity's model slugs carry their effort (`gemini-3.8-flash-medium`, `agy models`).
+    if provider == "telnyx":
         return ()
     if provider == "claude-code":
         return CLAUDE_EFFORTS
+    if provider == "antigravity":
+        return ANTIGRAVITY_EFFORTS
     if provider == "nim":
         return NIM_REASONING_EFFORTS_BY_MODEL.get(model_id, ())
     if provider == "xai":
