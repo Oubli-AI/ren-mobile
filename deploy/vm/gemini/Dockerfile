@@ -8,7 +8,7 @@ RUN UV_PYTHON_INSTALL_DIR=/opt/python uv venv /opt/gemini --python 3.12 \
 # (agent/api/core/web_tools.py, brave_tools.py, xai_model.py, dreaming.py and what they import), with the one package of
 # ren's that the image lacks and huggingface_hub (ren's pin) for its bucket storage; strands-agents-tools above vends the
 # Tavily, Exa and Bright Data tools web_tools() gives.
-ARG REN_COMMIT=8aac18d3215c42bc193672e97fa707db9d6937d0
+ARG REN_COMMIT=760df191d1ffe9eaae7f65d6dd18ce972be124ac
 RUN git clone --filter=blob:none --no-checkout https://github.com/Oubli-AI/ren.git /opt/ren \
     && git -C /opt/ren sparse-checkout set agent \
     && git -C /opt/ren checkout --detach "$REN_COMMIT" \
