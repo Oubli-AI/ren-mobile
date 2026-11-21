@@ -422,6 +422,10 @@ class CliModel(Model, abc.ABC):
                 yield event
             if turn.done:
                 session.busy = False
+                if not tool_specs:
+                    # A call with no tools is the harness's web_fetch summarizer, a one-turn Agent on this model that
+                    # never comes back to its process.
+                    await self.sessions.pop(session.token).close()
                 return
 
     def exited(self, item: Exited) -> RuntimeError:
