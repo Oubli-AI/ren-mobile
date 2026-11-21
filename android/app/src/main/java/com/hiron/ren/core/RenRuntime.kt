@@ -258,7 +258,7 @@ public class RenRuntime(private val app: Context) {
     public val images: ImageLoader = ImageLoader(http)
 
     private val elevenLabs = RenAgent(app, settings, ::runTool, ::approve, ::update, { _robot.tryEmit(it) }, scope, braveSearch)
-    /** Gemini, NVIDIA NIM, Mistral and Telnyx in Strands on the workspace VM. */
+    /** Claude Code, Antigravity, Gemini, NVIDIA NIM, Mistral, Telnyx and xAI in Strands on the workspace VM. */
     public val strands: StrandsAgent = StrandsAgent(app, settings, http, ::update, { _robot.tryEmit(it) }, scope) {
         contextWidget.account.value.let { if (it.signedIn) it.userId else "" }
     }
@@ -267,7 +267,7 @@ public class RenRuntime(private val app: Context) {
     public val agent: Assistant
         get() = when (settings.provider) {
             Provider.ElevenLabs -> elevenLabs
-            Provider.Gemini, Provider.Nim, Provider.Mistral, Provider.Telnyx, Provider.Xai -> strands
+            Provider.ClaudeCode, Provider.Antigravity, Provider.Gemini, Provider.Nim, Provider.Mistral, Provider.Telnyx, Provider.Xai -> strands
         }
 
     /** Switches provider; the conversation ends, and the next one starts with [provider]. */

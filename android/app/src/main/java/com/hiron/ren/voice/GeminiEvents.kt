@@ -18,7 +18,8 @@ import java.util.UUID
  * arrive. Text: the model's reasoning as it streams (`reasoning`), the reply as it streams (`data`), each finished message (`message`, a Strands `Message`: the reply's
  * text and tool uses, then the tool results), and how the turn ended (`stop_reason`, with the `handoff_to_user`
  * messages as `interrupts`). Voice: Strands' bidi events, whose transcripts are what the user and Ren said, plus
- * the same tool result `message`. It makes the same chat changes as [ChatEvents].
+ * the same tool result `message`. A CLI agent's own tool calls (`native_tool`: Claude Code's or Antigravity's) are steps
+ * too. Every step keeps the tool's whole input and output. It makes the same chat changes as [ChatEvents].
  */
 public object GeminiEvents {
     /** The tools that run on the phone, which the chat shows as the phone's own. */
@@ -36,6 +37,7 @@ public object GeminiEvents {
         event.has("reasoning") -> thought(state, event.optString("reasoning"), now)
         event.has("data") -> streamed(settled(state, now), event.optString("data"))
         event.has("message") -> message(settled(state, now), event.optJSONObject("message") ?: return state)
+        event.has("native_tool") -> native(settled(state, now), event.optJSONObject("native_tool") ?: return state)
         event.has("stop_reason") -> ended(settled(state, now), event.optJSONArray("interrupts"))
         event.has("error") -> state.copy(lastError = TURN_FAILED + event.optString("error"), activity = Activity.Failed)
         else -> state
@@ -119,16 +121,37 @@ public object GeminiEvents {
         val activity = if (name in SearchTools.NAMES) Activity.Searching else Activity.Working
         return RenStore.turn(state.copy(activity = activity)) { m ->
             if (m.parts.any { it is ToolStep && it.id == id }) m
-            else m.copy(parts = m.parts + ToolStep(id, name, if (name in PHONE) "client" else "strands", ToolState.Running))
+            else m.copy(parts = m.parts + ToolStep(id, name, if (name in PHONE) "client" else "strands", ToolState.Running, input = use.opt("input")?.toString()))
         }
     }
 
     private fun result(state: RenState, result: JSONObject): RenState {
         val id = result.optString("toolUseId").ifEmpty { return state }
-        val failed = result.optString("status") == "error"
-        return RenStore.turn(state) { m ->
-            val at = m.parts.indexOfFirst { it is ToolStep && it.id == id }
-            if (at < 0) m else m.copy(parts = m.parts.replaced(at, (m.parts[at] as ToolStep).copy(state = if (failed) ToolState.Failed else ToolState.Done)))
+        val content = result.optJSONArray("content") ?: JSONArray()
+        val output = (0 until content.length()).mapNotNull(content::optJSONObject).joinToString("\n") { block ->
+            if (block.has("text")) block.optString("text") else block.opt("json")?.toString() ?: block.keys().asSequence().joinToString { "[$it]" }
+        }
+        return finished(state, id, result.optString("status") == "error", output)
+    }
+
+    /** A CLI agent's own tool: a step when it starts (with its input), done or failed when it ends (with its output). */
+    private fun native(state: RenState, tool: JSONObject): RenState {
+        val id = tool.optString("id").ifEmpty { return state }
+        val status = tool.optString("status")
+        if (status != "running") return finished(state, id, status == "error", tool.optString("output"), tool.optString("input"))
+        val name = tool.optString("name").ifEmpty { return state }
+        return RenStore.turn(state.copy(activity = Activity.Working)) { m ->
+            if (m.parts.any { it is ToolStep && it.id == id }) m
+            else m.copy(parts = m.parts + ToolStep(id, name, "native", ToolState.Running, input = tool.optString("input")))
+        }
+    }
+
+    /** A tool step's end; [input] replaces the step's when given (an ACP tool call may fill its input after it starts). */
+    private fun finished(state: RenState, id: String, failed: Boolean, output: String, input: String = ""): RenState = RenStore.turn(state) { m ->
+        val at = m.parts.indexOfFirst { it is ToolStep && it.id == id }
+        if (at < 0) m else {
+            val step = m.parts[at] as ToolStep
+            m.copy(parts = m.parts.replaced(at, step.copy(state = if (failed) ToolState.Failed else ToolState.Done, output = output, input = input.ifEmpty { step.input })))
         }
     }
 

@@ -124,6 +124,8 @@ public object ChatPage {
             .put("kind", kind?.wire ?: "tool")
             .put("label", label(step, kind))
             .put("detail", detail ?: JSONObject.NULL)
+            .put("input", step.input ?: JSONObject.NULL)
+            .put("output", step.output ?: JSONObject.NULL)
             .put(
                 "state",
                 when (step.state) {

@@ -24,10 +24,13 @@ public interface Assistant {
 
 /**
  * Who runs Ren's agents; the screens, tools and approvals are the same either way. Every provider but ElevenLabs is a
- * text model under the Strands agents on the workspace VM ([StrandsAgent]), named there by [strands].
+ * text model under the Strands agents on the workspace VM ([StrandsAgent]), named there by [strands]; Claude Code and
+ * Antigravity are their CLIs on that server, with their own tools.
  */
 public enum class Provider(public val label: String, public val strands: String?) {
     ElevenLabs("ElevenLabs", null),
+    ClaudeCode("Claude Code", "claude-code"),
+    Antigravity("Antigravity", "antigravity"),
     Gemini("Gemini", "gemini"),
     Nim("NVIDIA NIM", "nim"),
     Mistral("Mistral", "mistral"),

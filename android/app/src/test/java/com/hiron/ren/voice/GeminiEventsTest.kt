@@ -34,6 +34,8 @@ class GeminiEventsTest {
         assertEquals("device_status", step.name)
         assertEquals("client", step.type)
         assertEquals(ToolState.Done, step.state)
+        assertEquals("{}", step.input)
+        assertEquals("{}", step.output)
         assertEquals("It's at 80%.", (last as Reply).text)
         assertEquals("Checking your battery.\n\nIt's at 80%.", turn.text)
         assertEquals(Activity.Done, state.activity)
@@ -115,5 +117,33 @@ class GeminiEventsTest {
         assertEquals(ToolState.Done, (step as ToolStep).state)
         assertEquals("Just lunch at noon.", (reply as Reply).text)
         assertFalse(reply.streaming)
+    }
+
+    @Test
+    fun aCliAgentsOwnToolShowsWithItsWholeInputAndOutput() {
+        val state = replay(
+            """{"native_tool": {"id": "toolu_1", "name": "Bash", "input": "{\"command\": \"ls\"}", "status": "running"}}""",
+            """{"native_tool": {"id": "toolu_1", "name": "Bash", "output": "a.txt\nb.txt", "status": "success"}}""",
+            """{"native_tool": {"id": "toolu_2", "name": "Read", "input": "{\"file_path\": \"/x\"}", "status": "running"}}""",
+            """{"native_tool": {"id": "toolu_2", "name": "Read", "output": "No such file", "status": "error"}}""",
+            """{"data": "Two files."}""",
+            """{"stop_reason": "end_turn", "interrupts": []}""",
+        )
+        val (bash, read, reply) = state.messages.single().parts
+        bash as ToolStep
+        assertEquals(ToolStep("toolu_1", "Bash", "native", ToolState.Done, input = "{\"command\": \"ls\"}", output = "a.txt\nb.txt"), bash)
+        assertEquals(ToolState.Failed, (read as ToolStep).state)
+        assertEquals("No such file", read.output)
+        assertEquals("Two files.", (reply as Reply).text)
+    }
+
+    @Test
+    fun aToolsInputThatComesAfterItStartsShowsWhenItEnds() {
+        val state = replay(
+            """{"native_tool": {"id": "t1", "name": "run_command", "input": "", "status": "running"}}""",
+            """{"native_tool": {"id": "t1", "name": "run_command", "input": "{\"CommandLine\": \"echo hi\"}", "output": "hi", "status": "success"}}""",
+            """{"stop_reason": "end_turn", "interrupts": []}""",
+        )
+        assertEquals(ToolStep("t1", "run_command", "native", ToolState.Done, input = "{\"CommandLine\": \"echo hi\"}", output = "hi"), state.messages.single().parts.single())
     }
 }

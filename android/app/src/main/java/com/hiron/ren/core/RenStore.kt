@@ -40,8 +40,8 @@ public data class Reply(override val id: String, val raw: String, val text: Stri
 public enum class ToolState { Running, Done, Failed }
 
 /**
- * One tool call; [type] is the agent's tool type: `client` (the phone), `webhook`, `mcp` or `system`, or `strands` for the
- * Gemini agents' other tools.
+ * One tool call; [type] is the agent's tool type: `client` (the phone), `webhook`, `mcp` or `system`, `strands` for the
+ * Strands agents' other tools, or `native` for a CLI agent's own (Claude Code's, Antigravity's).
  */
 public data class ToolStep(
     override val id: String,
@@ -52,6 +52,9 @@ public data class ToolStep(
     val search: SearchResults? = null,
     /** The MCP call's own id (`tlcal_…`); the agent names the same call by another id. */
     val mcpId: String? = null,
+    /** What the agent passed the tool, as JSON, and what the tool gave back, in full (the Strands agents). */
+    val input: String? = null,
+    val output: String? = null,
 ) : ChatPart
 
 /** Reasoning text and how long it took: [spentMs] for the closed segments, [openedAt] while one streams. */

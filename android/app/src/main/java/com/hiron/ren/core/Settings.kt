@@ -153,11 +153,11 @@ public class Settings(context: Context) {
         set(value) = prefs.edit().putBoolean("voice_model", value).apply()
 
     /**
-     * Who runs Ren's agents: the ElevenLabs agents (the default), or Gemini, NVIDIA NIM, Mistral or Telnyx on the
-     * workspace VM.
+     * Who runs Ren's agents: Claude Code (the default, owner 2026-11-21), Antigravity, Gemini, NVIDIA NIM, Mistral,
+     * Telnyx or xAI on the workspace VM, or the ElevenLabs agents.
      */
     public var provider: Provider
-        get() = runCatching { Provider.valueOf(prefs.getString("provider", null).orEmpty()) }.getOrDefault(Provider.ElevenLabs)
+        get() = runCatching { Provider.valueOf(prefs.getString("provider", null).orEmpty()) }.getOrDefault(Provider.ClaudeCode)
         set(value) = prefs.edit().putString("provider", value.name).apply()
 
     /** The [provider]'s text model, which also runs the voice agent's helpers; null is the provider's default. */

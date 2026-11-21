@@ -10,8 +10,10 @@ anything. In short:
   https://rivet.ron-ai.dev (Docker and Caddy; files in `deploy/vm/`) and runs Ren's hub, ren's search and the Strands
   agents. The Fly app `rivet-assistant` is stopped.
 - **The owner's rules for this project:**
-  - The ElevenLabs text agent is the default for typing and the ElevenLabs voice agent is the default for talking. Both use the
-    phone through their client tools. Qwen (Groq) and Perplexity are only model options for Emrys's own brain, never a fallback
+  - Claude Code is the default text agent and Antigravity CLI the other main one (owner, 2026-11-21): the CLIs on the
+    workspace server, signed in with the owner's accounts, each a Strands model in `create_harness` with every native tool
+    kept (`deploy/vm/gemini/cli_models.py`). The ElevenLabs voice agent is the default for talking; the ElevenLabs agents
+    use the phone through their client tools. Qwen (Groq) and Perplexity are only model options for Emrys's own brain, never a fallback
     or a workaround for the agents.
   - Gemini, NVIDIA NIM and Mistral are optional providers (Settings › Agents), never a fallback. Their side is Strands only,
     written as the Strands harness and bidi docs write it: `create_harness()` for text, `BidiAgent` on gemini-3.8-live for
@@ -28,7 +30,7 @@ anything. In short:
 - **Before launch:** see the checklist in `AGENTS.md`.
 - **Never:**
   - add Claude or Anthropic models to the product beyond the agents' models, which are the owner's choice (the text and
-    Task agents run `claude-opus-5-5`, 2026-11-03);
+    Task agents run `claude-opus-5-5`, 2026-11-03; Claude Code is the main text agent, 2026-11-21);
   - commit secrets (`android/ren.local.properties` and the VM's env files stay out of git);
   - send, call, buy, write to Telnyx, deploy, or touch real email without the owner's explicit approval.
 - **Before handing over an APK:** run the tests, lint and release build, review `android/build/screens/`, verify the APK, and run

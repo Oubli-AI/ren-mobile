@@ -218,6 +218,37 @@ What the overhaul added, on the branch `claude/project-thread-tnj6xo` (PR #14) a
   (`Vault.scrub`, digits found with spaces or dashes too). The tools are on the phone's MCP server, so every
   provider's agents reach them through the hub; `/hub/agents/mcp` serves `vault_*` beside `browser_*`. Nothing is
   synced or backed up (the backup rules exclude every file), so a lost phone loses the vault. Not run live.
+- **Claude Code and Antigravity CLI, the main text agents** (2026-11-21, owner: their CLIs on the server, signed in
+  with his accounts, all native tools kept, each a Strands model passed to `create_harness`, reasoning, tools and output
+  streamed whole to the panel): Settings › Agents › Claude Code (the default) and Antigravity. `deploy/vm/gemini/cli_models.py`
+  is a custom model provider per CLI, driving Claude Code in its headless stream-json mode (`claude -p`) and Antigravity
+  as an Agent Client Protocol server (`agy acp`), one process per conversation and per subagent. The CLI keeps its own conversation, so the model is stateful
+  (`capabilities.stateful`; Strands sends only the new turn and keeps the CLI's session id in `model_state`, saved with
+  the session); `create_harness` gets `context_manager=None`, which a stateful model requires. The CLI's native tools
+  (Claude Code's Bash, Read, Edit, WebSearch, Agent and the rest; Antigravity's run_command and the rest) run inside the
+  CLI and reach the phone as `{"native_tool": …}` (Strands passes them on as raw `{"event": …}` chunks, as ren's xAI
+  model does xAI's server-side tools); the agent's own tools (the hub's, ren's, the harness's) reach the CLI as one MCP
+  server, `ren` (`cli_bridge.py`, stdio, relaying to the loopback-only `/bridge/<token>`), and a call there ends the
+  model's message with a Strands `toolUse`, so Strands runs it and its result answers the CLI. Claude Code 2.1.330 (npm)
+  runs with `--permission-mode bypassPermissions`, summarized thinking and the agent's instructions after its own system
+  prompt (`--append-system-prompt-file`); models are its aliases, efforts low to ultracode; it signs in with
+  `CLAUDE_CODE_OAUTH_TOKEN` (`claude setup-token`) in `gemini.env`. Antigravity 1.5.13 (the release's `antigravity`
+  binary as `agy`) runs as `agy acp` (ACP v1 over stdio), because its headless `-p` stream-json carries the model's
+  thinking only as `thinking_tokens` (its headless docs; the verbosity setting, `high` showing "every tool call,
+  command, and thought in full", is the terminal view's), while ACP streams the thinking as `agent_thought_chunk`, which
+  the panel shows as the chain of thought, each tool call with its `rawInput` and `rawOutput`, and takes images in a
+  prompt. Each process's session opens in its own folder with `.agents/mcp_config.json` (every `ren` tool eager,
+  `timeoutSeconds: -1`), with `--add-dir /config/workspace` and `--dangerously-skip-permissions` ("Auto-approve all
+  tool permission requests"); a later process resumes the conversation (`session/resume`). It has no system prompt
+  flag, so a new conversation's first message starts with the instructions. The model picker lists the values of the
+  model option ACP gives a new session, and the effort (low to max, its `--effort` levels) sets the session's
+  `thought_level` option. It signs in with the owner's
+  Google account (owner's choice, 2026-11-21, after Google's FAQ: wrapping `agy` "is not supported under consumer
+  plans"), kept under `/config/.gemini`. Every step in the panel now opens to the tool's whole input and output, for
+  every Strands provider. Checked offline (2026-11-21): mypy, and both models through `create_harness` against stand-in
+  CLIs speaking Claude Code's documented stream-json and ACP, with a Strands tool called through the bridge, thinking
+  streamed as reasoning, and a conversation resumed in a new process. Not run live: ACP's config option ids and values
+  are read from the session, since Antigravity's docs name only the pickers (Model; Thinking level Low to Max).
 - **Connections** (2026-11-21, owner: Vercel, Netlify, GitHub, GitLab, Supabase and Bitbucket for every agent, with
   sign-in; `core/Connections.kt`, `ui/ConnectionsSettings.kt`, ren's `core/connections.py`): Settings › Connections
   lists the six. Each is the provider's official hosted MCP server: Vercel `https://mcp.vercel.com` (OAuth; Ren
@@ -509,7 +540,7 @@ answers their client tools on the phone. Nothing sits in between: no backend, no
 - **Transcript:** agent replies are shown without their expressive audio tags (`[warmly]`, `[surprised]`), which the
   voice still performs. `AgentTools.withoutAudioTags` uses the pattern from ElevenLabs' own widget (convai-widget-core
   `stripAudioTags`), so markdown links stay.
-- **Strands providers: Gemini, NVIDIA NIM, Mistral, Telnyx and xAI** (Settings › Agents; ElevenLabs is the default): Emrys's agents
+- **Strands providers: Claude Code, Antigravity, Gemini, NVIDIA NIM, Mistral, Telnyx and xAI** (Settings › Agents; Claude Code is the default, see "Claude Code and Antigravity CLI"): Emrys's agents
   in Strands on the workspace VM (`deploy/vm/gemini/app.py`, the `gemini` container at `wss://rivet.ron-ai.dev/gemini/`,
   behind Caddy's bearer `EMRYS_GEMINI_TOKEN`). The app's `voice/Assistant.kt` is the seam: `RenRuntime.agent` is
   `RenAgent` or `StrandsAgent`, and the screens use only its six members. Settings › Agents picks the provider, the text
@@ -596,7 +627,8 @@ answers their client tools on the phone. Nothing sits in between: no backend, no
 - **Models are the owner's choice, in the dashboard.** The text agent and the Task agent run `claude-opus-5-5` (owner,
   2026-11-03: the task needs the most capable model). The voice agent is in Realtime mode on Eleven Realtime v1 Max
   (`realtime_model: eleven_realtime_v1_max`), which manages its LLM, so its stored `gpt-6-astra` isn't used (read
-  2026-11-04). Don't add Claude or Anthropic models anywhere else in the product.
+  2026-11-04). Claude Code, on the owner's Claude account, is the main text agent (owner, 2026-11-21). Don't add Claude or
+  Anthropic models anywhere else in the product.
 - **No live side effects without the owner's approval:** sends, calls, purchases, Telnyx writes, DNS changes, real
   email. Deploying committed changes to the workspace VM doesn't need a separate OK (owner, 2026-10-31).
 - **Never commit secrets.** `android/ren.local.properties` (the baked answering number and the VM token) is gitignored; the VM's env

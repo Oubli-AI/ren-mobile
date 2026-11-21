@@ -1,4 +1,5 @@
-"""The text agent's model providers besides ElevenLabs: NVIDIA NIM, Mistral, Gemini, Telnyx and xAI.
+"""The text agent's model providers besides ElevenLabs: NVIDIA NIM, Mistral, Gemini, Telnyx and xAI, and Claude Code and
+Antigravity CLI (`cli_models.py`).
 
 Copied from ren (github.com/ImRonAI/TheBrowser, `agent/api/core/panel_agent.py` and `config.py` at `0c973a6`): the
 provider keys and defaults, the per-model reasoning-effort tables, `build_model` for NIM and Mistral, and the live model
@@ -30,12 +31,15 @@ the image (`agent/api/core/xai_model.py`, unmodified and the same at `b112adf`),
 from __future__ import annotations
 
 import os
+import shutil
 from typing import Literal
 
 from strands.models import Model
 
-ProviderName = Literal["nim", "mistral", "gemini", "telnyx", "xai"]
-PROVIDERS: tuple[ProviderName, ...] = ("nim", "mistral", "gemini", "telnyx", "xai")
+from cli_models import ANTIGRAVITY_EFFORTS, CLAUDE_EFFORTS, DEFAULT_MODEL
+
+ProviderName = Literal["nim", "mistral", "gemini", "telnyx", "xai", "claude-code", "antigravity"]
+PROVIDERS: tuple[ProviderName, ...] = ("nim", "mistral", "gemini", "telnyx", "xai", "claude-code", "antigravity")
 
 # NVIDIA NIM hosted endpoint (OpenAI-compatible chat completions): https://docs.api.nvidia.com/nim/reference/
 NVIDIA_NIM_BASE_URL = os.getenv("NVIDIA_NIM_BASE_URL") or "https://integrate.api.nvidia.com/v1"
@@ -187,7 +191,12 @@ MISTRAL_FALLBACK_MODELS = ("mistral-large-latest",)
 
 
 def provider_api_key(provider: str) -> str | None:
-    """The provider's key from the service's environment; Gemini's is the harness's `GOOGLE_API_KEY`."""
+    """The provider's key from the service's environment; Gemini's is the harness's `GOOGLE_API_KEY`.
+
+    Claude Code and Antigravity sign in themselves (`cli_models.py`), so their "key" is the CLI being installed.
+    """
+    if provider in ("claude-code", "antigravity"):
+        return shutil.which("claude" if provider == "claude-code" else "agy")
     name = {
         "nim": "NVIDIA_NIM_API_KEY",
         "mistral": "MISTRAL_API_KEY",
@@ -205,6 +214,8 @@ def provider_default_model(provider: ProviderName) -> str:
         "gemini": GEMINI_DEFAULT_MODEL,
         "telnyx": TELNYX_DEFAULT_MODEL,
         "xai": XAI_DEFAULT_MODEL,
+        "claude-code": DEFAULT_MODEL,
+        "antigravity": DEFAULT_MODEL,
     }[provider]
 
 
@@ -259,6 +270,10 @@ def reasoning_efforts(provider: ProviderName, model_id: str) -> tuple[str, ...]:
     """
     if provider == "telnyx":
         return ()
+    if provider == "claude-code":
+        return CLAUDE_EFFORTS
+    if provider == "antigravity":
+        return ANTIGRAVITY_EFFORTS
     if provider == "nim":
         return NIM_REASONING_EFFORTS_BY_MODEL.get(model_id, ())
     if provider == "xai":
@@ -365,7 +380,7 @@ def _strip_model_prefix(name: str) -> str:
     return name.removeprefix("models/") if name.startswith("models/") else name
 
 
-def list_provider_models(provider: ProviderName) -> list[dict[str, str]]:
+def list_provider_models(provider: Literal["nim", "mistral", "gemini", "telnyx", "xai"]) -> list[dict[str, str]]:
     """Live catalogue for one provider. Raises on hard failures; callers log and skip."""
     if provider == "nim":
         if not provider_api_key("nim"):
