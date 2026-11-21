@@ -51,6 +51,12 @@
 	handle /a2a* {
 		respond 404
 	}
+	# The providers send the user's browser back here after a sign-in to their account (Settings › Connections), and
+	# Vercel reads Ren's Client ID Metadata Document; neither can carry the token, and both are public by design.
+	@connections path /connections/callback /connections/client.json
+	handle @connections {
+		reverse_proxy ren:8765
+	}
 	handle {
 		@preflight method OPTIONS
 		handle @preflight {

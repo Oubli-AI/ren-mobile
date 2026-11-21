@@ -483,7 +483,7 @@ public class Browser internal constructor(
      * Opens a social sign-in's provider page (https only) in another browser's Custom Tab, since Google refuses
      * sign-in inside an app's WebView; with no other browser that offers Custom Tabs it opens in a new tab here.
      */
-    private fun signInPage(url: String, incognito: Boolean) {
+    internal fun signInPage(url: String, incognito: Boolean) {
         val page = Uri.parse(url)
         if (page.scheme != "https") return
         val browsers = context.packageManager

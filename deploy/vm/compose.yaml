@@ -128,7 +128,7 @@ services:
   # Projects, Documents, Calendar, Vibe and Build, at https://rivet.ron-ai.dev/.
   ren:
     build: ./ren
-    image: ren-api:45ca0a5
+    image: ren-api:363493f
     restart: unless-stopped
     env_file:
       # The Brave keys and NIM's key.
@@ -152,6 +152,10 @@ services:
       # only the public route; ren needs a token set, which the computer's port does not check).
       RON_COMPUTER_MCP_URL: http://computer:8080/computer/mcp
       RON_COMPUTER_MCP_TOKEN: compose-network
+      # The user's own Vercel, Netlify, GitHub, GitLab, Supabase and Bitbucket sign-ins (ren's core/connections.py): the
+      # tokens on the volume, and this server's public address, where the providers' OAuth returns.
+      RON_CONNECTIONS_DIR: /home/ren/data/connections
+      RON_PUBLIC_URL: https://${REN_HOST:-rivet.ron-ai.dev}
     mem_limit: 4g
     volumes:
       - ren_data:/home/ren/data
