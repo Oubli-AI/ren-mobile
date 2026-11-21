@@ -275,8 +275,8 @@ What the overhaul added, on the branch `claude/project-thread-tnj6xo` (PR #14) a
   thinking only as `thinking_tokens` (its headless docs; the verbosity setting, `high` showing "every tool call,
   command, and thought in full", is the terminal view's), while ACP streams the thinking as `agent_thought_chunk`, which
   the panel shows as the chain of thought, each tool call with its `rawInput` and `rawOutput`, and takes images in a
-  prompt. Each process's session opens in its own folder with `.agents/mcp_config.json` (every `ren` tool eager,
-  `timeoutSeconds: -1`), with `--add-dir /config/workspace` and `--dangerously-skip-permissions` ("Auto-approve all
+  prompt. Each process's session opens in its own folder with `.agents/mcp_config.json` (the `ren` tools loaded
+  as Antigravity loads MCP tools by default, lazily through `call_mcp_tool`, and `timeoutSeconds: -1`), with `--add-dir /config/workspace` and `--dangerously-skip-permissions` ("Auto-approve all
   tool permission requests"); a later process resumes the conversation (`session/resume`). It has no system prompt
   flag, so a new conversation's first message starts with the instructions. The model picker lists the values of the
   model option ACP gives a new session, and the effort (low to max, its `--effort` levels) sets the session's
