@@ -157,6 +157,11 @@ public class RenRuntime(private val app: Context) {
      */
     public val contextWidget: ContextWidget = ContextWidget(app, { settings.geminiToken }, { settings.theme }, ::phoneActivity, { settings.phoneReportedAt }, { settings.phoneReportedAt = it })
 
+    /** The user's developer accounts every agent can use (Settings › Connections), as the agents' user. */
+    public val connections: Connections = Connections(http, { settings.geminiToken }) {
+        contextWidget.account.value.let { if (it.signedIn) it.userId else "" }.ifEmpty { settings.userId }
+    }
+
     /** The apps OpenCode built for the ren account, on Home. */
     public val applications: Applications = Applications(app, http) { settings.geminiToken }
 
@@ -324,6 +329,8 @@ public class RenRuntime(private val app: Context) {
      * the user. When the agent stops waiting first, the request leaves the sheet.
      */
     public suspend fun approve(request: ApprovalRequest): ApprovalAnswer {
+        // "Always allow" granted this kind of action: the agents (and the connected accounts' changes) go ahead.
+        if (request.action?.let(settings::granted) == true) return ApprovalAnswer(approved = true, remember = true)
         val answer = CompletableDeferred<ApprovalAnswer>()
         pending[request.id] = answer
         var answered = false
