@@ -453,6 +453,9 @@ What the overhaul added, on the branch `claude/project-thread-tnj6xo` (PR #14) a
     several requests (the memory extraction is one), so the day's quota goes in a few web questions; the next ones
     ended in Google's 503 "high demand" after 38 s and in the 429 after 126 s. That is why a web
     question to Gemini text got no answer once the Brave tools were added. A billed key lifts it.
+    2026-11-20 on the IONOS server, with `gemini-3.5-flash-lite` and `GEMINI_WEB_SEARCH=0`: a harness turn sends 223
+    function declarations (about 142k tokens, 319k of the request's 559k characters are the `apify_` tools), and
+    every turn got 429 or 503; the same request with no tools or with 50 answered at once.
   - **NIM's default `z-ai/glm-5.3-flash`** (ren's default, listed in NVIDIA's catalogue) returns nothing, from this
     VM and from ren desktop's own NIM code and venv on the owner's Mac; other NIM models on the same key answer in
     under a second, and Settings › Agents picks one. The VM's NIM default is `minimaxai/minimax-m3.1-flash` (owner,
@@ -612,7 +615,7 @@ answers their client tools on the phone. Nothing sits in between: no backend, no
   - Text (`/gemini/text`): the Strands harness, `create_harness(model="google/<text model>", effort=…)` for Gemini, with
     every built-in on (shell, read, write, edit, web_fetch, Google Search, programmatic_tool_caller, subagent, todos,
     sessions) plus python_repl, http_request, notebook, sleep, stop, handoff_to_user, swarm, graph and
-    mcp_router. Gemini's default text model is gemini-4-argon.
+    mcp_router. Gemini's default text model is gemini-3.5-flash-lite (owner, 2026-11-20; `GEMINI_MODEL` overrides it).
   - Voice (`/gemini/voice`): `BidiAgent` with `GoogleGeminiLiveModel` on gemini-3.8-live, voice Algieba, the same
     vended tools except swarm and graph (subagent and web_fetch run on the text model) and the bidi docs'
     `end_conversation`. Live, 2026-11-06 on the Gemini API: `enable_affective_dialog` is refused (1007 "Request

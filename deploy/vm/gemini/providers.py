@@ -45,7 +45,7 @@ PROVIDERS: tuple[ProviderName, ...] = ("nim", "mistral", "gemini", "telnyx", "xa
 NVIDIA_NIM_BASE_URL = os.getenv("NVIDIA_NIM_BASE_URL") or "https://integrate.api.nvidia.com/v1"
 NIM_DEFAULT_MODEL = os.getenv("NIM_MODEL") or "z-ai/glm-5.3-flash"
 MISTRAL_DEFAULT_MODEL = os.getenv("MISTRAL_MODEL") or "mistral-large-latest"
-GEMINI_DEFAULT_MODEL = os.getenv("GEMINI_MODEL") or "gemini-4-argon"
+GEMINI_DEFAULT_MODEL = os.getenv("GEMINI_MODEL") or "gemini-3.5-flash-lite"
 # Telnyx Inference's OpenAI-compatible endpoint, and the model its catalogue marks "(Recommended)"
 # (https://developers.telnyx.com/docs/inference/models.md).
 TELNYX_BASE_URL = os.getenv("TELNYX_BASE_URL") or "https://api.telnyx.com/v2/ai/openai"
