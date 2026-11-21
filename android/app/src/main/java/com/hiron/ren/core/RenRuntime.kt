@@ -13,6 +13,7 @@ import com.hiron.ren.browser.PhoneAction
 import com.hiron.ren.browser.SitePermissionsManager
 import android.app.Application
 import android.content.Context
+import android.widget.Toast
 import com.hiron.ren.BuildConfig
 import com.hiron.ren.device.AppUsage
 import com.hiron.ren.device.DeviceTools
@@ -169,6 +170,14 @@ public class RenRuntime(private val app: Context) {
         scope.launch(Dispatchers.IO) { publicSuffixList.prefetch().await() }
         browser.visited = contextWidget::visit
         browser.accountReported = contextWidget::accountChanged
+        browser.installApplication = { id ->
+            scope.launch(Dispatchers.Main) {
+                applications.refresh()
+                val found = applications.list.value.firstOrNull { it.id == id && it.android }
+                Toast.makeText(app, found?.let { "Downloading ${it.name}…" } ?: "That app isn't in your Applications.", Toast.LENGTH_SHORT).show()
+                found?.let { applications.install(it) }?.let { Toast.makeText(app, it, Toast.LENGTH_LONG).show() }
+            }
+        }
         RenNotificationListener.posted = contextWidget::notification
         contextWidget.asked = ::opened
         scope.launch {
