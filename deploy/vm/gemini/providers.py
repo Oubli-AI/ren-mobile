@@ -193,11 +193,13 @@ MISTRAL_FALLBACK_MODELS = ("mistral-large-latest",)
 def provider_api_key(provider: str) -> str | None:
     """The provider's key from the service's environment; Gemini's is the harness's `GOOGLE_API_KEY`.
 
-    Claude Code and Antigravity sign in themselves (`cli_models.py`), so their "key" is the CLI being installed.
+    Claude Code's is its sign-in, `CLAUDE_CODE_OAUTH_TOKEN`; Antigravity signs in itself (`cli_models.py`), so its "key"
+    is the CLI being installed.
     """
-    if provider in ("claude-code", "antigravity"):
-        return shutil.which("claude" if provider == "claude-code" else "agy")
+    if provider == "antigravity":
+        return shutil.which("agy")
     name = {
+        "claude-code": "CLAUDE_CODE_OAUTH_TOKEN",
         "nim": "NVIDIA_NIM_API_KEY",
         "mistral": "MISTRAL_API_KEY",
         "gemini": "GOOGLE_API_KEY",
