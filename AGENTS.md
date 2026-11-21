@@ -200,8 +200,44 @@ What the overhaul added, on the branch `claude/project-thread-tnj6xo` (PR #14) a
   place: a web app or website in a frame with a way into a browser tab, an Android app with Install. Install links to
   the app's APK on ren; the browser hands that link to Android's installer as Home's tile does (`Applications.apkId`,
   `Browser.installApplication`). A mobile app needs a signed-in ren account, whose Applications serve the APK; the
-  picker says so. DataGrid and the rest of the forms are listed in https://claude.ai/artifact/KAuuP3nPvEgjMu1cLYPeRX.
-  Not run live.
+  picker says so. **DataGrid** (2026-11-21, ren PR #56) is always offered: the research swarm, then a grid swarm, a
+  Grid Builder that writes the researched data as a spreadsheet (`grid.json`: a row per item, every result a formula,
+  every row's source) and a Grid QA that checks it with Python against the research and sends back what fails. The
+  run's page shows the spreadsheet in the report's place and keeps it as a Document (see "Spreadsheets"). The rest of
+  the forms are listed in https://claude.ai/artifact/KAuuP3nPvEgjMu1cLYPeRX. Not run live.
+- **Spreadsheets (DataGrid)** (2026-11-21, owner: a DataGrid "which should have enriched features similar to excel or
+  Google Sheets"; ren PR #56): a spreadsheet is a block in a page (the "/" menu's Spreadsheet), so Documents, issue
+  descriptions and Squad's DataGrid outcome are one piece of code: ren's `GridBlock.tsx`, `components/grid/GridView.tsx`
+  and `engine.ts`, unmodified in `src/ren`. A page shows the sheet's first 9 rows and **Open spreadsheet**, which lays
+  Univer's sheets over the whole page (1.5.2, Apache-2.0, 29 `@univerjs/*` packages pinned exactly, with the plugins
+  Univer ships for phones: formulas, number formats, filter, sort, conditional formatting, data validation, find and
+  replace, tables and links); Done or Back closes it, and a page that can be edited keeps what it holds. Charts, pivot
+  tables and Excel import are in Univer's paid packages (https://docs.univer.ai/server/license.md) and are not here.
+  Agents read and write a spreadsheet as one ```` ```grid ```` fence of JSON (a title and sheets, each a name, rows
+  and column formats; a formula is text starting with `=`). The open spreadsheet downloads the sheet in view as CSV,
+  made in the page, and every sheet as Excel, written by ren (`POST /projects/grids/export`, XlsxWriter) with each
+  formula and its result.
+  - **In the APK:** the engine is a chunk of its own (1.75 MB compressed), loaded when a spreadsheet first calculates
+    or opens. To stay under 20 MB, `vite.config.ts` leaves out what a phone never loads, 1.67 MB compressed: the
+    hyphenation patterns of 77 languages, which Univer's layout loads only for a document with automatic hyphenation
+    on, and KaTeX's WOFF and TrueType fonts beside the WOFF2 a WebView takes. The app also keeps only English
+    resources (`localeFilters`), which drops 0.88 MB of the libraries' translations. With all of it the release APK
+    is 19.79 MB (2026-11-21).
+  - **A file a page makes** (a spreadsheet as Excel or CSV, Print's PDF, HTML and Word, a chat, an attachment) is a
+    link with a `download` name on a `blob:` or `data:` address. WebView's download listener gets the address without
+    that name, and the app reads a blob when the user says Save, by when ren's pages have let go of it (a second after
+    the click). So `src/host.ts` reads the file at the click and hands the app its name and content
+    (`{"type":"download"}` over `RenHost`), and `Browser.savePageFile` offers it on the download sheet, from Ren, and
+    saves it to Downloads.
+  - **How much a page holds:** 2,000,000 characters, which is about 57,000 cells as an agent writes them and about
+    19,000 once the sheet has been opened in a page that can be edited, which then also keeps Univer's workbook
+    (styles, column widths, filters); past it the page says it is too large to save. A page an agent rewrites comes
+    back without the workbook.
+  - **Checked** (2026-11-21) in Chromium at phone size, on the built pages against ren's own Projects and Squad code
+    on loopback, with the app's side of `RenHost` stood in: Squad offers DataGrid, a finished run shows its sheet, a
+    sheet opens over the whole page from Documents and from a run, Back closes it, and CSV, Excel and Print's three
+    files reach the app under their names. Not run on a phone: the download sheet and the saved file, Android's
+    keyboard over a sheet, the Context widget's orb over an open sheet, and a DataGrid run with a live model.
 - **Vault** (2026-11-20, owner: logins, cards, bank accounts and API tokens the agents use without seeing;
   `core/Vault.kt`, `mcp/VaultTools.kt`, `ui/VaultSettings.kt`): Settings › Vault keeps items on the phone, sealed in
   `files/vault.bin` with AES-GCM under an Android Keystore key (`KeystoreCipher`); opening an item takes biometrics or
@@ -304,7 +340,7 @@ What the overhaul added, on the branch `claude/project-thread-tnj6xo` (PR #14) a
   since ren's Projects requests carry Supabase's bearer in `Authorization`). The page gets the
   token from the `RenHost` web message listener, which answers only the app's bundled origin
   (`https://appassets.androidplatform.net`). The backend is ren desktop's own backend on the VM, run as ren
-  runs it (`python agent/api/main.py`; `deploy/vm/ren`, image built from `Oubli-AI/ren` at `fa8e405` (ren main through PR #54, 2026-11-21, which adds Squad's Web App, Website and Mobile App outcomes, built by OpenCode; before it `760df19`, ren main through PR #53: PR #49 serves the user's connected accounts, PR #51 rebuilds the second brain to Anthropic's memory design with dreams approved first, and PR #53 keeps the dreams from before review as applied versions that undo; before it `4d3a4f3`, ren main through PR #50, which prints every Document in Ink & Volt: a cover with the logotype, title and date, Bricolage headings and a footer with page numbers; before it `eeccec3`, ren main through PR #48, 2026-11-20, which renames Deep Research to Squad and has the user pick the outcome, a report or a Slidev deck, before a run; before it `45ca0a5`, ren main through PR #47, which keeps a Deep Research run going when Hugging Face's bucket refuses a save with 429, as both runs on 2026-11-20 died of; before it `ab77c6f`, ren main through PR #46; before that `a6213d7`, ren main through PR #38, and before that `beaa580`, ren main with PRs #16 to #19, #21 to #29, on `2d24e4c`, which holds the pages' commit `0f6fa57`, the web tools (ren PR #11), the Context Agent with OpenCode (ren PR #12), the Search page off Brave (ren PR #13) and Deep Research as the Strands SDK documents it (ren PR #14: plain `Swarm`s and `GraphBuilder` graphs, the outer graph's `stream_async` events); PR #16 makes Mistral every agent's default and takes the harness's EnvironmentContext, which handed the agent ren's checkout path and AGENTS.md, off every user agent, owner 2026-11-17; PR #19 tells every swarm agent when it hands off, as the Strands swarm docs do; PR #22 sends every Mistral model its largest `max_tokens`: 262144 for Mistral Large 4, 131072 for the GLM and DeepSeek models Mistral hosts, the context window for the rest; PR #23 lets only the fact checker open sources and gives each Deep Research agent only the sections of its skill that fit its role; PR #24 gives Deep Research six levels after Perplexity's Agent API presets (fast, low, medium, high, xhigh and ultra, 5–8 up to 30–40 pages), a turn budget per agent with a wrap-up reminder over its last five turns, the Slidev skills on the deck agents, each run's report as a Document under a personal Deep Research page, and Print to PDF, HTML and Word on every Document; PR #27 lists and opens runs saved before the levels, mapping standard, deep and exhaustive to low, medium and ultra; PR #21 takes the overall time cap off the top-level graph, so only each swarm keeps `RON_DEEP_RESEARCH_EXECUTION_TIMEOUT` (3 h)) (scheduled specialist runs on, ren's default, since 2026-11-20), with electron-playwright-mcp (no remote: the VM's `ren/electron-playwright-mcp/` is a copy of its `pyproject.toml`, `README.md` and `src/electron_playwright_mcp` from the owner's checkout at `4612a9b`) and Playwright's Chromium for deep research's PDF, with the toolbox's Node 26.13.0 and pnpm for its Slidev deck, keys in
+  runs it (`python agent/api/main.py`; `deploy/vm/ren`, image built from `Oubli-AI/ren` at `50aef8f` (ren main through PR #56, 2026-11-21, which adds spreadsheets in pages and Squad's DataGrid outcome; before it `fa8e405`, ren main through PR #54, which adds Squad's Web App, Website and Mobile App outcomes, built by OpenCode; before it `760df19`, ren main through PR #53: PR #49 serves the user's connected accounts, PR #51 rebuilds the second brain to Anthropic's memory design with dreams approved first, and PR #53 keeps the dreams from before review as applied versions that undo; before it `4d3a4f3`, ren main through PR #50, which prints every Document in Ink & Volt: a cover with the logotype, title and date, Bricolage headings and a footer with page numbers; before it `eeccec3`, ren main through PR #48, 2026-11-20, which renames Deep Research to Squad and has the user pick the outcome, a report or a Slidev deck, before a run; before it `45ca0a5`, ren main through PR #47, which keeps a Deep Research run going when Hugging Face's bucket refuses a save with 429, as both runs on 2026-11-20 died of; before it `ab77c6f`, ren main through PR #46; before that `a6213d7`, ren main through PR #38, and before that `beaa580`, ren main with PRs #16 to #19, #21 to #29, on `2d24e4c`, which holds the pages' commit `0f6fa57`, the web tools (ren PR #11), the Context Agent with OpenCode (ren PR #12), the Search page off Brave (ren PR #13) and Deep Research as the Strands SDK documents it (ren PR #14: plain `Swarm`s and `GraphBuilder` graphs, the outer graph's `stream_async` events); PR #16 makes Mistral every agent's default and takes the harness's EnvironmentContext, which handed the agent ren's checkout path and AGENTS.md, off every user agent, owner 2026-11-17; PR #19 tells every swarm agent when it hands off, as the Strands swarm docs do; PR #22 sends every Mistral model its largest `max_tokens`: 262144 for Mistral Large 4, 131072 for the GLM and DeepSeek models Mistral hosts, the context window for the rest; PR #23 lets only the fact checker open sources and gives each Deep Research agent only the sections of its skill that fit its role; PR #24 gives Deep Research six levels after Perplexity's Agent API presets (fast, low, medium, high, xhigh and ultra, 5–8 up to 30–40 pages), a turn budget per agent with a wrap-up reminder over its last five turns, the Slidev skills on the deck agents, each run's report as a Document under a personal Deep Research page, and Print to PDF, HTML and Word on every Document; PR #27 lists and opens runs saved before the levels, mapping standard, deep and exhaustive to low, medium and ultra; PR #21 takes the overall time cap off the top-level graph, so only each swarm keeps `RON_DEEP_RESEARCH_EXECUTION_TIMEOUT` (3 h)) (scheduled specialist runs on, ren's default, since 2026-11-20), with electron-playwright-mcp (no remote: the VM's `ren/electron-playwright-mcp/` is a copy of its `pyproject.toml`, `README.md` and `src/electron_playwright_mcp` from the owner's checkout at `4612a9b`) and Playwright's Chromium for deep research's PDF, with the toolbox's Node 26.13.0 and pnpm for its Slidev deck, keys in
   `search.env`, Supabase's, `HF_TOKEN`, `PERPLEXITY_API_KEY` (its tool-repair fixer runs on Perplexity) and ren desktop's own providers (`RON_CHAT_PROVIDERS`, `TELNYX_API_KEY`, `GEMINI_API_KEY`, `MISTRAL_API_KEY`, `XAI_API_KEY`, 2026-11-16) in `ren.env`, so Deep Research picks ren desktop's default, Telnyx `moonshotai/Kimi-K3.1-Pro` (with only NIM it ran on `minimaxai/minimax-m3.1-flash`, which went silent mid-reply and failed the run); Deep Research's working files are on the `ren_data` volume (`RON_DEEP_RESEARCH_ARTIFACTS_DIR`, since a new container lost a run's report on 2026-11-17); its storage is ren desktop's Hugging Face bucket, see "Context
   widget"), at `https://rivet.ron-ai.dev/` behind the same token (Caddy sends every
   path the other services don't take to it, except ren's A2A endpoint). "Add search to Ren context" goes to the signed-in account's Context Agent
@@ -734,7 +770,7 @@ cd deploy/vm/hub && uvx --python 3.12 --with fastmcp==3.4.0 --with mcp==1.26.0 -
    simplified Settings), CloudFS, and triggers and webhooks.
 7. **The Strands agents** (plan https://claude.ai/artifact/Ri9R22DZiVUhd2x2oW6CeL): they run on the Gemini API (AI
    Studio, owner, 2026-11-06), NIM, Mistral, Telnyx and xAI. The `gemini` and `search` images are built on the VM
-   (`emrys-gemini:1.64.0`, `ren-api:fa8e405`) and start once their env files are in `/opt/emrys`: `gemini.env`
+   (`emrys-gemini:1.64.0`, `ren-api:50aef8f`) and start once their env files are in `/opt/emrys`: `gemini.env`
    (`GOOGLE_API_KEY`, `NVIDIA_NIM_API_KEY`, `MISTRAL_API_KEY`, `TELNYX_API_KEY`, `XAI_API_KEY`; without `TELNYX_MCP_AUTHORIZATION` oubliai-telnyx
    doesn't load there), `search.env` (`BRAVE_SEARCH_API_KEY`, `BRAVE_ANSWERS_API_KEY`, `NVIDIA_NIM_API_KEY`) and
    `ren.env` (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `HF_TOKEN`, `PERPLEXITY_API_KEY`, `RON_CHAT_PROVIDERS` and ren desktop's provider keys).
@@ -750,7 +786,7 @@ cd deploy/vm/hub && uvx --python 3.12 --with fastmcp==3.4.0 --with mcp==1.26.0 -
 9. **Telnyx** (PR #13): checked by mypy and offline (the model, its window from the catalogue, the catalogue's filter);
    not run live. It needs `TELNYX_API_KEY` in the VM's `gemini.env` and the `gemini` image rebuilt, then one typed
    conversation from Settings › Agents › Telnyx with a tool call.
-10. **Memory:** the `gemini` image is on ren `760df19` and the `ren` image on `fa8e405`, which has the same memory code; both keep the brain in ren desktop's bucket
+10. **Memory:** the `gemini` image is on ren `760df19` and the `ren` image on `50aef8f`, which has the same memory code; both keep the brain in ren desktop's bucket
     under the signed-in account, so the phone's Strands agents and ren's pages share one brain; ren's API is its one
     dreamer and every dream waits for the user's approval. Brains the `gemini`
     service kept before 2026-11-20 under the install id stay in `/config/emrys-gemini/storage` and are not merged. Not
