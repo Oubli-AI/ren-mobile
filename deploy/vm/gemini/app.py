@@ -1,9 +1,14 @@
 """Emrys's Strands agents for the phone: the harness for text and a BidiAgent for voice, behind FastAPI WebSockets.
 
-The text agent runs on Gemini, NVIDIA NIM, Mistral, Telnyx or xAI, the phone's choice in Settings › Agents (`provider`,
+The text agent runs on Claude Code, Antigravity CLI, Gemini, NVIDIA NIM, Mistral, Telnyx or xAI, the phone's choice in
+Settings › Agents (`provider`,
 `model`, the provider's default when left out, and `effort`, the reasoning level or `auto`). NIM and Mistral models are
 built the way ren builds them, as is xAI's on ren's own `RonXAIModel`, and Telnyx's the way ren builds NIM's, on Telnyx's
 OpenAI-compatible API (`providers.py`);
+Claude Code and Antigravity are their CLIs on this server, signed in with the owner's accounts, each a Strands model
+(`cli_models.py`): the CLI keeps its native tools and its own conversation, gets the agent's tools as the MCP server `ren`
+(`/bridge/<token>`, loopback only), and its native tool calls reach the phone as `{"native_tool": …}` with their whole
+input and output.
 `GET /gemini/models` and `GET /gemini/efforts` list each provider's live models and each model's reasoning levels.
 Voice is always Gemini Live; its helpers run on the chosen text model.
 
@@ -97,6 +102,8 @@ from agent.api.core.web_tools import web_tools
 from agent.api.core.xai_model import XAIStatePruner
 
 import studio
+from cli_models import CliModel, cli_model, cli_models
+from cli_models import router as cli_bridge
 from providers import ProviderName, build_model, list_provider_models, provider_default_model, reasoning_efforts
 
 VOICE_AGENT = "agent_2901m620nzwrev2r7ekqpydcxe25"
@@ -168,6 +175,7 @@ PROMPTS_DIR = Path(os.environ.get("PROMPTS_DIR", "/opt/gemini/prompts"))
 
 app = FastAPI()
 # Vibe (ren://vibe) is one of the app's bundled pages, which call from that origin with the workspace token.
+app.include_router(cli_bridge)
 app.add_middleware(CORSMiddleware, allow_origins=[os.environ.get("CORS_ORIGINS", "https://appassets.androidplatform.net")], allow_methods=["*"], allow_headers=["*"])
 
 
@@ -240,12 +248,15 @@ class Phone(OutputStream):
 
 
 def text_model(provider: ProviderName, model: str, effort: str) -> Model:
-    """The text model the phone chose: Gemini as Strands builds it, NIM, Mistral, Telnyx and xAI as `providers.py` does.
+    """The text model the phone chose: Gemini as Strands builds it, Claude Code and Antigravity as `cli_models.py` does,
+    and NIM, Mistral, Telnyx and xAI as `providers.py` does.
 
     A level the model doesn't list (one the phone kept from an earlier model) runs on Auto.
     """
     if provider == "gemini":
         return GeminiModel(model_id=model)
+    if provider == "claude-code" or provider == "antigravity":
+        return cli_model(provider, model, effort if effort in reasoning_efforts(provider, model) else None)
     return build_model(provider, model, effort if effort in reasoning_efforts(provider, model) else None)
 
 
@@ -260,6 +271,8 @@ def harness_effort(effort: str) -> Effort:
 @app.get("/gemini/models")
 async def models(provider: ProviderName) -> dict[str, object]:
     """The provider's live model catalogue and its default model, as ren's `GET /models` lists them."""
+    if provider == "claude-code" or provider == "antigravity":
+        return {"models": await cli_models(provider), "default": provider_default_model(provider)}
     return {"models": await asyncio.to_thread(list_provider_models, provider), "default": provider_default_model(provider)}
 
 
@@ -335,9 +348,12 @@ async def text(
 ) -> None:
     await websocket.accept()
     chosen = model or provider_default_model(provider)
+    built = None if provider == "gemini" else text_model(provider, chosen, effort)
     agent = create_harness(
-        model=f"google/{chosen}" if provider == "gemini" else text_model(provider, chosen, effort),
+        model=f"google/{chosen}" if built is None else built,
         effort=harness_effort(effort) if provider == "gemini" else "auto",
+        # A CLI keeps its own conversation (a stateful model), which the Agent refuses a context manager for.
+        context_manager=None if isinstance(built, CliModel) else "auto",
         instructions=await instructions(TEXT_AGENT, variables(websocket, text_only=True)) + work_prompt(work) + dreaming.MEMORY_PROTOCOL,
         tools=[python_repl, http_request, notebook, sleep, stop, handoff_to_user, swarm, graph, make_mcp_router(servers=SERVERS), *brave_tools(), *web_tools(), *studio.VibeTools(user_id).tools],
         builtin_tools=GEMINI_BUILTINS if provider == "gemini" else None,
@@ -369,6 +385,9 @@ async def text(
                     async for event in agent.stream_async(prompt):
                         if "reasoningText" in event:
                             await websocket.send_json({"reasoning": event["reasoningText"]})
+                        elif "nativeTool" in event.get("event", {}):
+                            # One of a CLI's own tool calls, which Strands passes on as a raw chunk (`cli_models.py`).
+                            await websocket.send_json({"native_tool": event["event"]["nativeTool"]})
                         elif "data" in event:
                             await websocket.send_json({"data": event["data"]})
                         elif "message" in event:
@@ -391,6 +410,9 @@ async def text(
                     await websocket.send_json({"error": f"{type(error).__name__}: {error}"})
     except WebSocketDisconnect:
         pass
+    finally:
+        if isinstance(built, CliModel):
+            await built.close()
 
 
 class Make(BaseModel):

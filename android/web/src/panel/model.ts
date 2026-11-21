@@ -15,12 +15,14 @@ export type Picture = { n: number; title: string; thumbnail: string }
 
 export type Video = { title: string; url: string; thumbnail: string | null; duration: string | null }
 
-/** One tool call; [links], [pictures] and [videos] hold what a search found. */
+/** One tool call; [links], [pictures] and [videos] hold what a search found; [input] (JSON) and [output] are the call's own. */
 export type Step = {
   id: string
   kind: StepKind
   label: string
   detail: string | null
+  input: string | null
+  output: string | null
   state: ToolState
   links: Link[]
   pictures: Picture[]

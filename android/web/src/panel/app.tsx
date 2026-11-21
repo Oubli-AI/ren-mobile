@@ -7,7 +7,7 @@ import { ChainOfThought, ChainOfThoughtContent, ChainOfThoughtHeader, ChainOfTho
 import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation"
 import { Message, MessageContent } from "@/components/ai-elements/message"
 import { MessageResponse } from "@/components/ai-elements/response"
-import { Tool, ToolHeader } from "@/components/ai-elements/tool"
+import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput } from "@/components/ai-elements/tool"
 import { SentAttachments } from "@/components/agent-panel/PromptAttachments"
 import { cn } from "@/utils/cn"
 import { type Message as ChatMessage, type Reasoning, type Step, splitAttachments, tell, useChat } from "./model"
@@ -122,14 +122,30 @@ function ReasoningChain({ reasoning }: { reasoning: Reasoning }) {
 
 const TOOL_STATES = { running: "input-available", done: "output-available", failed: "output-error" } as const
 
-/** Any tool but a search, as ren's tool part. */
+/** Any tool but a search, as ren's tool part: opened, its whole input and output. */
 function ToolCard({ step }: { step: Step }) {
+  const failed = step.state === "failed"
   return (
     <Tool className="my-3 overflow-hidden border-surface-200 dark:border-surface-700">
       <ToolHeader type="dynamic-tool" toolName={step.label} title={step.label} state={TOOL_STATES[step.state]} />
       {step.detail !== null && <p className="px-3 pb-2 text-xs text-ink-muted dark:text-ink-inverse-muted">{step.detail}</p>}
+      {(step.input !== null || step.output !== null) && (
+        <ToolContent>
+          {step.input !== null && <ToolInput input={parsed(step.input)} />}
+          {step.output !== null && <ToolOutput output={failed ? undefined : step.output} errorText={failed ? step.output : undefined} />}
+        </ToolContent>
+      )}
     </Tool>
   )
+}
+
+/** A tool's input as the JSON it is, or as text when it isn't JSON. */
+function parsed(input: string): unknown {
+  try {
+    return JSON.parse(input)
+  } catch {
+    return input
+  }
 }
 
 /** A search, as ren's `SearchNativeCard`: what it searched for, the sources it found, and its pictures. */
