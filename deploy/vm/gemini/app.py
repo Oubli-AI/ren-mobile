@@ -35,20 +35,20 @@ Gemini voice, an ElevenLabs voice) reads each typed reply aloud (`voice` and `vo
 Vibe: `/gemini/vibe/*` is Vibe's studio (`studio.py`) for the app's Vibe page: the user's library, what to make in it,
 the voices, and Lyria RealTime on ren's own music session. Both agents have the same studio as tools.
 
-Memory is ren desktop's own (`agent/api/core/dreaming.py` in the image's copy of ren): both agents search the user's
-second brain and keep a journal in the folder `phone`, and the dream files the journal into the brain once the user
-has been idle. `user_id` is the signed-in ren account's (the install's when signed out) and the storage is the `ren`
-service's bucket, so the brain is the one ren's pages and the Context widget use. The text agent's turns are journaled
-and what it remembers is injected before each turn, as the SDK does both; the voice agent, a `BidiAgent`, has the two
-tools.
+Memory is ren desktop's own (`agent/api/core/dreaming.py` in the image's copy of ren): both agents read the user's
+second brain, write the folder `phone` with Anthropic's memory tool, search it by meaning and keep a journal. `user_id`
+is the signed-in ren account's (the install's when signed out) and the storage is the `ren` service's bucket, so the
+brain is the one ren's pages and the Context widget use, and ren's API is the one dreamer: it files this service's
+journal too, and nothing reaches the brain until the user approves the dream. The text agent's turns are journaled and
+the brain's index is injected before each turn, as the SDK does both; the voice agent, a `BidiAgent`, has the index in
+its prompt and the same tools.
 """
 
 import asyncio
 import base64
 import os
 import re
-from collections.abc import AsyncIterator, Mapping
-from contextlib import asynccontextmanager
+from collections.abc import Mapping
 from pathlib import Path
 
 import uvicorn
@@ -66,10 +66,8 @@ from strands.bidi.types.agent import BidiAgentInput
 from strands.bidi.types.events import BidiOutputEvent
 from strands.bidi.types.media import AudioDelta
 from strands.interrupt import Interrupt
-from strands.memory import MemoryManager
 from strands.models import Model
 from strands.models.gemini import GeminiModel
-from strands.models.routing import ModelRouter, RoutingCandidate
 from strands.multiagent.spec import Fixed
 from strands.tools.mcp import MCPClient, MCPServerConfig, ToolFilters
 from strands.types.agent import AgentInput
@@ -103,7 +101,7 @@ from agent.api.core.web_tools import web_tools
 from agent.api.core.xai_model import XAIStatePruner
 
 import studio
-from providers import ProviderName, build_model, list_provider_models, provider_api_key, provider_default_model, reasoning_efforts
+from providers import ProviderName, build_model, list_provider_models, provider_default_model, reasoning_efforts
 
 VOICE_AGENT = "agent_2901m620nzwrev2r7ekqpydcxe25"
 TEXT_AGENT = "agent_9601m623qa72ffs9cyy3ezc0p6tb"
@@ -180,27 +178,9 @@ elevenlabs = AsyncElevenLabs(api_key=key) if (key := os.environ.get("ELEVENLABS_
 PROMPTS_DIR = Path(os.environ.get("PROMPTS_DIR", "/opt/gemini/prompts"))
 
 
-@asynccontextmanager
-async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-    """Restart the dream countdowns a restart cut, as ren's own API does at startup."""
-    await dreaming.resume_dreams()
-    yield
-
-
-app = FastAPI(lifespan=lifespan)
+app = FastAPI()
 # Vibe (ren://vibe) is one of the app's bundled pages, which call from that origin with the workspace token.
 app.add_middleware(CORSMiddleware, allow_origins=[os.environ.get("CORS_ORIGINS", "https://appassets.androidplatform.net")], allow_methods=["*"], allow_headers=["*"])
-
-
-def dream_model() -> ModelRouter:
-    """The dream's models in ren's order, built as this service builds NIM and Mistral."""
-    return ModelRouter(
-        [RoutingCandidate(build_model(provider, model), name=f"{provider}:{model}") for provider, model in dreaming.DREAM_MODELS if provider_api_key(provider)]
-    )
-
-
-# ren builds the dream's models with its panel, which this image doesn't carry.
-dreaming.dream_model = dream_model
 
 
 async def instructions(agent_id: str, values: Mapping[str, str]) -> str:
@@ -315,7 +295,8 @@ async def voice(
     helper = text_model(provider, model or provider_default_model(provider), effort)
     agent = BidiAgent(
         model=GoogleGeminiLiveModel(model_id=VOICE_MODEL, voice=voice),
-        system_prompt=await instructions(VOICE_AGENT, variables(websocket, text_only=False)) + work_prompt(work) + dreaming.JOURNAL_DIRECTIVE,
+        system_prompt=await instructions(VOICE_AGENT, variables(websocket, text_only=False)) + work_prompt(work) + dreaming.MEMORY_PROTOCOL
+        + "\n\n" + await dreaming.index_block(user_id),
         tools=[
             *(MCPClient(
                 url=config["url"],
@@ -340,7 +321,7 @@ async def voice(
                 make_mcp_router(servers=servers(user_id)),
                 *brave_tools(),
                 *web_tools(),
-                *MemoryManager(stores=dreaming.agent_memory(user_id, MEMORY_FOLDER), injection=False).tools,
+                *dreaming.agent_memory_tools(user_id, MEMORY_FOLDER),
                 *studio.VibeTools(user_id).tools,
                 end_conversation,
             ) if not gemini_live_undeclarable(value)),
@@ -369,12 +350,12 @@ async def text(
     agent = create_harness(
         model=f"google/{chosen}" if provider == "gemini" else text_model(provider, chosen, effort),
         effort=harness_effort(effort) if provider == "gemini" else "auto",
-        instructions=await instructions(TEXT_AGENT, variables(websocket, text_only=True)) + work_prompt(work) + dreaming.JOURNAL_DIRECTIVE,
+        instructions=await instructions(TEXT_AGENT, variables(websocket, text_only=True)) + work_prompt(work) + dreaming.MEMORY_PROTOCOL,
         tools=[python_repl, http_request, notebook, sleep, stop, handoff_to_user, swarm, graph, make_mcp_router(servers=servers(user_id)), *brave_tools(), *web_tools(), *studio.VibeTools(user_id).tools],
         builtin_tools=GEMINI_BUILTINS if provider == "gemini" else None,
         mcp_servers=servers(user_id),
         session={"id": conversation, "dir": f"{HOME}/sessions"},
-        memory=MemoryManager(stores=dreaming.agent_memory(user_id, MEMORY_FOLDER)),
+        memory=dreaming.brain_memory(user_id, MEMORY_FOLDER),
     )
     if isinstance(agent.model, GeminiModel):
         # Gemini thinks either way but sends its thoughts only when asked to, which the harness doesn't ask.
