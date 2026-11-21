@@ -35,5 +35,8 @@ public enum class Provider(public val label: String, public val strands: String?
     Nim("NVIDIA NIM", "nim"),
     Mistral("Mistral", "mistral"),
     Telnyx("Telnyx", "telnyx"),
-    Xai("xAI", "xai"),
+    Xai("xAI", "xai");
+
+    /** Whether this provider runs as a CLI on the workspace server that signs in with the user's own account. */
+    public val cliAuth: Boolean get() = this == ClaudeCode || this == Antigravity
 }
