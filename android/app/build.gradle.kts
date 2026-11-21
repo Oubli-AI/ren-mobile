@@ -71,6 +71,8 @@ android {
         jniLibs { useLegacyPackaging = true }
         dex { useLegacyPackaging = true }
     }
+    // The app's own text is English only, so the libraries' translations (some 150 locales) stay out of the APK.
+    androidResources { localeFilters += "en" }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
