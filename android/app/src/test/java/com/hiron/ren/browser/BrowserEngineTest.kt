@@ -411,6 +411,15 @@ class BrowserEngineTest {
             assertEquals("hello-world", savedFile.readText(Charsets.UTF_8))
         }
 
+        // A file one of Ren's pages made is offered under the name the page gave it.
+        browser.savePageFile("Fleet costs.csv", "data:text/csv;charset=utf-8;base64,VmFuLDM=")
+        assertEquals(
+            DownloadRequest("data:text/csv;charset=utf-8;base64,VmFuLDM=", "Fleet costs.csv", "Ren", "text/csv", 5L, null),
+            browser.downloadRequest.value,
+        )
+        browser.download()
+        assertNull(browser.downloadRequest.value)
+
         // Opening > MAX_LIVE_WEBVIEWS background tabs evicts oldest non-active WebViews cleanly.
         val openedViews = ArrayList<WebView>()
         repeat(Browser.MAX_LIVE_WEBVIEWS + 2) { idx ->

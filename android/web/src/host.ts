@@ -300,6 +300,34 @@ window.fetch = async (input, init) => {
 }
 
 /**
+ * A file a page makes (a spreadsheet as Excel or CSV, a printed page, a chat) is a link with a `download` name on a
+ * `blob:` or `data:` address, clicked by the page or the user. WebView's download listener gets the address without
+ * that name, and the page lets go of a blob about a second after the click, before the user has said Save. So the page
+ * reads the file at the click and gives the app its name and content, which the app offers to save (browser/Browser.kt).
+ */
+function saves(link: HTMLAnchorElement): boolean {
+  if (host === undefined || link.download === "" || !/^(blob|data):/.test(link.href)) return false
+  const name = link.download
+  const reader = new FileReader()
+  reader.onload = () => {
+    if (typeof reader.result === "string") tell("download", { name, url: reader.result })
+  }
+  void send(link.href).then((file) => file.blob()).then((blob) => reader.readAsDataURL(blob))
+  return true
+}
+
+document.addEventListener("click", (event) => {
+  const link = event.target instanceof Element && event.target.closest("a")
+  if (link instanceof HTMLAnchorElement && saves(link)) event.preventDefault()
+}, true)
+
+// The click of a link that is not in the document never reaches the document's listener.
+const click = HTMLAnchorElement.prototype.click
+HTMLAnchorElement.prototype.click = function () {
+  if (this.isConnected || !saves(this)) click.call(this)
+}
+
+/**
  * Keeps the app told which ren account the pages are signed in to and whether its interview is done, as ren desktop's
  * App.tsx reads them (`useAuthStore`, `useOnboardingStore`): the app shows the Context widget only for a signed-in
  * account that finished the interview. Starts ren's sign-in check as App.tsx does.
