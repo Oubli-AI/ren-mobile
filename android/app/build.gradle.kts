@@ -8,10 +8,10 @@ plugins {
 }
 
 // The workspace VM's host, where Caddy serves ren's backend, the hub and the agents (deploy/vm's REN_HOST):
-// `workspaceHost` in ren.local.properties, or REN_WORKSPACE_HOST, or else the owner's domain.
+// `workspaceHost` in ren.local.properties, or REN_WORKSPACE_HOST, or else the server that runs it (the IONOS VPS).
 val workspaceHost: String = Properties().apply {
     rootProject.file("ren.local.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
-}.getProperty("workspaceHost") ?: System.getenv("REN_WORKSPACE_HOST")?.takeIf { it.isNotBlank() } ?: "rivet.ron-ai.dev"
+}.getProperty("workspaceHost") ?: System.getenv("REN_WORKSPACE_HOST")?.takeIf { it.isNotBlank() } ?: "216-225-199-26.sslip.io"
 
 android {
     namespace = "com.hiron.ren"
@@ -23,8 +23,8 @@ android {
         targetSdk = 36
         // Phones only: the ElevenLabs SDK's WebRTC library is ~12 MB per ABI, and the x86/armv7 copies were 34 MB.
         ndk { abiFilters += "arm64-v8a" }
-        versionCode = 21
-        versionName = "0.5.8"
+        versionCode = 23
+        versionName = "0.5.10"
         // Ready-to-use defaults from ren.local.properties (never committed), or else from the build machine's
         // environment (REN_ANSWERING_NUMBER and the rest, a cloud environment's secrets); they stay editable in Settings.
         val local = Properties().apply {
@@ -71,6 +71,8 @@ android {
         jniLibs { useLegacyPackaging = true }
         dex { useLegacyPackaging = true }
     }
+    // The app's own text is English only, so the libraries' translations (some 150 locales) stay out of the APK.
+    androidResources { localeFilters += "en" }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17

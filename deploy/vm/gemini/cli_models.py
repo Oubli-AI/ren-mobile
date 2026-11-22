@@ -422,6 +422,10 @@ class CliModel(Model, abc.ABC):
                 yield event
             if turn.done:
                 session.busy = False
+                if not tool_specs:
+                    # A call with no tools is the harness's web_fetch summarizer, a one-turn Agent on this model that
+                    # never comes back to its process.
+                    await self.sessions.pop(session.token).close()
                 return
 
     def exited(self, item: Exited) -> RuntimeError:
@@ -570,14 +574,16 @@ class AntigravityModel(CliModel):
     `--dangerously-skip-permissions` "Auto-approve[s] all tool permission requests". `agy` has no system prompt flag, so
     a new conversation's first message starts with the instructions. Its MCP config is per workspace
     (`<workspace>/.agents/mcp_config.json`, https://antigravity.google/docs/mcp.md), so each process's session opens in
-    its own folder, with `--add-dir` for the shared workspace; every `ren` tool is eager, so it is declared to the model
-    as `mcp_ren_<tool>`, and `timeoutSeconds: -1` "turns off both limits" (a Strands tool may run past the 180 s default).
+    its own folder, with `--add-dir` for the shared workspace. Its tools load as Antigravity loads them by default
+    (lazily: the model reads a tool's schema when it wants it and calls it through `call_mcp_tool`, or as
+    `mcp_ren_<tool>` where it falls back to eager loading), and `timeoutSeconds: -1` "turns off both limits" (a Strands
+    tool, such as a subagent, may run past the 180 s default).
     """
 
     bridge_prefix = "mcp_ren_"
 
     async def open(self, session: Session, conversation: str | None, instructions: str | None) -> None:
-        config = {"mcpServers": {"ren": {**session.mcp_server(), "timeoutSeconds": -1, "tools": {name: {"eager": True} for name in session.tool_names}}}}
+        config = {"mcpServers": {"ren": {**session.mcp_server(), "timeoutSeconds": -1}}}
         (session.folder / ".agents").mkdir(parents=True, exist_ok=True)
         (session.folder / ".agents" / "mcp_config.json").write_text(json.dumps(config))
         await session.start(["agy", "acp", "--dangerously-skip-permissions", "--add-dir", WORKSPACE], str(session.folder))
@@ -626,6 +632,8 @@ class AntigravityModel(CliModel):
                 name = session.native.setdefault(tool_id, text_at(update, "name") or text_at(update, "title"))
                 if at(update, "rawInput") is not None:
                     session.inputs[tool_id] = json.dumps(at(update, "rawInput"))
+                    if text_at(update, "rawInput", "ServerName") == "ren":
+                        session.native[tool_id] = name = self.bridge_prefix
                 tool_input = session.inputs.get(tool_id, "")
                 finished = text_at(update, "status") in ("completed", "failed")
                 if finished:
