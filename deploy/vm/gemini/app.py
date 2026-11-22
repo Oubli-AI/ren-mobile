@@ -106,6 +106,7 @@ from agent.api.core.web_tools import web_tools
 from agent.api.core.xai_model import XAIStatePruner
 
 import studio
+from cli_auth import router as cli_auth_router
 from cli_models import CliModel, cli_model, cli_models
 from cli_models import router as cli_bridge
 from providers import ProviderName, build_model, list_provider_models, provider_default_model, reasoning_efforts
@@ -188,6 +189,7 @@ PROMPTS_DIR = Path(os.environ.get("PROMPTS_DIR", "/opt/gemini/prompts"))
 app = FastAPI()
 # Vibe (ren://vibe) is one of the app's bundled pages, which call from that origin with the workspace token.
 app.include_router(cli_bridge)
+app.include_router(cli_auth_router)
 app.add_middleware(CORSMiddleware, allow_origins=[os.environ.get("CORS_ORIGINS", "https://appassets.androidplatform.net")], allow_methods=["*"], allow_headers=["*"])
 
 

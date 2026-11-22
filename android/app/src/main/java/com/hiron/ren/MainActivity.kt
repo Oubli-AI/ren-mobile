@@ -259,6 +259,17 @@ private fun RenAppUi(runtime: RenRuntime, listenRequests: Int, focusRequests: In
     LaunchedEffect(opens) {
         if (opens > 0) panel = true
     }
+    // CLI provider sign-in closes Settings to show the OAuth tab, then brings Settings straight back on callback.
+    LaunchedEffect(runtime) {
+        runtime.settingsOpen.collect { open ->
+            if (open) {
+                panel = false
+                page = Page.Settings
+            } else {
+                page = null
+            }
+        }
+    }
     // An opened link or a search shows its tab: the panel and any page over the browser close.
     LaunchedEffect(linkRequests, searchRequests) {
         if (linkRequests > 0 || searchRequests > 0) {

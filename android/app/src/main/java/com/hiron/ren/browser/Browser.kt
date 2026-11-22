@@ -60,6 +60,7 @@ import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import com.hiron.ren.MainActivity
 import com.hiron.ren.R
+import com.hiron.ren.core.CliAuth
 import com.hiron.ren.core.RenVoice
 import com.hiron.ren.core.Settings
 import com.hiron.ren.ui.ThemeChoice
@@ -270,6 +271,14 @@ public class Browser internal constructor(
     private val pendingSslHandlers: HashMap<String, SslErrorHandler> = HashMap()
     private var pendingHttpAuth: PendingHttpAuth? = null
     private var pendingJsDialog: PendingJsDialog? = null
+    private var authCapture: AuthCapture? = null
+
+    private data class AuthCapture(
+        val tabId: String,
+        val callbackPrefix: String,
+        val onCallback: (String) -> Unit,
+        var delivered: Boolean = false,
+    )
 
     @Volatile
     private var pslPrefetch: Deferred<Unit>? = null
@@ -331,6 +340,7 @@ public class Browser internal constructor(
         if (before.active == id && _findState.value.active) {
             _findState.value = FindState()
         }
+        if (authCapture?.tabId == id) authCapture = null
         views.remove(id)?.let(::destroy)
         defaultUserAgents.remove(id)
         httpsUpgradedUrls.remove(id)
@@ -480,6 +490,33 @@ public class Browser internal constructor(
     /** Loads Ren's own pages again (the theme changed); web pages stay as they are. */
     internal fun reloadPages() {
         views.values.filter { it.url?.startsWith(PAGES) == true }.forEach(WebView::reload)
+    }
+
+    /**
+     * Opens an OAuth sign-in page inside a Ren tab and automatically captures the redirect to [callbackPrefix],
+     * closing the tab and forwarding the callback URL to [onCallback].
+     */
+    internal fun openAuthTab(url: String, callbackPrefix: String, onCallback: (String) -> Unit): String {
+        val tabId = open(url, select = true, incognito = false)
+        authCapture = AuthCapture(tabId, callbackPrefix, onCallback)
+        return tabId
+    }
+
+    /** Clears any active OAuth callback listener without closing open tabs. */
+    internal fun clearAuthCapture() {
+        authCapture = null
+    }
+
+    private fun captureAuthCallback(tabId: String, url: String): Boolean {
+        val capture = authCapture ?: return false
+        if (capture.delivered || !CliAuth.isCallbackUrl(url, capture.callbackPrefix)) return false
+        capture.delivered = true
+        authCapture = null
+        val originTab = capture.tabId
+        close(tabId)
+        if (originTab != tabId) close(originTab)
+        capture.onCallback(url)
+        return true
     }
 
     /**
@@ -1401,12 +1438,13 @@ public class Browser internal constructor(
             return when (requestUrl.scheme?.lowercase(Locale.ROOT)) {
                 "http", "https" -> {
                     if (request.isForMainFrame) {
+                        val raw = requestUrl.toString()
+                        if (captureAuthCallback(tabId, raw)) return true
                         // Install on one of Ren's pages links to the app's APK on ren: Android's installer, as on Home.
                         Applications.apkId(requestUrl)?.takeIf { view.url?.startsWith(PAGES) == true }?.let {
                             installApplication(it)
                             return true
                         }
-                        val raw = requestUrl.toString()
                         val stripped = if (browserSettings?.stripTrackingParams != false) {
                             ContentBlocker.stripTrackingParameters(raw)
                         } else {
@@ -1439,6 +1477,10 @@ public class Browser internal constructor(
         }
 
         override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
+            if (captureAuthCallback(tabId, url)) {
+                view.stopLoading()
+                return
+            }
             // Ren's pages send the token cookie to the backend from another site; a website gets no third-party cookies.
             CookieManager.getInstance().setAcceptThirdPartyCookies(view, url.startsWith(PAGES))
             if (overHome.contains(tabId)) return
@@ -1453,7 +1495,13 @@ public class Browser internal constructor(
             }
         }
 
-        override fun doUpdateVisitedHistory(view: WebView, url: String, isReload: Boolean) = sync(tabId, view)
+        override fun doUpdateVisitedHistory(view: WebView, url: String, isReload: Boolean) {
+            if (captureAuthCallback(tabId, url)) {
+                view.stopLoading()
+                return
+            }
+            sync(tabId, view)
+        }
 
         override fun onPageFinished(view: WebView, url: String) {
             httpsUpgradedUrls.remove(tabId)

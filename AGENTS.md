@@ -303,6 +303,14 @@ What the overhaul added, on the branch `claude/project-thread-tnj6xo` (PR #14) a
   ACP, with native tools streamed, a Strands tool called through `ren`, thinking streamed as reasoning, and a
   conversation resumed in a new process. Not run live: ACP's config option ids and values
   are read from the session, since Antigravity's docs name only the pickers (Model; Thinking level Low to Max).
+  **In-app sign-in** (`deploy/vm/gemini/cli_auth.py`, `core/CliAuth.kt`, `Browser.openAuthTab`, Settings › Agents):
+  selecting Claude Code or Antigravity in Settings › Agents immediately shows its sign-in status and a one-tap
+  **Sign in to Claude Code** / **Sign in to Antigravity** button. `/gemini/cli-auth/start` runs the real CLI's OAuth
+  login (`_bundled/claude auth login --claudeai` or `agy acp --login`) on a wide PTY and returns its authorize URL; the
+  phone opens it in a Ren browser tab, automatically intercepts the callback redirect
+  (`platform.claude.com/oauth/code/callback` or `antigravity.google/oauth-callback`), closes the tab, returns to
+  Settings, and completes the exchange via `/gemini/cli-auth/complete` (converting Claude's callback query to
+  `<code>#<state>` and passing Antigravity's callback URL directly), with Use Chrome / Paste code fallback and Sign out.
 - **Connections** (2026-11-21, owner: Vercel, Netlify, GitHub, GitLab, Supabase and Bitbucket for every agent, with
   sign-in; `core/Connections.kt`, `ui/ConnectionsSettings.kt`, ren's `core/connections.py`): Settings › Connections
   lists the six. Each is the provider's official hosted MCP server: Vercel `https://mcp.vercel.com` (OAuth; Ren
