@@ -176,6 +176,7 @@ public fun BrowserScreen(runtime: RenRuntime, waiting: Int, searchRequests: Int 
     val permissionPrompt by browser.sitePermissions.prompt.collectAsStateWithLifecycle()
     val download by browser.downloadRequest.collectAsStateWithLifecycle()
     val fullscreen by browser.fullscreen.collectAsStateWithLifecycle()
+    val modal by browser.modal.collectAsStateWithLifecycle()
 
     val startEditing = {
         addressValue = initialAddressValue(tab)
@@ -234,8 +235,9 @@ public fun BrowserScreen(runtime: RenRuntime, waiting: Int, searchRequests: Int 
                     SplitPanes(browser, panes, tab.id)
                 } else {
                     PullToRefreshTabContainer(
-                        canRefresh = tab.error == null && tab.sslWarning == null,
+                        canRefresh = tab.error == null && tab.sslWarning == null && tab.id !in modal,
                         currentScrollY = browser::currentTabScrollY,
+                        topPulls = browser::currentTabTopPulls,
                         onRefresh = browser::reload,
                     ) {
                         TabView(browser, tab.id)
@@ -386,11 +388,16 @@ private fun initialAddressValue(tab: BrowserTab): TextFieldValue {
     return TextFieldValue(start, TextRange(0, start.length))
 }
 
-/** Pull-to-refresh wrapper for WebView tabs that activates only when the page is scrolled to the top (`scrollY == 0`). */
+/**
+ * Pull-to-refresh for WebView tabs: a pull that starts with the page scrolled to the top (`scrollY == 0`) reloads it once
+ * the page reports being pulled past its top ([topPulls] grows), as Chrome's does, so a pull inside a scrolled box of
+ * the page scrolls the box instead. A page showing a full-screen dialog (an open spreadsheet) isn't reloaded.
+ */
 @Composable
 private fun PullToRefreshTabContainer(
     canRefresh: Boolean,
     currentScrollY: () -> Int,
+    topPulls: () -> Int,
     onRefresh: () -> Unit,
     content: @Composable () -> Unit,
 ) {
@@ -409,6 +416,7 @@ private fun PullToRefreshTabContainer(
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
                     if (currentScrollY() != 0) return@awaitEachGesture
+                    val pullsAtDown = topPulls()
                     val startX = down.position.x
                     val startY = down.position.y
                     var engaged = false
@@ -428,7 +436,7 @@ private fun PullToRefreshTabContainer(
                                 if (currentScrollY() != 0 || dy < -slop || (abs(dx) > slop && abs(dx) >= abs(dy))) {
                                     break
                                 }
-                                if (dy > slop && dy > abs(dx) * 1.25f) {
+                                if (dy > slop && dy > abs(dx) * 1.25f && topPulls() != pullsAtDown) {
                                     engaged = true
                                 }
                             }

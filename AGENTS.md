@@ -35,7 +35,10 @@ What the overhaul added, on the branch `claude/project-thread-tnj6xo` (PR #14) a
   `browser/SitePermissionsManager.kt`, `browser/BrowserHistory.kt`, `browser/Omnibox.kt`,
   `browser/RenCustomTabsService.kt`, `ui/BrowserScreen.kt`, `ui/BrowserSheets.kt`, `ui/BrowserHome.kt`): the app
   opens on it. Tabs are real WebViews, made on a tab's first navigation, with normal and private (WebView multi-profile)
-  tabs, saved tab state, recently-closed tab reopen, desktop-site mode, find in page, pull-to-refresh, context menus,
+  tabs, saved tab state, recently-closed tab reopen, desktop-site mode, find in page, pull-to-refresh (a pull that starts
+  at the page's top reloads once the page reports being pulled past it, Chromium's root overscroll that Chrome's own
+  pull-to-refresh starts from, so a pull inside a box that scrolls on its own, as ren's pages and an open spreadsheet
+  do, scrolls the box; never while a page shows a full-screen dialog; `TabWebView`, 2026-11-23), context menus,
   print/PDF, downloads (including `blob:`/`data:`), uploads, fullscreen video, HTTP auth and JS dialogs, inline page
   error and TLS warning cards, and Custom Tabs. Tabs send WebView's user agent without its `; wv` and `Version/4.0`
   tokens (`Browser.browserUserAgent`, 2026-11-20), as DuckDuckGo's browser does, since Google refuses sign-in in an
