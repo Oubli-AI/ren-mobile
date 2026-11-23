@@ -179,6 +179,14 @@ export function Places({ sheet }: { sheet: SheetRows }) {
 /** The most bars a chart of numbers shows: the rows with the highest. */
 const TOP = 12
 const BAR_HEIGHT = 30
+const listed = new Intl.ListFormat('en', { type: 'conjunction' })
+
+/** The bars level with the first, by name when there are three or fewer; null when the first stands alone. */
+function tied(bars: { label: string; value: number }[], noun: string): string | null {
+  const level = bars.filter((bar) => bar.value === bars[0]?.value)
+  if (level.length < 2) return null
+  return level.length > 3 ? plural(level.length, noun) : listed.format(level.map((bar) => bar.label))
+}
 
 /**
  * A chart of each column of choices (how many rows have each) and of numbers (each row's, highest first), with its
@@ -194,10 +202,13 @@ export function Charts({ sheet }: { sheet: SheetRows }) {
       }).sort((a, b) => b.value - a.value)
       const total = bars.reduce((sum, bar) => sum + bar.value, 0)
       const [top] = bars
+      const level = tied(bars, 'choice')
       return top && total > 0 ? [{
         c, column, bars, header: [column.name, 'Rows'],
         question: `How many rows have each ${column.name}?`,
-        takeaway: `${top.label} is the most common, with ${plural(top.value, 'row')} of ${formatNumber(total)}.`,
+        takeaway: level
+          ? `${level} tie for the most, with ${plural(top.value, 'row')} each of ${formatNumber(total)}.`
+          : `${top.label} is the most common, with ${plural(top.value, 'row')} of ${formatNumber(total)}.`,
         howToRead: `Each bar counts the rows with that ${column.name}.`,
       }] : []
     }
@@ -207,10 +218,11 @@ export function Charts({ sheet }: { sheet: SheetRows }) {
       return typeof value === 'number' ? [{ label: sheet.title(r), value, shown: sheet.text(r, c) }] : []
     }).sort((a, b) => b.value - a.value)
     const [top] = bars
+    const level = tied(bars, 'row')
     return top ? [{
       c, column, bars, header: [label, column.name],
       question: `Which rows have the highest ${column.name}?`,
-      takeaway: `${top.label} has the highest, ${top.shown}.${bars.length > TOP ? ` The ${TOP} highest of ${formatNumber(bars.length)} rows are shown.` : ''}`,
+      takeaway: `${level ? `${level} tie for the highest` : `${top.label} has the highest`}, ${top.shown}.${bars.length > TOP ? ` The ${TOP} highest of ${formatNumber(bars.length)} rows are shown.` : ''}`,
       howToRead: `Each bar is one row's ${column.name}, highest first.`,
     }] : []
   })

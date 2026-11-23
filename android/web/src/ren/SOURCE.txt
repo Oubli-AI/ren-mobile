@@ -1,4 +1,4 @@
-ren desktop's pages and components, unmodified: github.com/Oubli-AI/ren (was ImRonAI/TheBrowser) at 6ab5be6 (pull
+ren desktop's pages and components, unmodified: github.com/Oubli-AI/ren (was ImRonAI/TheBrowser) at 1b92739 (pull
 61, a spreadsheet's rows as a chart, a calendar, a map, a gallery and a dashboard, after AppSheet; with pull 60, its
 rows as cards, a row and a form; with pull 56, spreadsheets in pages and
 Squad's DataGrid outcome; with pull 54, Squad's Web App, Website and Mobile App
