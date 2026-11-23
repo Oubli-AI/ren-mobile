@@ -28,3 +28,10 @@ body,
 form [role="radiogroup"][aria-label="Research depth"] {
   display: none;
 }
+
+/* A row wider than the phone (Documents' header: Saved, Print, + Context, Save) would widen the WebView's layout
+   viewport past the screen, and a full-screen overlay sized to it (the open spreadsheet) would run under the
+   browser's bottom bar. The page keeps the screen's width instead. */
+html {
+  overflow-x: clip;
+}
