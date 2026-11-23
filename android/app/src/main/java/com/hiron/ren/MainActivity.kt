@@ -346,17 +346,22 @@ private fun AgentPanel(runtime: RenRuntime, state: RenState, listen: () -> Unit,
 /**
  * ren desktop's Context widget over the browser, under the agent panel: its view takes only what the page shows (the
  * orb at the corner above the bottom bar, the orb with a finished run's notice, or the open panel over the whole
- * screen), and stays in place at no size while there is nothing to show, so its Context Agent keeps hearing the phone.
+ * screen), and stays in place at no size while there is nothing to show, or while the page in front shows a full-screen
+ * dialog (an open spreadsheet, whose row actions the orb would cover), so its Context Agent keeps hearing the phone.
  */
 @Composable
 private fun ContextOverlay(runtime: RenRuntime) {
     val layout by runtime.contextWidget.layout.collectAsStateWithLifecycle()
+    val browser by runtime.browser.state.collectAsStateWithLifecycle()
+    val modal by runtime.browser.modal.collectAsStateWithLifecycle()
     val view = runtime.contextWidget.view() ?: return
-    val size = when (layout) {
-        ContextLayout.None -> Modifier.size(0.dp)
-        ContextLayout.Orb -> Modifier.navigationBarsPadding().padding(bottom = BOTTOM_BAR).size(ORB)
-        ContextLayout.Notice -> Modifier.navigationBarsPadding().padding(bottom = BOTTOM_BAR).width(NOTICE_WIDTH).height(NOTICE_HEIGHT)
-        ContextLayout.Panel -> Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()
+    val covered = browser.active in modal
+    val size = when {
+        layout == ContextLayout.None -> Modifier.size(0.dp)
+        layout != ContextLayout.Panel && covered -> Modifier.size(0.dp)
+        layout == ContextLayout.Orb -> Modifier.navigationBarsPadding().padding(bottom = BOTTOM_BAR).size(ORB)
+        layout == ContextLayout.Notice -> Modifier.navigationBarsPadding().padding(bottom = BOTTOM_BAR).width(NOTICE_WIDTH).height(NOTICE_HEIGHT)
+        else -> Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()
     }
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomEnd) {
         key(view) {

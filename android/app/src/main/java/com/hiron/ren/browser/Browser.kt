@@ -251,6 +251,10 @@ public class Browser internal constructor(
     private val _jsDialog: MutableStateFlow<JsDialogPrompt?> = MutableStateFlow(null)
     internal val jsDialog: StateFlow<JsDialogPrompt?> = _jsDialog.asStateFlow()
 
+    /** The tabs whose page shows a full-screen dialog (an open spreadsheet), as the page reports it. */
+    private val _modal: MutableStateFlow<Set<String>> = MutableStateFlow(emptySet())
+    public val modal: StateFlow<Set<String>> = _modal.asStateFlow()
+
     /** A web page a tab finished loading, by address and title: ren's Context Agent hears about it. */
     public var visited: (url: String, title: String) -> Unit = { _, _ -> }
 
@@ -345,6 +349,7 @@ public class Browser internal constructor(
         defaultUserAgents.remove(id)
         httpsUpgradedUrls.remove(id)
         overHome.remove(id)
+        _modal.update { it - id }
         deleteTabStateBundle(id)
 
         val tabs = before.tabs.filterNot { it.id == id }
@@ -385,6 +390,7 @@ public class Browser internal constructor(
             defaultUserAgents.remove(tab.id)
             httpsUpgradedUrls.remove(tab.id)
             overHome.remove(tab.id)
+            _modal.update { it - tab.id }
             deleteTabStateBundle(tab.id)
         }
         if (before.active in closingIds && _findState.value.active) {
@@ -1175,7 +1181,7 @@ public class Browser internal constructor(
         if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
             // Ren's pages ask for the workspace token their requests carry, the theme and the favorites, give back the
             // favorites Discover changed, say which ren account they are signed in to and hand over a file they made,
-            // as a data URL with its name; Vibe asks whose library it shows and sets Ren's voice. No other origin
+            // as a data URL with its name, and say when they show a full-screen dialog; Vibe asks whose library it shows and sets Ren's voice. No other origin
             // reaches this listener.
             WebViewCompat.addWebMessageListener(webView, "RenHost", setOf("https://$ORIGIN_HOST")) { _, message, _, isMainFrame, reply ->
                 val asked = message.data?.let { runCatching { JSONObject(it) }.getOrNull() }
@@ -1202,6 +1208,7 @@ public class Browser internal constructor(
                         )
                         "ren-voice" -> asked.optJSONObject("voice")?.let(RenVoice::of)?.let { browserSettings?.renVoice = it }
                         "download" -> savePageFile(asked.optString("name"), asked.optString("url"))
+                        "modal" -> _modal.update { if (asked.optBoolean("open")) it + id else it - id }
                     }
                 }
             }
@@ -1483,6 +1490,7 @@ public class Browser internal constructor(
             }
             // Ren's pages send the token cookie to the backend from another site; a website gets no third-party cookies.
             CookieManager.getInstance().setAcceptThirdPartyCookies(view, url.startsWith(PAGES))
+            _modal.update { it - tabId }
             if (overHome.contains(tabId)) return
             update(tabId) {
                 it.copy(

@@ -328,6 +328,20 @@ HTMLAnchorElement.prototype.click = function () {
 }
 
 /**
+ * Keeps the app told whether the page shows a full-screen dialog (ren's `aria-modal` portals: an open spreadsheet), so
+ * what the app floats over the page, the Context widget's orb, steps aside while it does.
+ */
+if (host !== undefined) {
+  let open = false
+  new MutationObserver(() => {
+    const now = document.querySelector('[aria-modal="true"]') !== null
+    if (now === open) return
+    open = now
+    tell("modal", { open })
+  }).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["aria-modal"] })
+}
+
+/**
  * Keeps the app told which ren account the pages are signed in to and whether its interview is done, as ren desktop's
  * App.tsx reads them (`useAuthStore`, `useOnboardingStore`): the app shows the Context widget only for a signed-in
  * account that finished the interview. Starts ren's sign-in check as App.tsx does.
