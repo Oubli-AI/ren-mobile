@@ -66,7 +66,9 @@ What the overhaul added, on the branch `claude/project-thread-tnj6xo` (PR #14) a
   `MainContent` draws for the addresses its tab store opens (`ron://projects`, `ron://project/<key>`,
   `ron://documents`), all unmodified in `src/ren`, and `DeepResearchPage` for Research. Every model picker reads Model Provider, Model, Reasoning Effort, Research Depth (owner, 2026-11-20): ren's `ModelSelector` (the agent panel, `ren://agent`, Research, Vibe's agent, issue chats) gets the phone's popover (`src/destinations/picker.tsx`, by a Vite alias for that importer alone), which adds the depth row the shell provides from ren's Deep Research store (`research-depth.tsx`), and `page.css` hides Research's own depth control; Settings › Agents ends with Research depth, the search level Home's chips set (`Settings.searchLevel`). `src/destinations/` mounts
   them under a switcher (ren desktop's `navigation/destinations.ts`: Home and the seven destinations); Home's switcher
-  scrolls to the same seven. A story opens in ren
+  scrolls to the same seven. The page scrolls in the area under the switcher, as ren desktop's `BrowserLayout` scrolls a
+  tab's content, since ren's `index.css` keeps the body from scrolling (2026-11-23: until then a finger couldn't scroll
+  the Documents list or a document, seen on the emulator). A story opens in ren
   desktop's article reader (`ArticleReaderPage`, `ron://read`) in the same tab, and Back returns. Projects work
   as ren's guest workspace (`X-Ron-Workspace`, kept in SQLite on the VM) or signed in with Supabase (email and
   password, or ren's Google and GitHub buttons: the provider's page opens in a Custom Tab of another browser, since

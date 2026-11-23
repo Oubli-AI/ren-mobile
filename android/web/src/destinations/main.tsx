@@ -177,7 +177,8 @@ function Page() {
       ) : (
         <div className="flex h-full flex-col bg-surface-0 dark:bg-surface-900">
           <Destinations />
-          <div className="min-h-0 flex-1">
+          {/* The page scrolls here, as BrowserLayout scrolls a tab's content on the desktop: ren's body never does. */}
+          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
             <Content />
           </div>
         </div>
