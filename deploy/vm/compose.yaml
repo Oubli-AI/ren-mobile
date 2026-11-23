@@ -128,7 +128,7 @@ services:
   # Projects, Documents, Calendar, Vibe and Build, at https://rivet.ron-ai.dev/.
   ren:
     build: ./ren
-    image: ren-api:4841e40
+    image: ren-api:52b1060
     restart: unless-stopped
     env_file:
       # The Brave keys and NIM's key.
