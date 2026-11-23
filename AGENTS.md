@@ -230,7 +230,19 @@ What the overhaul added, on the branch `claude/project-thread-tnj6xo` (PR #14) a
     Squad's Grid Builder keeps totals on a summary sheet. Checked (2026-11-21) in Chromium at phone size on the
     built pages against ren's Projects code on loopback, light and dark: cards with pictures, a row's actions, an
     edit, a new row with the formula of the row above, a copy, a delete, a summary over whole columns, Back through
-    every step, a sheet with only its header, and the saved page. Not run on a phone.
+    every step, a sheet with only its header, and the saved page. On the emulator (2026-11-23, 0.5.11) a page with a
+    spreadsheet filled by hand showed its cards, a row with its actions and the new-row form. Documents' header row
+    is wider than a phone and widened the WebView's layout viewport, so the open spreadsheet ran under the browser's
+    bottom bar with its Cards and Sheet tabs and Done out of sight; the page keeps the screen's width (`overflow-x:
+    clip` on the root, `src/page.css`). And the bottom bar left the layout while the keyboard was up, so a tab grew
+    by its height as the keyboard came and shrank by it once the keyboard went; Univer takes a shrink of 80 px or
+    more for a keyboard and kept the taller height, its canvas over the tabs. The keyboard now rises over the bar and
+    the tab ends at whichever is higher (`BrowserScreen`), so a tab only shrinks as the keyboard comes and grows as
+    it goes. The Context widget's orb sat over a row's Text and Delete; a page tells the app when it shows an
+    `aria-modal` dialog (`{"type":"modal"}` over `RenHost`, `src/host.ts`), and the orb or notice takes no room while
+    the tab in front has one open (`Browser.modal`, `ContextOverlay`). The grey rail at the screen's right edge on the
+    emulator is Android's accessibility button (the floating menu for the App operator), which the phone's own
+    accessibility settings place, not the app.
   - **In the APK:** the engine is a chunk of its own (1.75 MB compressed), loaded when a spreadsheet first calculates
     or opens. To stay under 20 MB, `vite.config.ts` leaves out what a phone never loads, 1.67 MB compressed: the
     hyphenation patterns of 77 languages, which Univer's layout loads for a cell laid out as a document whose text

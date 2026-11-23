@@ -24,7 +24,6 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -33,14 +32,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.isImeVisible
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -104,6 +104,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -149,7 +150,6 @@ public enum class Page { Activity, Settings }
  * in split view), and the bottom bar with back, forward, search, the tabs and the menu. The bottom bar steps aside while the keyboard is up.
  * Each new [searchRequests] (the search widget) puts the address bar in editing, with the keyboard up.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 public fun BrowserScreen(runtime: RenRuntime, waiting: Int, searchRequests: Int = 0, onAskRen: () -> Unit, onOpen: (Page) -> Unit) {
     val p = LocalPalette.current
@@ -195,99 +195,104 @@ public fun BrowserScreen(runtime: RenRuntime, waiting: Int, searchRequests: Int 
     BackHandler(fullscreen == null && !findState.active && editing) { editing = false }
     BackHandler(fullscreen == null && !findState.active && !editing && tab.canGoBack) { browser.back() }
 
-    Column(Modifier.fillMaxSize().background(p.bg).imePadding()) {
-        Toolbar(
-            tab = tab,
-            editing = editing,
-            addressValue = addressValue,
-            onAddressChange = { addressValue = it },
-            waiting = waiting,
-            onEdit = startEditing,
-            onGo = go,
-            onCancel = { editing = false },
-            onHome = { browser.load(tab.id, Addresses.HOME) },
-            onAskRen = onAskRen,
-        )
-        if (findState.active && !editing) {
-            FindInPageBar(
-                findState = findState,
-                onQueryChange = browser::findInPage,
-                onPrevious = { browser.findNext(false) },
-                onNext = { browser.findNext(true) },
-                onClose = browser::clearFind,
+    // The keyboard rises over the bottom bar, and the page ends at whichever is higher. The page so only shrinks as the
+    // keyboard comes and grows as it goes, as in a browser without a bottom bar: a page that tells the keyboard from a
+    // resize by how much it shrank (Univer, in an open spreadsheet) isn't left a bar's height taller than the screen.
+    var bottomBarHeight by remember { mutableIntStateOf(0) }
+    Box(Modifier.fillMaxSize().background(p.bg)) {
+        Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.ime.union(WindowInsets(bottom = bottomBarHeight)))) {
+            Toolbar(
+                tab = tab,
+                editing = editing,
+                addressValue = addressValue,
+                onAddressChange = { addressValue = it },
+                waiting = waiting,
+                onEdit = startEditing,
+                onGo = go,
+                onCancel = { editing = false },
+                onHome = { browser.load(tab.id, Addresses.HOME) },
+                onAskRen = onAskRen,
             )
-        }
-        Box(Modifier.fillMaxWidth().height(2.dp).background(p.chrome)) {
-            if (tab.loading) {
-                Box(Modifier.fillMaxHeight().fillMaxWidth(tab.progress.coerceIn(5, 100) / 100f).background(p.accent))
+            if (findState.active && !editing) {
+                FindInPageBar(
+                    findState = findState,
+                    onQueryChange = browser::findInPage,
+                    onPrevious = { browser.findNext(false) },
+                    onNext = { browser.findNext(true) },
+                    onClose = browser::clearFind,
+                )
             }
-        }
-        Box(Modifier.weight(1f).fillMaxWidth()) {
-            if (tab.home) {
-                BrowserHome(runtime, go)
-            } else if (panes != null) {
-                SplitPanes(browser, panes, tab.id)
-            } else {
-                PullToRefreshTabContainer(
-                    canRefresh = tab.error == null && tab.sslWarning == null,
-                    currentScrollY = browser::currentTabScrollY,
-                    onRefresh = browser::reload,
-                ) {
-                    TabView(browser, tab.id)
+            Box(Modifier.fillMaxWidth().height(2.dp).background(p.chrome)) {
+                if (tab.loading) {
+                    Box(Modifier.fillMaxHeight().fillMaxWidth(tab.progress.coerceIn(5, 100) / 100f).background(p.accent))
                 }
             }
-            val sslWarning = tab.sslWarning
-            val pageError = tab.error
-            if (sslWarning != null) {
-                SslWarningCard(
-                    warning = sslWarning,
-                    onBackToSafety = { browser.goBackFromSslWarning(tab.id) },
-                    onProceed = { browser.proceedPastSslWarning(tab.id) },
-                )
-            } else if (pageError != null) {
-                PageErrorCard(
-                    error = pageError,
-                    canGoBack = tab.canGoBack,
-                    onRetry = { browser.retryError(tab.id) },
-                    onSearchWithRen = { go(Addresses.searchUrl(pageError.failingUrl, runtime.settings.searchLevel)) },
-                    onBack = browser::back,
-                )
-            }
-            if (editing) {
-                OmniboxDropdown(
-                    tab = tab,
-                    tabs = state.tabs,
-                    typedText = addressValue.text,
-                    runtime = runtime,
-                    onGo = go,
-                    onSelectTab = { selectedId ->
-                        editing = false
-                        browser.select(selectedId)
-                    },
-                )
-            }
-        }
-        if (!WindowInsets.isImeVisible) {
-            BottomBar(
-                tab = tab,
-                count = state.tabs.size,
-                onBack = browser::back,
-                onForward = browser::forward,
-                onSearch = startEditing,
-                onTabs = { tabs = true },
-                onMore = { menu = true },
-                onSwipeTab = { delta ->
-                    val list = state.tabs
-                    val currentIndex = list.indexOfFirst { it.id == tab.id }
-                    if (currentIndex >= 0) {
-                        val nextIndex = currentIndex + delta
-                        if (nextIndex in list.indices) {
-                            browser.select(list[nextIndex].id)
-                        }
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+                if (tab.home) {
+                    BrowserHome(runtime, go)
+                } else if (panes != null) {
+                    SplitPanes(browser, panes, tab.id)
+                } else {
+                    PullToRefreshTabContainer(
+                        canRefresh = tab.error == null && tab.sslWarning == null,
+                        currentScrollY = browser::currentTabScrollY,
+                        onRefresh = browser::reload,
+                    ) {
+                        TabView(browser, tab.id)
                     }
-                },
-            )
+                }
+                val sslWarning = tab.sslWarning
+                val pageError = tab.error
+                if (sslWarning != null) {
+                    SslWarningCard(
+                        warning = sslWarning,
+                        onBackToSafety = { browser.goBackFromSslWarning(tab.id) },
+                        onProceed = { browser.proceedPastSslWarning(tab.id) },
+                    )
+                } else if (pageError != null) {
+                    PageErrorCard(
+                        error = pageError,
+                        canGoBack = tab.canGoBack,
+                        onRetry = { browser.retryError(tab.id) },
+                        onSearchWithRen = { go(Addresses.searchUrl(pageError.failingUrl, runtime.settings.searchLevel)) },
+                        onBack = browser::back,
+                    )
+                }
+                if (editing) {
+                    OmniboxDropdown(
+                        tab = tab,
+                        tabs = state.tabs,
+                        typedText = addressValue.text,
+                        runtime = runtime,
+                        onGo = go,
+                        onSelectTab = { selectedId ->
+                            editing = false
+                            browser.select(selectedId)
+                        },
+                    )
+                }
+            }
         }
+        BottomBar(
+            tab = tab,
+            count = state.tabs.size,
+            onBack = browser::back,
+            onForward = browser::forward,
+            onSearch = startEditing,
+            onTabs = { tabs = true },
+            onMore = { menu = true },
+            onSwipeTab = { delta ->
+                val list = state.tabs
+                val currentIndex = list.indexOfFirst { it.id == tab.id }
+                if (currentIndex >= 0) {
+                    val nextIndex = currentIndex + delta
+                    if (nextIndex in list.indices) {
+                        browser.select(list[nextIndex].id)
+                    }
+                }
+            },
+            modifier = Modifier.align(Alignment.BottomCenter).onSizeChanged { bottomBarHeight = it.height },
+        )
     }
 
     if (tabs) TabsSheet(browser, state.tabs, state.active, onDismiss = { tabs = false })
@@ -735,10 +740,11 @@ private fun BottomBar(
     onTabs: () -> Unit,
     onMore: () -> Unit,
     onSwipeTab: (Int) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val p = LocalPalette.current
     Column(
-        Modifier
+        modifier
             .fillMaxWidth()
             .background(p.chrome)
             .pointerInput(Unit) {
