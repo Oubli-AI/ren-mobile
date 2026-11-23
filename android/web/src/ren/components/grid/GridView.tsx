@@ -1,20 +1,21 @@
 /**
  * A spreadsheet in a page: what its sheets show, and the spreadsheet itself over the whole screen once it is opened
- * (`engine.ts`, which loads then), as its rows (`GridRows`) or as the sheet. Documents' grid block and a Squad
- * DataGrid run's page both draw it.
+ * (`engine.ts`, which loads then), as its rows in a view its data gives it (`GridRows`) or as the sheet. Documents'
+ * grid block and a Squad DataGrid run's page both draw it.
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { IWorkbookData } from '@univerjs/core'
-import { Download, LayoutList, Loader2, Maximize2, Sheet } from 'lucide-react'
+import { Download, Loader2, Maximize2, Sheet } from 'lucide-react'
 import { BlockHeader } from '@/components/board/task-detail/editor/extensions/blocks/ui'
 import { Button } from '@/components/ui/button'
-import { gridDisplay, gridWorkbook, readGrid, sheetCsv, type GridValue } from '@/lib/grid'
+import { gridColumns, gridDisplay, gridWorkbook, readGrid, rowViews, sheetCsv, type GridValue, type RowView } from '@/lib/grid'
 import { documentErrorMessage, exportGrid, saveExported, saveFile } from '@/lib/project-documents'
 import { cn } from '@/lib/utils'
 import { getProjectsState, projectsRequestFor } from '@/stores/projectsStore'
 import type { GridEngine, GridReading } from './engine'
 import { GridRows, SheetTabs, type GridRowsValue } from './GridRows'
+import { ROW_VIEWS } from './GridViews'
 
 /** The rows a page shows of a sheet, its header among them; the rest are in the open spreadsheet. */
 const PREVIEW_ROWS = 9
@@ -22,8 +23,9 @@ const PREVIEW_ROWS = 9
 /** A cell that reads as a number, a date or an amount sits right, as a spreadsheet sets it. */
 const numeric = (shown: string | undefined) => !!shown && /\d/.test(shown) && !/[a-z]/i.test(shown)
 
-/** How an open spreadsheet shows: a card per row, or the sheet. */
-const VIEWS = [{ id: 'rows', label: 'Cards', icon: LayoutList }, { id: 'sheet', label: 'Sheet', icon: Sheet }] as const
+/** How an open spreadsheet shows: its rows in a view, or the sheet. */
+type View = RowView | 'sheet'
+const VIEWS: Record<View, { label: string; icon: typeof Sheet }> = { ...ROW_VIEWS, sheet: { label: 'Sheet', icon: Sheet } }
 
 /** One spreadsheet at a time calculates off screen. */
 let calculating: Promise<unknown> = Promise.resolve()
@@ -156,8 +158,13 @@ function OpenGrid({ value, editable, onClose }: {
   const [busy, setBusy] = useState<'csv' | 'xlsx' | 'closing' | null>(null)
   const [error, setError] = useState('')
   // A sheet with rows opens as its cards; an empty one as the sheet, to type its header into.
-  const [view, setView] = useState<(typeof VIEWS)[number]['id']>(() => (value.grid.sheets.some((sheet) => sheet.rows.length > 1) ? 'rows' : 'sheet'))
+  const [view, setView] = useState<View>(() => (value.grid.sheets.some((sheet) => sheet.rows.length > 1) ? 'cards' : 'sheet'))
   const [held, setHeld] = useState<GridRowsValue | null>(null)
+  // The views the sheet in view gives its rows, kept while the sheet shows.
+  const [views, setViews] = useState<readonly RowView[]>(['cards'])
+  const shown: View = view === 'sheet' || views.includes(view) ? view : 'cards'
+  const rows = shown !== 'sheet'
+  const tabs: readonly View[] = [...views, 'sheet']
   const leave = useRef<() => boolean>(() => false)
 
   useEffect(() => {
@@ -177,16 +184,20 @@ function OpenGrid({ value, editable, onClose }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- opened once, on what the grid held then
   }, [])
 
-  // The cards show what the spreadsheet holds: read as they come into view, and after each row they write.
+  // The rows show what the spreadsheet holds: read as they come into view, and after each row they write.
   const read = async () => {
     const reading = await engine.current?.read()
-    if (reading) setHeld({ ...readGrid(title, reading.sheets), active: reading.active })
+    if (!reading) return
+    const next = { ...readGrid(title, reading.sheets), active: reading.active }
+    const sheet = next.grid.sheets[next.active]
+    setHeld(next)
+    setViews(sheet ? rowViews(gridColumns(sheet, next.values[next.active])) : ['cards'])
   }
   useEffect(() => {
-    if (!ready || view !== 'rows') return setHeld(null)
+    if (!ready || !rows) return setHeld(null)
     read().catch(() => setError('The spreadsheet could not be read.'))
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- read when the cards come into view
-  }, [ready, view])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- read when the rows come into view
+  }, [ready, rows])
 
   const close = useRef(onClose)
   close.current = onClose
@@ -255,11 +266,11 @@ function OpenGrid({ value, editable, onClose }: {
       </div>
       <div className="relative min-h-0 flex-1">
         {/* Univer layers its toolbar, canvas and floating keys by z-index; isolated, they stay under the cards. */}
-        <div ref={host} inert={view === 'rows'} className="absolute inset-0 isolate" />
-        {view === 'rows' && (
+        <div ref={host} inert={rows} className="absolute inset-0 isolate" />
+        {rows && (
           <div className="absolute inset-0 flex flex-col bg-surface-0 dark:bg-surface-900">
             {held && (
-              <GridRows value={held} editable={editable} leave={leave}
+              <GridRows value={held} view={shown} editable={editable} leave={leave}
                 onShow={(sheet) => {
                   engine.current?.show(sheet)
                   read().catch(() => setError('The spreadsheet could not be read.'))
@@ -271,16 +282,17 @@ function OpenGrid({ value, editable, onClose }: {
             )}
           </div>
         )}
-        {(!ready || (view === 'rows' && !held)) && !error && <Loader2 className="absolute left-1/2 top-1/2 size-5 -translate-x-1/2 -translate-y-1/2 animate-spin text-muted-foreground" />}
+        {(!ready || (rows && !held)) && !error && <Loader2 className="absolute left-1/2 top-1/2 size-5 -translate-x-1/2 -translate-y-1/2 animate-spin text-muted-foreground" />}
       </div>
-      <div role="tablist" aria-label="Views" className="flex h-12 shrink-0 border-t border-surface-200 dark:border-surface-800">
-        {VIEWS.map(({ id, label, icon: Icon }) => (
-          <button key={id} type="button" role="tab" aria-selected={view === id} onClick={() => setView(id)}
-            className={cn('flex flex-1 flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition-colors duration-150',
-              view === id ? 'text-blurple-600 dark:text-blurple-400' : 'text-ink-muted hover:text-ink dark:text-ink-inverse-muted dark:hover:text-ink-inverse')}>
+      <div role="tablist" aria-label="Views" className="flex h-12 shrink-0 overflow-x-auto border-t border-surface-200 scrollbar-none dark:border-surface-800">
+        {tabs.map((id) => {
+          const { label, icon: Icon } = VIEWS[id]
+          return <button key={id} type="button" role="tab" aria-selected={shown === id} onClick={() => setView(id)}
+            className={cn('flex flex-auto shrink-0 flex-col items-center justify-center gap-0.5 px-1.5 text-[11px] font-medium transition-colors duration-150',
+              shown === id ? 'text-blurple-600 dark:text-blurple-400' : 'text-ink-muted hover:text-ink dark:text-ink-inverse-muted dark:hover:text-ink-inverse')}>
             <Icon className="size-4" />{label}
           </button>
-        ))}
+        })}
       </div>
     </div>,
     document.body,

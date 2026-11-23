@@ -243,6 +243,14 @@ What the overhaul added, on the branch `claude/project-thread-tnj6xo` (PR #14) a
     the tab in front has one open (`Browser.modal`, `ContextOverlay`). The grey rail at the screen's right edge on the
     emulator is Android's accessibility button (the floating menu for the App operator), which the phone's own
     accessibility settings place, not the app.
+  - **The other views** (2026-11-23, ren PR #61, `GridViews.tsx`, unmodified in `src/ren`): beside Cards and Sheet,
+    the spreadsheet's bottom bar offers each of AppSheet's views the sheet in view has the data for: Chart (a bar
+    chart of each column of choices, rows per choice, and of numbers, each row's highest first, with its table one
+    tap away), Calendar (a month with the rows on each day, by the first column of dates, and the day's rows), Map
+    (the rows with a place, by the first column of addresses or coordinates, and the one picked on Google Maps'
+    keyless embed, as an Embed tab's map: one place at a time, since nothing geocodes the rest), Gallery (the rows'
+    pictures) and Dashboard (all of those in one scroll, where there are two or more). A tap opens the row; Back
+    returns to the view. The tabs size to their labels, so seven fit a 360 dp screen.
   - **In the APK:** the engine is a chunk of its own (1.75 MB compressed), loaded when a spreadsheet first calculates
     or opens. To stay under 20 MB, `vite.config.ts` leaves out what a phone never loads, 1.67 MB compressed: the
     hyphenation patterns of 77 languages, which Univer's layout loads for a cell laid out as a document whose text

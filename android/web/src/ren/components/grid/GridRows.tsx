@@ -1,6 +1,6 @@
 /**
- * A sheet's rows as an app, after AppSheet's deck, detail and form views
- * (https://support.google.com/appsheet/answer/10106772): a card per row, a row with its previous and next, and a form
+ * A sheet's rows as an app, after AppSheet's views (https://support.google.com/appsheet/answer/10106772): a card per
+ * row or another of the views the sheet's data gives it (`GridViews`), a row with its previous and next, and a form
  * that adds a row or changes one. A column's type (`gridColumns`) decides how a cell shows, what a tap on it starts
  * (a call, a text, an email, its link, its place on a map, as AppSheet's external actions do:
  * https://support.google.com/appsheet/answer/10107706) and which input the form gives it.
@@ -12,10 +12,11 @@ import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import {
-  gridColumns, isFormula, temporalSerial, temporalText,
-  type ColumnType, type Grid, type GridCell, type GridColumn, type GridDisplaySheet,
+  gridColumns, isFormula, rowViews, temporalSerial, temporalText,
+  type ColumnType, type Grid, type GridCell, type GridColumn, type GridDisplaySheet, type RowView,
 } from '@/lib/grid'
 import { cn } from '@/lib/utils'
+import { Calendar, Charts, Gallery, ICON, Places, ROW_VIEWS, RowCard, type SheetRows } from './GridViews'
 
 /** What an open spreadsheet holds: its grid, each cell's value and what each shows by sheet, and the sheet in view. */
 export interface GridRowsValue { grid: Grid; values: GridCell[][][]; display: GridDisplaySheet[]; active: number }
@@ -56,7 +57,6 @@ function entered(column: GridColumn, cell: GridCell | undefined): string | boole
   return column.type === 'date' || column.type === 'datetime' || column.type === 'time' ? temporalText(column.type, cell) : String(cell)
 }
 
-const ICON = 'flex size-9 shrink-0 items-center justify-center rounded-lg text-ink-secondary transition-colors duration-150 hover:bg-surface-100 hover:text-ink disabled:pointer-events-none disabled:opacity-40 dark:text-ink-inverse-secondary dark:hover:bg-surface-850 dark:hover:text-ink-inverse [&_svg]:size-4'
 const BAR = 'flex h-12 shrink-0 items-center gap-1 border-b border-surface-200 px-2 dark:border-surface-800'
 const STEP = 'fixed inset-0 z-10 flex flex-col bg-surface-0 font-sans text-ink dark:bg-surface-900 dark:text-ink-inverse'
 
@@ -75,8 +75,10 @@ export function SheetTabs({ names, active, onShow }: { names: readonly string[];
   </div>
 }
 
-export function GridRows({ value, editable, leave, onShow, onWrite }: {
+export function GridRows({ value, view, editable, leave, onShow, onWrite }: {
   value: GridRowsValue
+  /** How the rows show. */
+  view: RowView
   /** Whether rows can be added, changed and removed. */
   editable: boolean
   /** Set here to what Back does while a row or the form is open: it leaves that step and answers true. */
@@ -119,6 +121,41 @@ export function GridRows({ value, editable, leave, onShow, onWrite }: {
     return columns[c]?.type !== 'yesno' ? cell : cell === 'TRUE' ? 'Yes' : cell === 'FALSE' ? 'No' : cell
   }
   const title = (r: number) => text(r, label) || `Row ${r}`
+  const sheetRows: SheetRows = {
+    columns, label, rows: written.slice(1).map((_, index) => index + 1), value: (r, c) => results?.[r]?.[c], text, title,
+    open: (row) => enter({ kind: 'row', row }),
+  }
+
+  const body = (each: RowView): ReactNode => {
+    switch (each) {
+      case 'cards':
+        return <ul aria-label={sheet?.name} className="grid auto-rows-min gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {sheetRows.rows.map((r) => (
+            <li key={r}>
+              <RowCard title={title(r)} picture={image < 0 ? undefined : text(r, image)} onOpen={() => enter({ kind: 'row', row: r })}
+                lines={summary.flatMap((c) => (text(r, c) ? [<><span className="text-muted-foreground">{columns[c]?.name}</span> {text(r, c)}</>] : []))} />
+            </li>
+          ))}
+        </ul>
+      case 'chart':
+        return <Charts sheet={sheetRows} />
+      case 'calendar':
+        return <Calendar sheet={sheetRows} />
+      case 'map':
+        return <Places sheet={sheetRows} />
+      case 'gallery':
+        return <Gallery sheet={sheetRows} />
+      case 'dashboard':
+        return <div className="space-y-6">
+          {rowViews(columns).filter((part) => part !== 'cards' && part !== 'dashboard').map((part) => (
+            <section key={part} aria-label={ROW_VIEWS[part].label} className="space-y-2">
+              <h3 className="px-1 text-[12px] font-semibold text-muted-foreground">{ROW_VIEWS[part].label}</h3>
+              {body(part)}
+            </section>
+          ))}
+        </div>
+    }
+  }
 
   return <>
     {value.grid.sheets.length > 1 && <SheetTabs names={value.grid.sheets.map((each) => each.name)} active={value.active} onShow={onShow} />}
@@ -129,29 +166,7 @@ export function GridRows({ value, editable, leave, onShow, onWrite }: {
       )}
     </div>
     {count > 0
-      ? (
-        <ul aria-label={sheet?.name} className="grid min-h-0 flex-1 auto-rows-min gap-2 overflow-y-auto px-3 pb-3 sm:grid-cols-2 lg:grid-cols-3">
-          {written.slice(1).map((_, index) => {
-            const r = index + 1
-            const picture = image < 0 ? '' : text(r, image)
-            return <li key={r}>
-              <button type="button" onClick={() => enter({ kind: 'row', row: r })}
-                className="flex w-full items-center gap-3 rounded-xl border border-surface-200 bg-surface-0 p-3 text-left transition-colors duration-150 hover:border-surface-300 dark:border-surface-800 dark:bg-surface-900 dark:hover:border-surface-700">
-                {picture && <img src={picture} alt="" loading="lazy" className="size-12 shrink-0 rounded-lg object-cover" />}
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[14px] font-semibold text-ink dark:text-ink-inverse">{title(r)}</span>
-                  {summary.map((c) => text(r, c) && (
-                    <span key={c} className="block truncate text-[12.5px] leading-5 text-ink-secondary dark:text-ink-inverse-secondary">
-                      <span className="text-muted-foreground">{columns[c]?.name}</span> {text(r, c)}
-                    </span>
-                  ))}
-                </span>
-                <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-              </button>
-            </li>
-          })}
-        </ul>
-      )
+      ? <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">{body(view)}</div>
       : <p className="min-h-0 flex-1 px-4 py-10 text-center text-[13px] text-muted-foreground">{columns.length > 0 ? 'This sheet has no rows yet.' : 'This sheet is empty.'}</p>}
     {step?.kind === 'row' && (
       <Row key={step.row} columns={columns} title={title(step.row)} picture={image < 0 ? '' : text(step.row, image)} text={(c) => text(step.row, c)}
@@ -206,7 +221,7 @@ function Row({ columns, title, picture, text, row, count, editable, onTurn, onEd
 
   return <div role="dialog" aria-modal="true" aria-label={title} className={STEP}>
     <div className={BAR}>
-      <button type="button" aria-label="Back to the cards" className={ICON} onClick={() => window.history.back()}><ArrowLeft /></button>
+      <button type="button" aria-label="Back" className={ICON} onClick={() => window.history.back()}><ArrowLeft /></button>
       <p className="min-w-0 flex-1 truncate text-sm font-semibold">{title}</p>
       <p className="shrink-0 text-[12px] tabular-nums text-muted-foreground">{row} of {count}</p>
       <button type="button" aria-label="Previous row" className={ICON} disabled={row <= 1} onClick={() => onTurn(row - 1)}><ChevronLeft /></button>
