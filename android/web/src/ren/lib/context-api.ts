@@ -55,9 +55,12 @@ export type ScheduleEvery = 'hours' | 'day' | 'weekdays' | 'week'
 export interface AgentCadence { every: ScheduleEvery; hours: number; time: string; weekday: number; timezone: string }
 export interface AgentSchedule { cadence: AgentCadence; task: string; enabled: boolean; next_run_at: string | null }
 export type AgentRunStatus = 'running' | 'completed' | 'failed' | 'cancelled' | 'interrupted' | 'checkpointed'
-/** One run of a specialist: a panel session (`session_id`) the Agent Panel opens as that specialist. */
+/**
+ * One run of a specialist: a panel session (`session_id`) the Agent Panel opens as that specialist. A spreadsheet's bot
+ * runs Ren (no `agent_id`), started by rows saved (`bot`) or on its schedule.
+ */
 export interface AgentRun {
-  id: string; agent_id: string; agent_name: string; session_id: string; trigger: 'schedule' | 'manual'
+  id: string; agent_id: string | null; agent_name: string; session_id: string; trigger: 'schedule' | 'manual' | 'bot'
   status: AgentRunStatus; summary: string; error: string; started_at: string; finished_at: string | null; seen_at: string | null
 }
 

@@ -1,7 +1,8 @@
 /**
- * A sheet's slices and color rules, after AppSheet's (slices: https://support.google.com/appsheet/answer/10106592,
- * format rules: https://support.google.com/appsheet/answer/10106703): a slice shows only the rows that pass its tests,
- * in every view; a color rule colors the cells of the rows that pass its tests. A test names a column, a comparison its
+ * A sheet's slices, color rules and bots, after AppSheet's (slices: https://support.google.com/appsheet/answer/10106592,
+ * format rules: https://support.google.com/appsheet/answer/10106703, bots: https://support.google.com/appsheet/answer/11998993):
+ * a slice shows only the rows that pass its tests, in every view; a color rule colors the cells of the rows that pass
+ * its tests; a bot hands Ren rows to work on (`agent/api/core/grid_bots.py`). A test names a column, a comparison its
  * type allows and a value, which the form takes with the input of the column's type.
  */
 import { useId, useState, type FormEvent, type ReactNode } from 'react'
@@ -9,9 +10,12 @@ import { ArrowLeft, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { projectInputClass } from '@/components/projects/ProjectFieldInput'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
+import { Textarea } from '@/components/ui/textarea'
+import { WEEKDAYS, cadenceLabel, defaultCadence, type AgentCadence, type ScheduleEvery } from '@/lib/context-api'
 import {
-  RULE_COLORS, fold, temporalText,
-  type ColumnType, type ConditionOp, type GridColumn, type GridCondition, type GridRule, type GridSheet, type GridSlice, type RuleColor,
+  BOT_EVENTS, RULE_COLORS, fold, temporalText,
+  type BotEvent, type ColumnType, type ConditionOp, type GridBot, type GridColumn, type GridCondition, type GridRule, type GridSheet,
+  type GridSlice, type RuleColor,
 } from '@/lib/grid'
 import { cn } from '@/lib/utils'
 import { BAR, CARD, ICON, STEP, TONES } from './GridViews'
@@ -58,18 +62,35 @@ function describe(columns: readonly GridColumn[], where: readonly GridCondition[
 
 const missing = (test: GridCondition) => !TAKES_NO_VALUE.includes(test.op) && (test.value === undefined || test.value === '')
 
-/** A sheet's slices and color rules, each with Edit and Delete, and a way to add one of each. */
-export function SheetFilters({ sheet, columns, onSlice, onRule, onChange }: {
+/** When a bot runs: on rows a save adds or changes, or as often as a scheduled agent can. */
+type When = BotEvent | ScheduleEvery
+const WHEN: readonly (readonly [When, string])[] = [
+  ['added', 'When rows are added'], ['changed', 'When rows are changed'], ['added or changed', 'When rows are added or changed'],
+  ['hours', 'Every few hours'], ['day', 'Every day'], ['weekdays', 'Every weekday'], ['week', 'Every week'],
+]
+const isEvent = (when: When): when is BotEvent => BOT_EVENTS.some((each) => each === when)
+
+/** When a bot runs and the rows it hands Ren, in words. */
+function botLine(bot: GridBot): string {
+  const when = bot.schedule ? cadenceLabel(bot.schedule) : WHEN.find(([each]) => each === bot.on)?.[1] ?? ''
+  return `${when} · ${bot.slice ? `Slice ${bot.slice}` : 'Every row'}`
+}
+
+/** A sheet's slices, color rules and bots, each with Edit and Delete, and a way to add one of each. */
+export function SheetFilters({ sheet, columns, onSlice, onRule, onBot, onChange }: {
   sheet: GridSheet
   columns: readonly GridColumn[]
   /** Open the form on a slice, or on a new one (null). */
   onSlice: (index: number | null) => void
   /** Open the form on a color rule, or on a new one (null). */
   onRule: (index: number | null) => void
+  /** Open the form on a bot, or on a new one (null). */
+  onBot: (index: number | null) => void
   onChange: (sheet: GridSheet) => void
 }) {
   const slices = sheet.slices ?? []
   const rules = sheet.rules ?? []
+  const bots = sheet.bots ?? []
   const item = (key: number, label: string, title: ReactNode, line: string, onEdit: () => void, onDelete: () => void) => (
     <li key={key} className={cn(CARD, 'flex items-center gap-1 py-2 pl-3 pr-1')}>
       <span className="min-w-0 flex-1">
@@ -81,10 +102,10 @@ export function SheetFilters({ sheet, columns, onSlice, onRule, onChange }: {
     </li>
   )
 
-  return <div role="dialog" aria-modal="true" aria-label="Slices and color rules" className={STEP}>
+  return <div role="dialog" aria-modal="true" aria-label="Slices, color rules and bots" className={STEP}>
     <div className={BAR}>
       <button type="button" aria-label="Back" className={ICON} onClick={() => window.history.back()}><ArrowLeft /></button>
-      <p className="min-w-0 flex-1 truncate text-sm font-semibold">Slices and color rules</p>
+      <p className="min-w-0 flex-1 truncate text-sm font-semibold">Slices, color rules and bots</p>
     </div>
     <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-4">
       <section className="space-y-2">
@@ -108,6 +129,18 @@ export function SheetFilters({ sheet, columns, onSlice, onRule, onChange }: {
           })}
         </ul>
         <Button type="button" size="sm" variant="outline" className="h-8 gap-1.5 rounded-full" onClick={() => onRule(null)}><Plus />New color rule</Button>
+      </section>
+      <section className="space-y-2">
+        <h3 className="text-[13px] font-semibold">Bots</h3>
+        <p className="text-[12.5px] text-muted-foreground">
+          A bot hands Ren rows to work on: the rows you add or change, or all of them on a schedule. Ren's report comes as a notification.
+          Bots run in Documents, for a signed-in account.
+        </p>
+        <ul className="space-y-2">
+          {bots.map((bot, index) => item(index, `the bot ${bot.name}`, bot.name, botLine(bot), () => onBot(index),
+            () => onChange({ ...sheet, bots: bots.filter((_, i) => i !== index) })))}
+        </ul>
+        <Button type="button" size="sm" variant="outline" className="h-8 gap-1.5 rounded-full" onClick={() => onBot(null)}><Plus />New bot</Button>
       </section>
     </div>
   </div>
@@ -280,6 +313,80 @@ export function RuleForm({ columns, rules, index, onSave }: {
         {chip(formatted.length === 0, 'Every column', () => setFormatted([]))}
         {columns.map((column) => chip(formatted.includes(column.name), column.name, () => toggle(column.name)))}
       </div>
+    </div>
+  </Form>
+}
+
+/** A bot: its name, when it runs, the rows it hands Ren, and what Ren does with them. */
+export function BotForm({ slices, bots, index, onSave }: {
+  slices: readonly GridSlice[]
+  bots: readonly GridBot[]
+  /** The bot being changed, or null for a new one. */
+  index: number | null
+  onSave: (bot: GridBot) => void
+}) {
+  const id = useId()
+  const editing = index === null ? undefined : bots[index]
+  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  const [name, setName] = useState(editing?.name ?? '')
+  const [when, setWhen] = useState<When>(editing?.schedule?.every ?? editing?.on ?? 'added')
+  // A schedule is kept in the time zone of whoever saves it last, as a scheduled agent's is.
+  const [cadence, setCadence] = useState<AgentCadence>({ ...(editing?.schedule ?? defaultCadence(zone)), timezone: zone })
+  const [slice, setSlice] = useState(editing?.slice ?? '')
+  const [ask, setAsk] = useState(editing?.ask ?? '')
+  const [error, setError] = useState('')
+  const patch = (next: Partial<AgentCadence>) => setCadence((current) => ({ ...current, ...next }))
+  const save = () => {
+    const named = name.trim().slice(0, 60).trim()
+    if (!named) return setError('Give the bot a name.')
+    if (bots.some((each, i) => i !== index && each.name.toLowerCase() === named.toLowerCase())) return setError('Another bot has that name.')
+    if (!ask.trim()) return setError('Say what Ren does with the rows.')
+    onSave({ name: named, ask: ask.trim().slice(0, 2000), ...(isEvent(when) ? { on: when } : { schedule: { ...cadence, every: when } }), ...(slice ? { slice } : {}) })
+  }
+  const label = 'mb-1 block text-[12px] font-medium text-muted-foreground'
+
+  return <Form title={editing ? 'Edit bot' : 'New bot'} error={error} onSave={save}>
+    <div>
+      <label htmlFor={`${id}-name`} className={label}>Name</label>
+      <input id={`${id}-name`} className={projectInputClass} value={name} maxLength={60} onChange={(event) => setName(event.target.value)} />
+    </div>
+    <div className="space-y-2">
+      <label htmlFor={`${id}-when`} className={label}>When it runs</label>
+      <select id={`${id}-when`} className={projectInputClass} value={when}
+        onChange={(event) => {
+          const picked = WHEN.find(([each]) => each === event.target.value)?.[0]
+          if (picked) setWhen(picked)
+        }}>
+        {WHEN.map(([each, said]) => <option key={each} value={each}>{said}</option>)}
+      </select>
+      {when === 'hours' && (
+        <input type="number" aria-label="Hours between runs" className={projectInputClass} min={1} max={168} value={cadence.hours}
+          onChange={(event) => patch({ hours: Math.min(168, Math.max(1, Number(event.target.value) || 1)) })} />
+      )}
+      {when === 'week' && (
+        <select aria-label="Day of the week" className={projectInputClass} value={cadence.weekday} onChange={(event) => patch({ weekday: Number(event.target.value) })}>
+          {WEEKDAYS.map((day, each) => <option key={day} value={each}>{day}</option>)}
+        </select>
+      )}
+      {(when === 'day' || when === 'weekdays' || when === 'week') && (
+        <input type="time" aria-label="Time of day" required className={projectInputClass} value={cadence.time} onChange={(event) => patch({ time: event.target.value })} />
+      )}
+      <p className="text-[12px] text-muted-foreground">
+        {isEvent(when) ? 'Ren gets the rows when the page saves, after you close the spreadsheet.' : `Your time zone: ${cadence.timezone}`}
+      </p>
+    </div>
+    <div>
+      <label htmlFor={`${id}-rows`} className={label}>Rows</label>
+      <select id={`${id}-rows`} className={projectInputClass} value={slice} onChange={(event) => setSlice(event.target.value)}>
+        <option value="">Every row</option>
+        {slice && !slices.some((each) => each.name === slice) && <option value={slice}>{slice} (not in this sheet)</option>}
+        {slices.map((each) => <option key={each.name} value={each.name}>Slice {each.name}</option>)}
+      </select>
+    </div>
+    <div>
+      <label htmlFor={`${id}-ask`} className={label}>What Ren does with them</label>
+      <Textarea id={`${id}-ask`} rows={4} maxLength={2000} value={ask} placeholder="Find tickets for each new plan, with prices and links."
+        onChange={(event) => setAsk(event.target.value)} />
     </div>
   </Form>
 }

@@ -8,6 +8,7 @@
  * stays in its own chunk.
  */
 import type { ICellData, IWorkbookData, IWorksheetData } from '@univerjs/core'
+import type { AgentCadence, ScheduleEvery } from './context-api.ts'
 
 export type GridCell = string | number | boolean | null
 /** How a condition tests a cell. */
@@ -22,7 +23,16 @@ export type RuleColor = 'red' | 'yellow' | 'green' | 'blue' | 'purple' | 'gray'
  * later rule's color wins (AppSheet's format rule: https://support.google.com/appsheet/answer/10106703).
  */
 export interface GridRule { where: GridCondition[]; columns: string[]; color: RuleColor; bold?: boolean }
-export interface GridSheet { name: string; rows: GridCell[][]; formats?: Record<string, string>; slices?: GridSlice[]; rules?: GridRule[] }
+/** What starts a bot that isn't scheduled: rows a person's save adds, changes, or either. */
+export type BotEvent = 'added' | 'changed' | 'added or changed'
+/**
+ * Ren doing `ask` with the rows, those of `slice` when it names one: the rows a save adds or changes (`on`), or all of
+ * them on a schedule (AppSheet's bot: https://support.google.com/appsheet/answer/11998993; `agent/api/core/grid_bots.py`).
+ */
+export interface GridBot { name: string; ask: string; on?: BotEvent; schedule?: AgentCadence; slice?: string }
+export interface GridSheet {
+  name: string; rows: GridCell[][]; formats?: Record<string, string>; slices?: GridSlice[]; rules?: GridRule[]; bots?: GridBot[]
+}
 export interface Grid { title: string; sheets: GridSheet[] }
 
 /** What a grid shows, sheet by sheet: each cell as the spreadsheet displays it. */
@@ -43,7 +53,7 @@ export interface SheetReading { name: string; formulas: string[][]; values: unkn
 export const GRID_FENCE = 'grid'
 
 /** How agents are told to write a spreadsheet (`GRID_MARKDOWN` on the server, word for word). */
-export const GRID_RULE = 'A spreadsheet is one ```grid fence holding JSON: {"title": ..., "sheets": [{"name": ..., "rows": [[...], ...], "formats": {"B": "#,##0"}}]}. The first row of a sheet is its header; a cell is a number, true or false, text, or a formula as text starting with "=" in A1 notation ("=SUM(B2:B9)", "=Sheet2!B4*0.2"); "formats" is optional and gives a column\'s Excel number format by its letter. "slices" is optional and names parts of the rows, each the rows that pass every test: [{"name": "Shows", "where": [{"column": "Kind", "op": "=", "value": "Show"}]}]; "rules" is optional and colors the cells of "columns" (every column when empty) in a row that passes every test: [{"where": [{"column": "Cost", "op": ">", "value": 50}], "columns": ["Cost"], "color": "red", "bold": true}]; "op" is =, !=, >, >=, <, <=, contains, empty or filled, a date is written "2026-11-21", and "color" is red, yellow, green, blue, purple or gray. Use it for data to sort, filter and calculate with; a small table of text stays a Markdown table.'
+export const GRID_RULE = 'A spreadsheet is one ```grid fence holding JSON: {"title": ..., "sheets": [{"name": ..., "rows": [[...], ...], "formats": {"B": "#,##0"}}]}. The first row of a sheet is its header; a cell is a number, true or false, text, or a formula as text starting with "=" in A1 notation ("=SUM(B2:B9)", "=Sheet2!B4*0.2"); "formats" is optional and gives a column\'s Excel number format by its letter. "slices" is optional and names parts of the rows, each the rows that pass every test: [{"name": "Shows", "where": [{"column": "Kind", "op": "=", "value": "Show"}]}]; "rules" is optional and colors the cells of "columns" (every column when empty) in a row that passes every test: [{"where": [{"column": "Cost", "op": ">", "value": 50}], "columns": ["Cost"], "color": "red", "bold": true}]; "op" is =, !=, >, >=, <, <=, contains, empty or filled, a date is written "2026-11-21", and "color" is red, yellow, green, blue, purple or gray. "bots" is optional and is set by the person in the spreadsheet: keep it as it is. Use it for data to sort, filter and calculate with; a small table of text stays a Markdown table.'
 
 /** Spare rows and columns below and beside the data, so there is room to add to a sheet. */
 const SPARE_ROWS = 50
@@ -71,8 +81,13 @@ const titled = (title: string): string => title.trim().slice(0, 120) || 'Spreads
 
 const OPS: readonly ConditionOp[] = ['=', '!=', '>', '>=', '<', '<=', 'contains', 'empty', 'filled']
 export const RULE_COLORS: readonly RuleColor[] = ['red', 'yellow', 'green', 'blue', 'purple', 'gray']
+export const BOT_EVENTS: readonly BotEvent[] = ['added', 'changed', 'added or changed']
+const EVERY: readonly ScheduleEvery[] = ['hours', 'day', 'weekdays', 'week']
 const isOp = (value: unknown): value is ConditionOp => OPS.some((op) => op === value)
 const isColor = (value: unknown): value is RuleColor => RULE_COLORS.some((color) => color === value)
+const isEvent = (value: unknown): value is BotEvent => BOT_EVENTS.some((event) => event === value)
+const isEvery = (value: unknown): value is ScheduleEvery => EVERY.some((every) => every === value)
+const whole = (value: unknown, otherwise: number): number => (Number.isInteger(value) && typeof value === 'number' ? value : otherwise)
 const names = (value: unknown): string[] => (Array.isArray(value) ? value.flatMap((each) => (typeof each === 'string' && each.trim() ? [each.trim()] : [])) : [])
 
 function conditions(value: unknown): GridCondition[] {
@@ -85,8 +100,35 @@ function conditions(value: unknown): GridCondition[] {
   })
 }
 
-/** A sheet's slices with a name of their own, and its rules, from JSON anyone wrote. */
-function sheetParts(sheet: Record<string, unknown>): Pick<GridSheet, 'slices' | 'rules'> {
+/**
+ * A bot's schedule from JSON anyone wrote: a scheduled agent's cadence, with what it leaves out as a new one has it
+ * (`defaultCadence`); the server checks it when it keeps the bot to run.
+ */
+function schedule(value: unknown): AgentCadence | null {
+  if (!isRecord(value)) return null
+  const every = value["every"]
+  if (!isEvery(every)) return null
+  return { every, hours: whole(value["hours"], 24), time: text(value["time"]) || '08:00', weekday: whole(value["weekday"], 0), timezone: text(value["timezone"]) || 'UTC' }
+}
+
+/** A sheet's bots, each with a name of its own, something to do, and an event or a schedule. */
+function bots(value: unknown): GridBot[] {
+  const taken = new Set<string>()
+  return (Array.isArray(value) ? value : []).flatMap((bot): GridBot[] => {
+    if (!isRecord(bot)) return []
+    const name = (names([bot["name"]])[0] ?? '').slice(0, 60).trim()
+    const ask = text(bot["ask"]).trim().slice(0, 2000)
+    const when = schedule(bot["schedule"])
+    const on = bot["on"]
+    const [slice] = names([bot["slice"]])
+    if (!name || !ask || taken.has(name.toLowerCase()) || (!when && !isEvent(on))) return []
+    taken.add(name.toLowerCase())
+    return [{ name, ask, ...(when ? { schedule: when } : isEvent(on) ? { on } : {}), ...(slice ? { slice } : {}) }]
+  })
+}
+
+/** A sheet's slices with a name of their own, its rules and its bots, from JSON anyone wrote. */
+function sheetParts(sheet: Record<string, unknown>): Pick<GridSheet, 'slices' | 'rules' | 'bots'> {
   const taken = new Set<string>()
   const slices = (Array.isArray(sheet["slices"]) ? sheet["slices"] : []).flatMap((slice): GridSlice[] => {
     const name = isRecord(slice) ? (names([slice["name"]])[0] ?? '').slice(0, 60).trim() : ''
@@ -98,7 +140,8 @@ function sheetParts(sheet: Record<string, unknown>): Pick<GridSheet, 'slices' | 
     isRecord(rule) && isColor(rule["color"])
       ? [{ where: conditions(rule["where"]), columns: names(rule["columns"]), color: rule["color"], ...(rule["bold"] === true ? { bold: true } : {}) }]
       : []))
-  return { ...(slices.length > 0 ? { slices } : {}), ...(rules.length > 0 ? { rules } : {}) }
+  const kept = bots(sheet["bots"])
+  return { ...(slices.length > 0 ? { slices } : {}), ...(rules.length > 0 ? { rules } : {}), ...(kept.length > 0 ? { bots: kept } : {}) }
 }
 
 /**
@@ -143,7 +186,8 @@ export function gridMarkdown(grid: Grid): string {
     const formats = sheet.formats ? `, "formats": ${JSON.stringify(sheet.formats)}` : ''
     const slices = sheet.slices ? `, "slices": ${JSON.stringify(sheet.slices)}` : ''
     const rules = sheet.rules ? `, "rules": ${JSON.stringify(sheet.rules)}` : ''
-    return `    {"name": ${JSON.stringify(sheet.name)}${formats}${slices}${rules}, "rows": [\n${rows}\n    ]}`
+    const bots = sheet.bots ? `, "bots": ${JSON.stringify(sheet.bots)}` : ''
+    return `    {"name": ${JSON.stringify(sheet.name)}${formats}${slices}${rules}${bots}, "rows": [\n${rows}\n    ]}`
   }).join(',\n')
   return `\`\`\`${GRID_FENCE}\n{"title": ${JSON.stringify(grid.title)}, "sheets": [\n${sheets}\n]}\n\`\`\``
 }
@@ -222,13 +266,13 @@ export function readGrid(title: string, sheets: readonly SheetReading[]): { grid
   return { grid: { title: titled(title), sheets: read.map((item) => item.sheet) }, values: read.map((item) => item.values), display: read.map((item) => item.display) }
 }
 
-/** `grid` with the slices and rules each of its sheets, found by its name, has in `from`: a spreadsheet reads back only cells. */
+/** `grid` with the slices, rules and bots each of its sheets, found by its name, has in `from`: a spreadsheet reads back only cells. */
 export function withParts(grid: Grid, from: Grid): Grid {
   return {
     ...grid,
     sheets: grid.sheets.map((sheet) => {
       const kept = from.sheets.find((each) => each.name === sheet.name)
-      return { ...sheet, ...(kept?.slices ? { slices: kept.slices } : {}), ...(kept?.rules ? { rules: kept.rules } : {}) }
+      return { ...sheet, ...(kept?.slices ? { slices: kept.slices } : {}), ...(kept?.rules ? { rules: kept.rules } : {}), ...(kept?.bots ? { bots: kept.bots } : {}) }
     }),
   }
 }

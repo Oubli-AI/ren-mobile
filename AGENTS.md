@@ -269,6 +269,19 @@ What the overhaul added, on the branch `claude/project-thread-tnj6xo` (PR #14) a
     keeps its height when its area shrinks by 80 px or more, taking that for a keyboard, so its canvas ran past the
     area and drew over the views' bar. The area clips it (ren `6eba369`, on main `52b1060` by itself; ren PR #62
     carries it to main).
+  - **Bots** (2026-11-23, ren PR #62 at `5555c63`, `BotForm` in `GridFilters.tsx`, unmodified in `src/ren`): after
+    AppSheet's bots (https://support.google.com/appsheet/answer/11998993), a sheet keeps bots, each a name, what Ren
+    does with the rows, when it runs (rows added, changed, or added or changed; or a schedule, as a scheduled
+    specialist's) and optionally a slice, in the ```` ```grid ```` fence, which agents keep as it is. The sliders key
+    opens Slices, color rules and bots, with a form for each bot. They run on ren's server, for a signed-in account
+    (`core/grid_bots.py`): a person's save of a page starts each bot that the rows added or changed there meet, and a
+    scheduled bot is a row of `grid_bots` (ren's migration 025) that the scheduler's loop starts. A run is Ren in a
+    panel session of its own, with the rows as a table, and its report is the Context widget's notice (the `notice`
+    layout). Ren's own saves and guests start none. A run has no page tools, so it reports; a reply in its thread can
+    have Ren change the page. Checked (2026-11-23) in Chromium at phone size on the built pages against ren's
+    Projects code on loopback, light and dark: the section, a new bot on a slice and its errors, a scheduled bot and
+    a change of its schedule, a name clash, Back, the bots kept after Done and a reload, editing and deleting them.
+    Not yet on the server (migration 025 waits on the owner), on the emulator, or run with a model.
   - **In the APK:** the engine is a chunk of its own (1.75 MB compressed), loaded when a spreadsheet first calculates
     or opens. To stay under 20 MB, `vite.config.ts` leaves out what a phone never loads, 1.67 MB compressed: the
     hyphenation patterns of 77 languages, which Univer's layout loads for a cell laid out as a document whose text

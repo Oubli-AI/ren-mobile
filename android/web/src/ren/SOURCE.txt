@@ -1,6 +1,6 @@
-ren desktop's pages and components, unmodified: github.com/Oubli-AI/ren (was ImRonAI/TheBrowser) at 6eba369 (main
-52b1060 with the fix that keeps the open spreadsheet's sheet inside its area, which pull 62 carries; pull
-61, a spreadsheet's rows as a chart, a calendar, a map, a gallery and a dashboard, and its slices, color rules and
+ren desktop's pages and components, unmodified: github.com/Oubli-AI/ren (was ImRonAI/TheBrowser) at 5555c63 (pull
+62: a spreadsheet's bots, after AppSheet's, and the fix that keeps the open spreadsheet's sheet inside its area,
+on main 52b1060; pull 61, a spreadsheet's rows as a chart, a calendar, a map, a gallery and a dashboard, and its slices, color rules and
 search, after AppSheet; with pull 60, its
 rows as cards, a row and a form; with pull 56, spreadsheets in pages and
 Squad's DataGrid outcome; with pull 54, Squad's Web App, Website and Mobile App

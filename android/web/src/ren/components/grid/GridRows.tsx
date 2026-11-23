@@ -18,7 +18,7 @@ import {
   type CellTone, type ColumnType, type Grid, type GridCell, type GridColumn, type GridDisplaySheet, type GridSheet, type RowView,
 } from '@/lib/grid'
 import { cn } from '@/lib/utils'
-import { RuleForm, SheetFilters, SliceForm } from './GridFilters'
+import { BotForm, RuleForm, SheetFilters, SliceForm } from './GridFilters'
 import { BAR, Calendar, Charts, Gallery, ICON, Places, ROW_VIEWS, RowCard, STEP, toneClass, type SheetRows } from './GridViews'
 
 /** What an open spreadsheet holds: its grid, each cell's value and what each shows by sheet, and the sheet in view. */
@@ -29,11 +29,11 @@ type RowCells = readonly (GridCell | undefined)[]
 
 /**
  * What lies over the cards: a row, the form on a row (null for a new one) filled from a row (null for an empty form),
- * the sheet's slices and color rules, or the form on one of them (null for a new one).
+ * the sheet's slices, color rules and bots, or the form on one of them (null for a new one).
  */
 type Step =
   | { kind: 'row'; row: number } | { kind: 'form'; row: number | null; from: number | null }
-  | { kind: 'filters' } | { kind: 'slice' | 'rule'; index: number | null }
+  | { kind: 'filters' } | { kind: 'slice' | 'rule' | 'bot'; index: number | null }
 
 const NUMBER = /^-?\d+(?:\.\d+)?$/
 
@@ -107,6 +107,7 @@ export function GridRows({ value, view, editable, leave, onShow, onWrite, onShee
   const count = Math.max(0, written.length - 1)
   const slices = sheet?.slices ?? []
   const rules = sheet?.rules ?? []
+  const bots = sheet?.bots ?? []
   // The rows show in every view as the slice picked has them, and as a search finds them.
   const [picked, setPicked] = useState<string | null>(null)
   const slice = slices.find((each) => each.name === picked)
@@ -190,7 +191,7 @@ export function GridRows({ value, view, editable, leave, onShow, onWrite, onShee
         </button>
       )}
       {editable && columns.length > 0 && <>
-        <button type="button" aria-label="Slices and color rules" className={ICON} onClick={() => enter({ kind: 'filters' })}><SlidersHorizontal /></button>
+        <button type="button" aria-label="Slices, color rules and bots" className={ICON} onClick={() => enter({ kind: 'filters' })}><SlidersHorizontal /></button>
         <Button type="button" size="sm" className="ml-1 h-8 gap-1.5 rounded-full" onClick={() => enter({ kind: 'form', row: null, from: null })}><Plus />Add row</Button>
       </>}
     </div>
@@ -229,7 +230,7 @@ export function GridRows({ value, view, editable, leave, onShow, onWrite, onShee
     )}
     {step?.kind === 'filters' && sheet && (
       <SheetFilters sheet={sheet} columns={columns} onSlice={(index) => enter({ kind: 'slice', index })} onRule={(index) => enter({ kind: 'rule', index })}
-        onChange={onSheet} />
+        onBot={(index) => enter({ kind: 'bot', index })} onChange={onSheet} />
     )}
     {step?.kind === 'slice' && sheet && (
       <SliceForm columns={columns} slices={slices} index={step.index} onSave={(made) => {
@@ -244,6 +245,13 @@ export function GridRows({ value, view, editable, leave, onShow, onWrite, onShee
       <RuleForm columns={columns} rules={rules} index={step.index} onSave={(made) => {
         const old = step.index === null ? undefined : rules[step.index]
         onSheet({ ...sheet, rules: old ? rules.map((each) => (each === old ? made : each)) : [...rules, made] })
+        window.history.back()
+      }} />
+    )}
+    {step?.kind === 'bot' && sheet && (
+      <BotForm slices={slices} bots={bots} index={step.index} onSave={(made) => {
+        const old = step.index === null ? undefined : bots[step.index]
+        onSheet({ ...sheet, bots: old ? bots.map((each) => (each === old ? made : each)) : [...bots, made] })
         window.history.back()
       }} />
     )}
