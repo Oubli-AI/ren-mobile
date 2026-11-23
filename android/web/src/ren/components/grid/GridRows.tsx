@@ -6,17 +6,20 @@
  * https://support.google.com/appsheet/answer/10107706) and which input the form gives it.
  */
 import { useId, useMemo, useRef, useState, type FormEvent, type ReactNode, type RefObject } from 'react'
-import { ArrowLeft, ChevronLeft, ChevronRight, Copy, ExternalLink, Loader2, Mail, MapPin, MessageSquare, Pencil, Phone, Plus, Trash2 } from 'lucide-react'
+import {
+  ArrowLeft, ChevronLeft, ChevronRight, Copy, ExternalLink, Loader2, Mail, MapPin, MessageSquare, Pencil, Phone, Plus, Search, SlidersHorizontal, Trash2, X,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import {
-  gridColumns, isFormula, rowViews, temporalSerial, temporalText,
-  type ColumnType, type Grid, type GridCell, type GridColumn, type GridDisplaySheet, type RowView,
+  fold, gridColumns, isFormula, rowMatches, rowTones, rowViews, temporalSerial, temporalText,
+  type CellTone, type ColumnType, type Grid, type GridCell, type GridColumn, type GridDisplaySheet, type GridSheet, type RowView,
 } from '@/lib/grid'
 import { cn } from '@/lib/utils'
-import { Calendar, Charts, Gallery, ICON, Places, ROW_VIEWS, RowCard, type SheetRows } from './GridViews'
+import { RuleForm, SheetFilters, SliceForm } from './GridFilters'
+import { BAR, Calendar, Charts, Gallery, ICON, Places, ROW_VIEWS, RowCard, STEP, toneClass, type SheetRows } from './GridViews'
 
 /** What an open spreadsheet holds: its grid, each cell's value and what each shows by sheet, and the sheet in view. */
 export interface GridRowsValue { grid: Grid; values: GridCell[][][]; display: GridDisplaySheet[]; active: number }
@@ -24,8 +27,13 @@ export interface GridRowsValue { grid: Grid; values: GridCell[][][]; display: Gr
 /** A row's cells for `GridEngine.write`: undefined keeps what a cell holds. */
 type RowCells = readonly (GridCell | undefined)[]
 
-/** What lies over the cards: a row, or the form on a row (null for a new one) filled from a row (null for an empty form). */
-type Step = { kind: 'row'; row: number } | { kind: 'form'; row: number | null; from: number | null }
+/**
+ * What lies over the cards: a row, the form on a row (null for a new one) filled from a row (null for an empty form),
+ * the sheet's slices and color rules, or the form on one of them (null for a new one).
+ */
+type Step =
+  | { kind: 'row'; row: number } | { kind: 'form'; row: number | null; from: number | null }
+  | { kind: 'filters' } | { kind: 'slice' | 'rule'; index: number | null }
 
 const NUMBER = /^-?\d+(?:\.\d+)?$/
 
@@ -57,12 +65,9 @@ function entered(column: GridColumn, cell: GridCell | undefined): string | boole
   return column.type === 'date' || column.type === 'datetime' || column.type === 'time' ? temporalText(column.type, cell) : String(cell)
 }
 
-const BAR = 'flex h-12 shrink-0 items-center gap-1 border-b border-surface-200 px-2 dark:border-surface-800'
-const STEP = 'fixed inset-0 z-10 flex flex-col bg-surface-0 font-sans text-ink dark:bg-surface-900 dark:text-ink-inverse'
-
-/** The sheets of a spreadsheet as tabs. */
-export function SheetTabs({ names, active, onShow }: { names: readonly string[]; active: number; onShow: (sheet: number) => void }) {
-  return <div role="tablist" aria-label="Sheets" className="flex shrink-0 gap-1 overflow-x-auto border-b border-surface-200 px-2 py-1.5 scrollbar-none dark:border-surface-800">
+/** The sheets of a spreadsheet, or a sheet's slices, as tabs. */
+export function SheetTabs({ label, names, active, onShow }: { label: string; names: readonly string[]; active: number; onShow: (index: number) => void }) {
+  return <div role="tablist" aria-label={label} className="flex shrink-0 gap-1 overflow-x-auto border-b border-surface-200 px-2 py-1.5 scrollbar-none dark:border-surface-800">
     {names.map((name, index) => (
       <button key={name} type="button" role="tab" aria-selected={index === active} onClick={() => onShow(index)}
         className={cn('h-7 shrink-0 rounded-md px-2.5 text-[12px] font-medium transition-colors duration-150',
@@ -75,7 +80,7 @@ export function SheetTabs({ names, active, onShow }: { names: readonly string[];
   </div>
 }
 
-export function GridRows({ value, view, editable, leave, onShow, onWrite }: {
+export function GridRows({ value, view, editable, leave, onShow, onWrite, onSheet }: {
   value: GridRowsValue
   /** How the rows show. */
   view: RowView
@@ -87,6 +92,8 @@ export function GridRows({ value, view, editable, leave, onShow, onWrite }: {
   onShow: (sheet: number) => void
   /** Write a row of the sheet in view (`GridEngine.write`), and read the spreadsheet again. */
   onWrite: (row: number, cells: RowCells | null, fill?: boolean) => Promise<void>
+  /** Keep the sheet in view with other slices or color rules. */
+  onSheet: (sheet: GridSheet) => void
 }) {
   const sheet = value.grid.sheets[value.active]
   const written = sheet?.rows ?? []
@@ -98,6 +105,12 @@ export function GridRows({ value, view, editable, leave, onShow, onWrite }: {
   const image = columns.findIndex((column) => column.type === 'image')
   const summary = columns.flatMap((column, c) => (c === label || c === image || column.type === 'longtext' ? [] : [c])).slice(0, 3)
   const count = Math.max(0, written.length - 1)
+  const slices = sheet?.slices ?? []
+  const rules = sheet?.rules ?? []
+  // The rows show in every view as the slice picked has them, and as a search finds them.
+  const [picked, setPicked] = useState<string | null>(null)
+  const slice = slices.find((each) => each.name === picked)
+  const [search, setSearch] = useState<string | null>(null)
 
   // A row and the form are steps in the tab's history, as the open spreadsheet is, so Back leaves them first.
   const [steps, setSteps] = useState<Step[]>([])
@@ -121,10 +134,17 @@ export function GridRows({ value, view, editable, leave, onShow, onWrite }: {
     return columns[c]?.type !== 'yesno' ? cell : cell === 'TRUE' ? 'Yes' : cell === 'FALSE' ? 'No' : cell
   }
   const title = (r: number) => text(r, label) || `Row ${r}`
-  const sheetRows: SheetRows = {
-    columns, label, rows: written.slice(1).map((_, index) => index + 1), value: (r, c) => results?.[r]?.[c], text, title,
-    open: (row) => enter({ kind: 'row', row }),
-  }
+  const valueOf = (r: number) => (c: number) => results?.[r]?.[c]
+  const all = written.slice(1).map((_, index) => index + 1)
+  // A search is text-based, without case or accents, over every column, as AppSheet's (https://support.google.com/appsheet/answer/15299637).
+  const query = fold(search ?? '').trim()
+  const rows = all.filter((r) => (!slice || rowMatches(slice.where, columns, valueOf(r), (c) => text(r, c)))
+    && (!query || columns.some((_, c) => fold(text(r, c)).includes(query))))
+  const tones = new Map(rules.length > 0 ? all.map((r): [number, (CellTone | null)[]] => [r, rowTones(rules, columns, valueOf(r), (c) => text(r, c))]) : [])
+  const tone = (r: number, c: number) => toneClass(tones.get(r)?.[c] ?? null)
+  const sheetRows: SheetRows = { columns, label, rows, value: (r, c) => results?.[r]?.[c], text, title, tone, open: (row) => enter({ kind: 'row', row }) }
+  // A row turns to the one before or after it among those the view shows.
+  const order = (row: number) => (rows.includes(row) ? rows : all)
 
   const body = (each: RowView): ReactNode => {
     switch (each) {
@@ -132,8 +152,8 @@ export function GridRows({ value, view, editable, leave, onShow, onWrite }: {
         return <ul aria-label={sheet?.name} className="grid auto-rows-min gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {sheetRows.rows.map((r) => (
             <li key={r}>
-              <RowCard title={title(r)} picture={image < 0 ? undefined : text(r, image)} onOpen={() => enter({ kind: 'row', row: r })}
-                lines={summary.flatMap((c) => (text(r, c) ? [<><span className="text-muted-foreground">{columns[c]?.name}</span> {text(r, c)}</>] : []))} />
+              <RowCard title={title(r)} tone={tone(r, label)} picture={image < 0 ? undefined : text(r, image)} onOpen={() => enter({ kind: 'row', row: r })}
+                lines={summary.flatMap((c) => (text(r, c) ? [<><span className="text-muted-foreground">{columns[c]?.name}</span> <span className={tone(r, c)}>{text(r, c)}</span></>] : []))} />
             </li>
           ))}
         </ul>
@@ -158,19 +178,34 @@ export function GridRows({ value, view, editable, leave, onShow, onWrite }: {
   }
 
   return <>
-    {value.grid.sheets.length > 1 && <SheetTabs names={value.grid.sheets.map((each) => each.name)} active={value.active} onShow={onShow} />}
-    <div className="flex h-11 shrink-0 items-center justify-between gap-2 px-4">
-      <p className="truncate text-[12.5px] text-muted-foreground">{count} {count === 1 ? 'row' : 'rows'}</p>
-      {editable && columns.length > 0 && (
-        <Button type="button" size="sm" className="h-8 gap-1.5 rounded-full" onClick={() => enter({ kind: 'form', row: null, from: null })}><Plus />Add row</Button>
+    {value.grid.sheets.length > 1 && <SheetTabs label="Sheets" names={value.grid.sheets.map((each) => each.name)} active={value.active} onShow={onShow} />}
+    <div className="flex h-11 shrink-0 items-center gap-1 pl-4 pr-2">
+      {search === null
+        ? <p className="min-w-0 flex-1 truncate text-[12.5px] text-muted-foreground">{rows.length === count ? '' : `${rows.length} of `}{count} {count === 1 ? 'row' : 'rows'}</p>
+        : <input autoFocus aria-label="Search rows" placeholder="Search rows" value={search} onChange={(event) => setSearch(event.target.value)}
+            className="h-8 min-w-0 flex-1 rounded-full bg-surface-100 px-3 text-[13px] outline-none dark:bg-surface-800" />}
+      {count > 0 && (
+        <button type="button" aria-label={search === null ? 'Search rows' : 'Close the search'} className={ICON} onClick={() => setSearch(search === null ? '' : null)}>
+          {search === null ? <Search /> : <X />}
+        </button>
       )}
+      {editable && columns.length > 0 && <>
+        <button type="button" aria-label="Slices and color rules" className={ICON} onClick={() => enter({ kind: 'filters' })}><SlidersHorizontal /></button>
+        <Button type="button" size="sm" className="ml-1 h-8 gap-1.5 rounded-full" onClick={() => enter({ kind: 'form', row: null, from: null })}><Plus />Add row</Button>
+      </>}
     </div>
-    {count > 0
+    {slices.length > 0 && (
+      <SheetTabs label="Slices" names={['All', ...slices.map((each) => each.name)]} active={slice ? slices.indexOf(slice) + 1 : 0}
+        onShow={(index) => setPicked(slices[index - 1]?.name ?? null)} />
+    )}
+    {rows.length > 0
       ? <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">{body(view)}</div>
-      : <p className="min-h-0 flex-1 px-4 py-10 text-center text-[13px] text-muted-foreground">{columns.length > 0 ? 'This sheet has no rows yet.' : 'This sheet is empty.'}</p>}
+      : <p className="min-h-0 flex-1 px-4 py-10 text-center text-[13px] text-muted-foreground">
+        {count > 0 ? 'No rows match.' : columns.length > 0 ? 'This sheet has no rows yet.' : 'This sheet is empty.'}
+      </p>}
     {step?.kind === 'row' && (
       <Row key={step.row} columns={columns} title={title(step.row)} picture={image < 0 ? '' : text(step.row, image)} text={(c) => text(step.row, c)}
-        row={step.row} count={count} editable={editable} onTurn={(row) => turn({ kind: 'row', row })}
+        tone={(c) => tone(step.row, c)} order={order(step.row)} row={step.row} editable={editable} onTurn={(row) => turn({ kind: 'row', row })}
         onEdit={() => enter({ kind: 'form', row: step.row, from: step.row })}
         onCopy={() => enter({ kind: 'form', row: null, from: step.row })}
         onRemove={async () => {
@@ -192,23 +227,49 @@ export function GridRows({ value, view, editable, leave, onShow, onWrite }: {
           }
         }} />
     )}
+    {step?.kind === 'filters' && sheet && (
+      <SheetFilters sheet={sheet} columns={columns} onSlice={(index) => enter({ kind: 'slice', index })} onRule={(index) => enter({ kind: 'rule', index })}
+        onChange={onSheet} />
+    )}
+    {step?.kind === 'slice' && sheet && (
+      <SliceForm columns={columns} slices={slices} index={step.index} onSave={(made) => {
+        const old = step.index === null ? undefined : slices[step.index]
+        onSheet({ ...sheet, slices: old ? slices.map((each) => (each === old ? made : each)) : [...slices, made] })
+        // The rows show the slice just made, or keep showing the one just changed.
+        if (!old || picked === old.name) setPicked(made.name)
+        window.history.back()
+      }} />
+    )}
+    {step?.kind === 'rule' && sheet && (
+      <RuleForm columns={columns} rules={rules} index={step.index} onSave={(made) => {
+        const old = step.index === null ? undefined : rules[step.index]
+        onSheet({ ...sheet, rules: old ? rules.map((each) => (each === old ? made : each)) : [...rules, made] })
+        window.history.back()
+      }} />
+    )}
   </>
 }
 
 /** One row over the whole screen: every cell with what a tap on it starts, the rows before and after it, and what can be done to it. */
-function Row({ columns, title, picture, text, row, count, editable, onTurn, onEdit, onCopy, onRemove }: {
+function Row({ columns, title, picture, text, tone, order, row, editable, onTurn, onEdit, onCopy, onRemove }: {
   columns: readonly GridColumn[]
   title: string
   picture: string
   text: (column: number) => string
+  /** The classes a cell takes from the sheet's color rules. */
+  tone: (column: number) => string | undefined
+  /** The rows it turns through, in order. */
+  order: readonly number[]
   row: number
-  count: number
   editable: boolean
   onTurn: (row: number) => void
   onEdit: () => void
   onCopy: () => void
   onRemove: () => Promise<void>
 }) {
+  const at = order.indexOf(row)
+  const previous = at > 0 ? order[at - 1] : undefined
+  const next = order[at + 1]
   const [removing, setRemoving] = useState<'asked' | 'busy' | null>(null)
   const [error, setError] = useState('')
   const remove = () => {
@@ -223,9 +284,9 @@ function Row({ columns, title, picture, text, row, count, editable, onTurn, onEd
     <div className={BAR}>
       <button type="button" aria-label="Back" className={ICON} onClick={() => window.history.back()}><ArrowLeft /></button>
       <p className="min-w-0 flex-1 truncate text-sm font-semibold">{title}</p>
-      <p className="shrink-0 text-[12px] tabular-nums text-muted-foreground">{row} of {count}</p>
-      <button type="button" aria-label="Previous row" className={ICON} disabled={row <= 1} onClick={() => onTurn(row - 1)}><ChevronLeft /></button>
-      <button type="button" aria-label="Next row" className={ICON} disabled={row >= count} onClick={() => onTurn(row + 1)}><ChevronRight /></button>
+      <p className="shrink-0 text-[12px] tabular-nums text-muted-foreground">{at + 1} of {order.length}</p>
+      <button type="button" aria-label="Previous row" className={ICON} disabled={previous === undefined} onClick={() => previous !== undefined && onTurn(previous)}><ChevronLeft /></button>
+      <button type="button" aria-label="Next row" className={ICON} disabled={next === undefined} onClick={() => next !== undefined && onTurn(next)}><ChevronRight /></button>
     </div>
     <div className="min-h-0 flex-1 overflow-y-auto">
       {picture && <img src={picture} alt="" className="max-h-60 w-full object-cover" />}
@@ -235,7 +296,7 @@ function Row({ columns, title, picture, text, row, count, editable, onTurn, onEd
           return <div key={c} className="flex items-center gap-1 border-b border-surface-200 py-2 pl-4 pr-2 dark:border-surface-800">
             <div className="min-w-0 flex-1">
               <dt className="text-[12px] leading-5 text-muted-foreground">{column.name}</dt>
-              <dd className="min-h-5 whitespace-pre-wrap break-words text-[14px] leading-5">
+              <dd className={cn('min-h-5 whitespace-pre-wrap break-words text-[14px] leading-5', tone(c))}>
                 {column.type === 'enum' && shown
                   ? <span className="inline-block rounded-full bg-surface-100 px-2 text-[12.5px] font-medium dark:bg-surface-800">{shown}</span>
                   : shown}

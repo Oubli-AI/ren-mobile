@@ -14,7 +14,7 @@ import { EMBED_ALLOW, EMBED_SANDBOX } from '@/components/board/task-detail/edito
 import { ChartCard } from '@/components/projects/dashboard/ChartFrame'
 import { AXIS, VIZ_VARS, formatNumber, plural } from '@/components/projects/dashboard/viz'
 import { mapsEmbed } from '@/lib/editor-blocks'
-import { cellDay, type GridCell, type GridColumn, type RowView } from '@/lib/grid'
+import { cellDay, type CellTone, type GridCell, type GridColumn, type RowView, type RuleColor } from '@/lib/grid'
 import { cn } from '@/lib/utils'
 
 /** The rows of the sheet in view, as a view draws them. */
@@ -30,6 +30,8 @@ export interface SheetRows {
   text: (row: number, column: number) => string
   /** What a row is known by. */
   title: (row: number) => string
+  /** The classes a cell takes from the sheet's color rules. */
+  tone: (row: number, column: number) => string | undefined
   /** Open a row over the view. */
   open: (row: number) => void
 }
@@ -43,17 +45,35 @@ export const ROW_VIEWS: Record<RowView, { label: string; icon: LucideIcon }> = {
   dashboard: { label: 'Dashboard', icon: LayoutDashboard },
 }
 
+/** A color rule's color as text, in Light and Dark. */
+export const TONES: Record<RuleColor, string> = {
+  red: 'text-red-600 dark:text-red-400',
+  yellow: 'text-yellow-600 dark:text-yellow-400',
+  green: 'text-green-600 dark:text-green-400',
+  blue: 'text-blue-600 dark:text-blue-400',
+  purple: 'text-blurple-600 dark:text-blurple-400',
+  gray: 'text-ink-muted dark:text-ink-inverse-muted',
+}
+
+/** The classes the color rules give a cell. */
+export const toneClass = (tone: CellTone | null): string | undefined => (tone ? cn(TONES[tone.color], tone.bold && 'font-bold') : undefined)
+
+/** A step over the open spreadsheet (a row, a form) and its bar. */
+export const STEP = 'fixed inset-0 z-10 flex flex-col bg-surface-0 font-sans text-ink dark:bg-surface-900 dark:text-ink-inverse'
+export const BAR = 'flex h-12 shrink-0 items-center gap-1 border-b border-surface-200 px-2 dark:border-surface-800'
 export const CARD = 'rounded-xl border border-surface-200 bg-surface-0 transition-colors duration-150 hover:border-surface-300 dark:border-surface-800 dark:bg-surface-900 dark:hover:border-surface-700'
 export const ICON = 'flex size-9 shrink-0 items-center justify-center rounded-lg text-ink-secondary transition-colors duration-150 hover:bg-surface-100 hover:text-ink disabled:pointer-events-none disabled:opacity-40 dark:text-ink-inverse-secondary dark:hover:bg-surface-850 dark:hover:text-ink-inverse [&_svg]:size-4'
 const LINE = 'block truncate text-[12.5px] leading-5 text-ink-secondary dark:text-ink-inverse-secondary'
 const TITLE = 'block truncate text-[14px] font-semibold text-ink dark:text-ink-inverse'
 
-/** A row as a card: its picture, what it is known by and a few of its cells. A tap opens it. */
-export function RowCard({ title, picture, lines, onOpen }: { title: string; picture?: string | undefined; lines: readonly ReactNode[]; onOpen: () => void }) {
+/** A row as a card: its picture, what it is known by (in `tone`, from a color rule) and a few of its cells. A tap opens it. */
+export function RowCard({ title, tone, picture, lines, onOpen }: {
+  title: string; tone?: string | undefined; picture?: string | undefined; lines: readonly ReactNode[]; onOpen: () => void
+}) {
   return <button type="button" onClick={onOpen} className={cn(CARD, 'flex w-full items-center gap-3 p-3 text-left')}>
     {picture && <img src={picture} alt="" loading="lazy" className="size-12 shrink-0 rounded-lg object-cover" />}
     <span className="min-w-0 flex-1">
-      <span className={TITLE}>{title}</span>
+      <span className={cn(TITLE, tone)}>{title}</span>
       {lines.map((line, index) => <span key={index} className={LINE}>{line}</span>)}
     </span>
     <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
@@ -71,7 +91,7 @@ export function Gallery({ sheet }: { sheet: SheetRows }) {
           {picture
             ? <img src={picture} alt="" loading="lazy" className="aspect-square w-full object-cover" />
             : <span className="flex aspect-square w-full items-center justify-center bg-surface-100 text-muted-foreground dark:bg-surface-850"><ImageOff className="size-5" /></span>}
-          <span className={cn(TITLE, 'px-2.5 py-2 text-[13px]')}>{sheet.title(r)}</span>
+          <span className={cn(TITLE, 'px-2.5 py-2 text-[13px]', sheet.tone(r, sheet.label))}>{sheet.title(r)}</span>
         </button>
       </li>
     })}
@@ -135,7 +155,11 @@ export function Calendar({ sheet }: { sheet: SheetRows }) {
     </div>
     <p className="mt-3 px-1 text-[12.5px] font-medium text-muted-foreground">{dayName.format(Date.parse(picked))}</p>
     {rows.length > 0
-      ? <ul className="mt-2 space-y-2">{rows.map((r) => <li key={r}><RowCard title={sheet.title(r)} lines={[sheet.text(r, at)]} onOpen={() => sheet.open(r)} /></li>)}</ul>
+      ? <ul className="mt-2 space-y-2">
+        {rows.map((r) => <li key={r}>
+          <RowCard title={sheet.title(r)} tone={sheet.tone(r, sheet.label)} lines={[<span className={sheet.tone(r, at)}>{sheet.text(r, at)}</span>]} onOpen={() => sheet.open(r)} />
+        </li>)}
+      </ul>
       : <p className="px-1 py-3 text-[13px] text-muted-foreground">No rows on this day.</p>}
   </div>
 }
@@ -165,8 +189,8 @@ export function Places({ sheet }: { sheet: SheetRows }) {
               r === shown && 'border-blurple-600 hover:border-blurple-600 dark:border-blurple-400 dark:hover:border-blurple-400')}>
             <MapPin className={cn('size-4 shrink-0', r === shown ? 'text-blurple-600 dark:text-blurple-400' : 'text-muted-foreground')} />
             <span className="min-w-0 flex-1">
-              <span className={TITLE}>{sheet.title(r)}</span>
-              <span className={LINE}>{sheet.text(r, at)}</span>
+              <span className={cn(TITLE, sheet.tone(r, sheet.label))}>{sheet.title(r)}</span>
+              <span className={cn(LINE, sheet.tone(r, at))}>{sheet.text(r, at)}</span>
             </span>
           </button>
           <button type="button" aria-label={`Open ${sheet.title(r)}`} className={ICON} onClick={() => sheet.open(r)}><ChevronRight /></button>

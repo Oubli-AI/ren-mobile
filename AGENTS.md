@@ -256,6 +256,15 @@ What the overhaul added, on the branch `claude/project-thread-tnj6xo` (PR #14) a
     keyless embed, as an Embed tab's map: one place at a time, since nothing geocodes the rest), Gallery (the rows'
     pictures) and Dashboard (all of those in one scroll, where there are two or more). A tap opens the row; Back
     returns to the view. The tabs size to their labels, so seven fit a 360 dp screen.
+  - **Slices, color rules and search** (2026-11-23, `GridFilters.tsx`, unmodified in `src/ren`): after AppSheet's
+    slices and format rules, a sheet keeps named slices of its rows and color rules (a color, and bold, for chosen
+    columns of the rows that pass every test; where two color a cell, the later wins), which agents write in the
+    ```` ```grid ```` fence too. The slices are tabs above the rows and filter every view; the header's search filters
+    the rows by any cell's text, without case or accents; the sliders key opens Slices and color rules, with a form
+    for each, and Back leaves each step. A row's previous and next stay among the rows its view shows. Checked
+    (2026-11-23) in Chromium at phone size on the built pages against ren's Projects code on loopback, light and dark:
+    the tabs, the search, a new slice and color rule, a row turning within its slice, Back, a slice in the chart,
+    calendar, map and gallery, both still there after Done and a reload, and deleting them. Not on a phone yet.
   - **In the APK:** the engine is a chunk of its own (1.75 MB compressed), loaded when a spreadsheet first calculates
     or opens. To stay under 20 MB, `vite.config.ts` leaves out what a phone never loads, 1.67 MB compressed: the
     hyphenation patterns of 77 languages, which Univer's layout loads for a cell laid out as a document whose text

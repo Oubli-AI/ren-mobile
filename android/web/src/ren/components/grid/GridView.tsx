@@ -9,7 +9,7 @@ import type { IWorkbookData } from '@univerjs/core'
 import { Download, Loader2, Maximize2, Sheet } from 'lucide-react'
 import { BlockHeader } from '@/components/board/task-detail/editor/extensions/blocks/ui'
 import { Button } from '@/components/ui/button'
-import { gridColumns, gridDisplay, gridWorkbook, readGrid, rowViews, sheetCsv, type GridValue, type RowView } from '@/lib/grid'
+import { gridColumns, gridDisplay, gridWorkbook, readGrid, rowViews, sheetCsv, withParts, type Grid, type GridValue, type RowView } from '@/lib/grid'
 import { documentErrorMessage, exportGrid, saveExported, saveFile } from '@/lib/project-documents'
 import { cn } from '@/lib/utils'
 import { getProjectsState, projectsRequestFor } from '@/stores/projectsStore'
@@ -99,7 +99,7 @@ export function GridView({ value, editable, onChange, children }: {
       subtitle={`${sheets.length === 1 ? '' : `${sheets.length} sheets · `}${Math.max(0, rows.length - 1)} ${rows.length === 2 ? 'row' : 'rows'}`}>
       {children}
     </BlockHeader>
-    {sheets.length > 1 && <SheetTabs names={sheets.map((each) => each.name)} active={tab} onShow={setTab} />}
+    {sheets.length > 1 && <SheetTabs label="Sheets" names={sheets.map((each) => each.name)} active={tab} onShow={setTab} />}
     <div className="cursor-pointer overflow-x-auto scrollbar-thin" onClick={show}>
       {rows.length > 0
         ? (
@@ -129,11 +129,11 @@ export function GridView({ value, editable, onChange, children }: {
       </Button>
     </div>
     {open && (
-      <OpenGrid value={current} editable={editable} onClose={(reading, title) => {
+      <OpenGrid value={current} editable={editable} onClose={(reading, title, kept) => {
         setOpen(false)
         if (!reading) return
         const { grid, display } = readGrid(title, reading.sheets)
-        const next = { grid, display, workbook: reading.workbook }
+        const next = { grid: withParts(grid, kept), display, workbook: reading.workbook }
         setCurrent(next)
         changed.current?.(next, true)
       }} />
@@ -143,13 +143,13 @@ export function GridView({ value, editable, onChange, children }: {
 
 /**
  * The spreadsheet over the whole screen, under Univer's own menus (its z-indexes start at 1001): its rows as cards
- * over the sheet, or the sheet. Done and Back both close it; an editable one then answers what it holds and the
- * title it was given.
+ * over the sheet, or the sheet. Done and Back both close it; an editable one then answers what it holds, the title it
+ * was given and its sheets' slices and color rules.
  */
 function OpenGrid({ value, editable, onClose }: {
   value: GridValue
   editable: boolean
-  onClose: (reading: GridReading | null, title: string) => void
+  onClose: (reading: GridReading | null, title: string, kept: Grid) => void
 }) {
   const host = useRef<HTMLDivElement>(null)
   const engine = useRef<GridEngine | null>(null)
@@ -166,6 +166,8 @@ function OpenGrid({ value, editable, onClose }: {
   const rows = shown !== 'sheet'
   const tabs: readonly View[] = [...views, 'sheet']
   const leave = useRef<() => boolean>(() => false)
+  // What each sheet keeps beside its cells, which the spreadsheet doesn't hold: its slices and color rules.
+  const parts = useRef(value.grid)
 
   useEffect(() => {
     let closed = false
@@ -188,7 +190,8 @@ function OpenGrid({ value, editable, onClose }: {
   const read = async () => {
     const reading = await engine.current?.read()
     if (!reading) return
-    const next = { ...readGrid(title, reading.sheets), active: reading.active }
+    const { grid, values, display } = readGrid(title, reading.sheets)
+    const next = { grid: withParts(grid, parts.current), values, display, active: reading.active }
     const sheet = next.grid.sheets[next.active]
     setHeld(next)
     setViews(sheet ? rowViews(gridColumns(sheet, next.values[next.active])) : ['cards'])
@@ -206,9 +209,9 @@ function OpenGrid({ value, editable, onClose }: {
       // A row or the form over the cards closes first.
       if (leave.current()) return
       const opened = engine.current
-      if (!editable || !opened) return close.current(null, title)
+      if (!editable || !opened) return close.current(null, title, parts.current)
       setBusy('closing')
-      opened.read().then((reading) => close.current(reading, title), () => {
+      opened.read().then((reading) => close.current(reading, title, parts.current), () => {
         // What the spreadsheet holds is not in the page yet, so it stays open.
         window.history.pushState(null, '')
         setBusy(null)
@@ -278,6 +281,11 @@ function OpenGrid({ value, editable, onClose }: {
                 onWrite={async (row, cells, fill) => {
                   await engine.current?.write(held.active, row, cells, fill)
                   await read()
+                }}
+                onSheet={(sheet) => {
+                  const grid = { ...held.grid, sheets: held.grid.sheets.map((each, index) => (index === held.active ? sheet : each)) }
+                  parts.current = grid
+                  setHeld({ ...held, grid })
                 }} />
             )}
           </div>

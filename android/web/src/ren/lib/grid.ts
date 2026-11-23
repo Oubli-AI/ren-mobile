@@ -10,7 +10,19 @@
 import type { ICellData, IWorkbookData, IWorksheetData } from '@univerjs/core'
 
 export type GridCell = string | number | boolean | null
-export interface GridSheet { name: string; rows: GridCell[][]; formats?: Record<string, string> }
+/** How a condition tests a cell. */
+export type ConditionOp = '=' | '!=' | '>' | '>=' | '<' | '<=' | 'contains' | 'empty' | 'filled'
+/** A test on a row's cell in the column with that header: `value` as the cell keeps it, a date as "2026-11-21". */
+export interface GridCondition { column: string; op: ConditionOp; value?: string | number | boolean }
+/** A named part of a sheet's rows: those that pass every test (AppSheet's slice: https://support.google.com/appsheet/answer/10106592). */
+export interface GridSlice { name: string; where: GridCondition[] }
+export type RuleColor = 'red' | 'yellow' | 'green' | 'blue' | 'purple' | 'gray'
+/**
+ * The color, and bold, of the cells in `columns` (every column when it is empty) of a row that passes every test; a
+ * later rule's color wins (AppSheet's format rule: https://support.google.com/appsheet/answer/10106703).
+ */
+export interface GridRule { where: GridCondition[]; columns: string[]; color: RuleColor; bold?: boolean }
+export interface GridSheet { name: string; rows: GridCell[][]; formats?: Record<string, string>; slices?: GridSlice[]; rules?: GridRule[] }
 export interface Grid { title: string; sheets: GridSheet[] }
 
 /** What a grid shows, sheet by sheet: each cell as the spreadsheet displays it. */
@@ -31,7 +43,7 @@ export interface SheetReading { name: string; formulas: string[][]; values: unkn
 export const GRID_FENCE = 'grid'
 
 /** How agents are told to write a spreadsheet (`GRID_MARKDOWN` on the server, word for word). */
-export const GRID_RULE = 'A spreadsheet is one ```grid fence holding JSON: {"title": ..., "sheets": [{"name": ..., "rows": [[...], ...], "formats": {"B": "#,##0"}}]}. The first row of a sheet is its header; a cell is a number, true or false, text, or a formula as text starting with "=" in A1 notation ("=SUM(B2:B9)", "=Sheet2!B4*0.2"); "formats" is optional and gives a column\'s Excel number format by its letter. Use it for data to sort, filter and calculate with; a small table of text stays a Markdown table.'
+export const GRID_RULE = 'A spreadsheet is one ```grid fence holding JSON: {"title": ..., "sheets": [{"name": ..., "rows": [[...], ...], "formats": {"B": "#,##0"}}]}. The first row of a sheet is its header; a cell is a number, true or false, text, or a formula as text starting with "=" in A1 notation ("=SUM(B2:B9)", "=Sheet2!B4*0.2"); "formats" is optional and gives a column\'s Excel number format by its letter. "slices" is optional and names parts of the rows, each the rows that pass every test: [{"name": "Shows", "where": [{"column": "Kind", "op": "=", "value": "Show"}]}]; "rules" is optional and colors the cells of "columns" (every column when empty) in a row that passes every test: [{"where": [{"column": "Cost", "op": ">", "value": 50}], "columns": ["Cost"], "color": "red", "bold": true}]; "op" is =, !=, >, >=, <, <=, contains, empty or filled, a date is written "2026-11-21", and "color" is red, yellow, green, blue, purple or gray. Use it for data to sort, filter and calculate with; a small table of text stays a Markdown table.'
 
 /** Spare rows and columns below and beside the data, so there is room to add to a sheet. */
 const SPARE_ROWS = 50
@@ -57,6 +69,38 @@ function cell(value: unknown): GridCell {
 
 const titled = (title: string): string => title.trim().slice(0, 120) || 'Spreadsheet'
 
+const OPS: readonly ConditionOp[] = ['=', '!=', '>', '>=', '<', '<=', 'contains', 'empty', 'filled']
+export const RULE_COLORS: readonly RuleColor[] = ['red', 'yellow', 'green', 'blue', 'purple', 'gray']
+const isOp = (value: unknown): value is ConditionOp => OPS.some((op) => op === value)
+const isColor = (value: unknown): value is RuleColor => RULE_COLORS.some((color) => color === value)
+const names = (value: unknown): string[] => (Array.isArray(value) ? value.flatMap((each) => (typeof each === 'string' && each.trim() ? [each.trim()] : [])) : [])
+
+function conditions(value: unknown): GridCondition[] {
+  if (!Array.isArray(value)) return []
+  return value.flatMap((each): GridCondition[] => {
+    if (!isRecord(each) || !isOp(each["op"])) return []
+    const [column] = names([each["column"]])
+    const tested = cell(each["value"])
+    return column ? [{ column, op: each["op"], ...(tested === null ? {} : { value: tested }) }] : []
+  })
+}
+
+/** A sheet's slices with a name of their own, and its rules, from JSON anyone wrote. */
+function sheetParts(sheet: Record<string, unknown>): Pick<GridSheet, 'slices' | 'rules'> {
+  const taken = new Set<string>()
+  const slices = (Array.isArray(sheet["slices"]) ? sheet["slices"] : []).flatMap((slice): GridSlice[] => {
+    const name = isRecord(slice) ? (names([slice["name"]])[0] ?? '').slice(0, 60).trim() : ''
+    if (!isRecord(slice) || !name || taken.has(name.toLowerCase())) return []
+    taken.add(name.toLowerCase())
+    return [{ name, where: conditions(slice["where"]) }]
+  })
+  const rules = (Array.isArray(sheet["rules"]) ? sheet["rules"] : []).flatMap((rule): GridRule[] => (
+    isRecord(rule) && isColor(rule["color"])
+      ? [{ where: conditions(rule["where"]), columns: names(rule["columns"]), color: rule["color"], ...(rule["bold"] === true ? { bold: true } : {}) }]
+      : []))
+  return { ...(slices.length > 0 ? { slices } : {}), ...(rules.length > 0 ? { rules } : {}) }
+}
+
 /**
  * A grid from JSON anyone wrote: every sheet with a name of its own that Excel accepts and rows of plain cells; null
  * when it holds no sheet.
@@ -77,6 +121,7 @@ export function normalizeGrid(value: unknown): Grid | null {
       name,
       rows: Array.isArray(sheet["rows"]) ? sheet["rows"].filter(Array.isArray).map((row: unknown[]) => row.map(cell)) : [],
       ...(Object.keys(formats).length > 0 ? { formats } : {}),
+      ...sheetParts(sheet),
     })
   }
   return sheets.length > 0 ? { title: titled(text(value["title"])), sheets } : null
@@ -96,7 +141,9 @@ export function gridMarkdown(grid: Grid): string {
   const sheets = grid.sheets.map((sheet) => {
     const rows = sheet.rows.map((row) => `      ${JSON.stringify(row)}`).join(',\n')
     const formats = sheet.formats ? `, "formats": ${JSON.stringify(sheet.formats)}` : ''
-    return `    {"name": ${JSON.stringify(sheet.name)}${formats}, "rows": [\n${rows}\n    ]}`
+    const slices = sheet.slices ? `, "slices": ${JSON.stringify(sheet.slices)}` : ''
+    const rules = sheet.rules ? `, "rules": ${JSON.stringify(sheet.rules)}` : ''
+    return `    {"name": ${JSON.stringify(sheet.name)}${formats}${slices}${rules}, "rows": [\n${rows}\n    ]}`
   }).join(',\n')
   return `\`\`\`${GRID_FENCE}\n{"title": ${JSON.stringify(grid.title)}, "sheets": [\n${sheets}\n]}\n\`\`\``
 }
@@ -173,6 +220,17 @@ export function readGrid(title: string, sheets: readonly SheetReading[]): { grid
     }
   })
   return { grid: { title: titled(title), sheets: read.map((item) => item.sheet) }, values: read.map((item) => item.values), display: read.map((item) => item.display) }
+}
+
+/** `grid` with the slices and rules each of its sheets, found by its name, has in `from`: a spreadsheet reads back only cells. */
+export function withParts(grid: Grid, from: Grid): Grid {
+  return {
+    ...grid,
+    sheets: grid.sheets.map((sheet) => {
+      const kept = from.sheets.find((each) => each.name === sheet.name)
+      return { ...sheet, ...(kept?.slices ? { slices: kept.slices } : {}), ...(kept?.rules ? { rules: kept.rules } : {}) }
+    }),
+  }
 }
 
 const isDisplay = (value: unknown): value is GridDisplaySheet[] => Array.isArray(value) && value.every((sheet) =>
@@ -296,6 +354,69 @@ export function cellDay(cell: GridCell | undefined): string | null {
   if (typeof cell !== 'number') return null
   const date = new Date(Math.round((cell - EPOCH) * DAY))
   return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10)
+}
+
+/** Text as a search compares it: without case or accents. */
+export const fold = (text: string): string => text.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
+
+const NUMERIC = /^-?\d+(?:\.\d+)?$/
+
+/** How a cell compares with a value a test gives: below 0 when it is less, 0 when they are the same. */
+function compare(type: ColumnType, held: GridCell, tested: string | number | boolean, shown: string): number {
+  if (type === 'date' || type === 'datetime') {
+    return (cellDay(held) ?? '').localeCompare(typeof tested === 'number' ? cellDay(tested) ?? '' : String(tested).slice(0, 10))
+  }
+  const number = typeof tested === 'number' ? tested : NUMERIC.test(String(tested).trim()) ? Number(tested) : null
+  if (typeof held === 'number' && number !== null) return held - number
+  if (type === 'yesno') return Number(held === true) - Number(tested === true || /^(?:yes|true)$/i.test(String(tested)))
+  return fold(shown).localeCompare(fold(String(tested)))
+}
+
+/**
+ * Whether a row passes every test: `value` gives its cell in a column (a formula's result) and `shown` what the cell
+ * shows. A test names its column by its header; a date is compared by its day, and text without case or accents.
+ */
+export function rowMatches(
+  where: readonly GridCondition[], columns: readonly GridColumn[], value: (column: number) => GridCell | undefined, shown: (column: number) => string,
+): boolean {
+  return where.every(({ column, op, value: tested }) => {
+    const c = columns.findIndex((each) => fold(each.name) === fold(column))
+    const type = columns[c]?.type
+    if (!type) return false
+    const held = value(c) ?? null
+    const empty = held === null || held === ''
+    if (op === 'empty' || op === 'filled') return empty === (op === 'empty')
+    // An empty cell is no value at all, so it is only ever not the one tested.
+    if (empty || tested === undefined) return op === '!='
+    if (op === 'contains') return fold(shown(c)).includes(fold(String(tested)))
+    const order = compare(type, held, tested, shown(c))
+    switch (op) {
+      case '=': return order === 0
+      case '!=': return order !== 0
+      case '>': return order > 0
+      case '>=': return order >= 0
+      case '<': return order < 0
+      case '<=': return order <= 0
+    }
+  })
+}
+
+/** How a rule shows a cell. */
+export interface CellTone { color: RuleColor; bold: boolean }
+
+/** How each of a row's cells shows, by column, from the rules the row passes: a later rule's color wins, and any can make it bold. */
+export function rowTones(
+  rules: readonly GridRule[], columns: readonly GridColumn[], value: (column: number) => GridCell | undefined, shown: (column: number) => string,
+): (CellTone | null)[] {
+  const tones: (CellTone | null)[] = columns.map(() => null)
+  for (const rule of rules) {
+    if (!rowMatches(rule.where, columns, value, shown)) continue
+    const formatted = rule.columns.map(fold)
+    columns.forEach((column, c) => {
+      if (formatted.length === 0 || formatted.includes(fold(column.name))) tones[c] = { color: rule.color, bold: !!rule.bold || !!tones[c]?.bold }
+    })
+  }
+  return tones
 }
 
 /** A date, a time or both as a spreadsheet keeps one, in days with a time as a part of a day, from what an input gives ("2026-11-21", "09:30", "2026-11-21T09:30"). */

@@ -1,5 +1,6 @@
-ren desktop's pages and components, unmodified: github.com/Oubli-AI/ren (was ImRonAI/TheBrowser) at 1b92739 (pull
-61, a spreadsheet's rows as a chart, a calendar, a map, a gallery and a dashboard, after AppSheet; with pull 60, its
+ren desktop's pages and components, unmodified: github.com/Oubli-AI/ren (was ImRonAI/TheBrowser) at 52b1060 (pull
+61, a spreadsheet's rows as a chart, a calendar, a map, a gallery and a dashboard, and its slices, color rules and
+search, after AppSheet; with pull 60, its
 rows as cards, a row and a form; with pull 56, spreadsheets in pages and
 Squad's DataGrid outcome; with pull 54, Squad's Web App, Website and Mobile App
 outcomes and the app a run built on its page; with pull 48, Squad:
