@@ -35,7 +35,10 @@ What the overhaul added, on the branch `claude/project-thread-tnj6xo` (PR #14) a
   `browser/SitePermissionsManager.kt`, `browser/BrowserHistory.kt`, `browser/Omnibox.kt`,
   `browser/RenCustomTabsService.kt`, `ui/BrowserScreen.kt`, `ui/BrowserSheets.kt`, `ui/BrowserHome.kt`): the app
   opens on it. Tabs are real WebViews, made on a tab's first navigation, with normal and private (WebView multi-profile)
-  tabs, saved tab state, recently-closed tab reopen, desktop-site mode, find in page, pull-to-refresh, context menus,
+  tabs, saved tab state, recently-closed tab reopen, desktop-site mode, find in page, pull-to-refresh (a pull that starts
+  at the page's top reloads once the page reports being pulled past it, Chromium's root overscroll that Chrome's own
+  pull-to-refresh starts from, so a pull inside a box that scrolls on its own, as ren's pages and an open spreadsheet
+  do, scrolls the box; never while a page shows a full-screen dialog; `TabWebView`, 2026-11-23), context menus,
   print/PDF, downloads (including `blob:`/`data:`), uploads, fullscreen video, HTTP auth and JS dialogs, inline page
   error and TLS warning cards, and Custom Tabs. Tabs send WebView's user agent without its `; wv` and `Version/4.0`
   tokens (`Browser.browserUserAgent`, 2026-11-20), as DuckDuckGo's browser does, since Google refuses sign-in in an
@@ -63,7 +66,9 @@ What the overhaul added, on the branch `claude/project-thread-tnj6xo` (PR #14) a
   `MainContent` draws for the addresses its tab store opens (`ron://projects`, `ron://project/<key>`,
   `ron://documents`), all unmodified in `src/ren`, and `DeepResearchPage` for Research. Every model picker reads Model Provider, Model, Reasoning Effort, Research Depth (owner, 2026-11-20): ren's `ModelSelector` (the agent panel, `ren://agent`, Research, Vibe's agent, issue chats) gets the phone's popover (`src/destinations/picker.tsx`, by a Vite alias for that importer alone), which adds the depth row the shell provides from ren's Deep Research store (`research-depth.tsx`), and `page.css` hides Research's own depth control; Settings › Agents ends with Research depth, the search level Home's chips set (`Settings.searchLevel`). `src/destinations/` mounts
   them under a switcher (ren desktop's `navigation/destinations.ts`: Home and the seven destinations); Home's switcher
-  scrolls to the same seven. A story opens in ren
+  scrolls to the same seven. The page scrolls in the area under the switcher, as ren desktop's `BrowserLayout` scrolls a
+  tab's content, since ren's `index.css` keeps the body from scrolling (2026-11-23: until then a finger couldn't scroll
+  the Documents list or a document, seen on the emulator). A story opens in ren
   desktop's article reader (`ArticleReaderPage`, `ron://read`) in the same tab, and Back returns. Projects work
   as ren's guest workspace (`X-Ron-Workspace`, kept in SQLite on the VM) or signed in with Supabase (email and
   password, or ren's Google and GitHub buttons: the provider's page opens in a Custom Tab of another browser, since
@@ -243,6 +248,14 @@ What the overhaul added, on the branch `claude/project-thread-tnj6xo` (PR #14) a
     the tab in front has one open (`Browser.modal`, `ContextOverlay`). The grey rail at the screen's right edge on the
     emulator is Android's accessibility button (the floating menu for the App operator), which the phone's own
     accessibility settings place, not the app.
+  - **The other views** (2026-11-23, ren PR #61, `GridViews.tsx`, unmodified in `src/ren`): beside Cards and Sheet,
+    the spreadsheet's bottom bar offers each of AppSheet's views the sheet in view has the data for: Chart (a bar
+    chart of each column of choices, rows per choice, and of numbers, each row's highest first, with its table one
+    tap away), Calendar (a month with the rows on each day, by the first column of dates, and the day's rows), Map
+    (the rows with a place, by the first column of addresses or coordinates, and the one picked on Google Maps'
+    keyless embed, as an Embed tab's map: one place at a time, since nothing geocodes the rest), Gallery (the rows'
+    pictures) and Dashboard (all of those in one scroll, where there are two or more). A tap opens the row; Back
+    returns to the view. The tabs size to their labels, so seven fit a 360 dp screen.
   - **In the APK:** the engine is a chunk of its own (1.75 MB compressed), loaded when a spreadsheet first calculates
     or opens. To stay under 20 MB, `vite.config.ts` leaves out what a phone never loads, 1.67 MB compressed: the
     hyphenation patterns of 77 languages, which Univer's layout loads for a cell laid out as a document whose text

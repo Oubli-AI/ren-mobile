@@ -268,7 +268,7 @@ public class Browser internal constructor(
     public var fileChooser: ((ValueCallback<Array<Uri>>, WebChromeClient.FileChooserParams) -> Boolean)? = null
 
     /** Access-ordered live WebViews so oldest background views evict first above [MAX_LIVE_WEBVIEWS]. */
-    private val views: LinkedHashMap<String, WebView> = LinkedHashMap(16, 0.75f, true)
+    private val views: LinkedHashMap<String, TabWebView> = LinkedHashMap(16, 0.75f, true)
     private val defaultUserAgents: HashMap<String, String> = HashMap()
     private val httpAllowedHosts: HashSet<String> = HashSet()
     private val httpsUpgradedUrls: HashMap<String, String> = HashMap()
@@ -791,6 +791,12 @@ public class Browser internal constructor(
         return views[tab.id]?.scrollY ?: 0
     }
 
+    /** How many times the active tab's page has been pulled past its top (see [TabWebView]), or `0` on Home. */
+    internal fun currentTabTopPulls(): Int {
+        val tab = _state.value.current?.takeUnless { it.home } ?: return 0
+        return views[tab.id]?.topPulls ?: 0
+    }
+
     /** Re-applies dynamic WebView and DNS preferences (such as algorithmic darkening and DoH) across live tabs. */
     internal fun applyWebPreferences() {
         val currentSettings = browserSettings
@@ -988,7 +994,7 @@ public class Browser internal constructor(
         }
     }
 
-    private fun view(id: String): WebView {
+    private fun view(id: String): TabWebView {
         val existing = views[id]
         if (existing != null) return existing
         val created = create(id)
@@ -1127,8 +1133,8 @@ public class Browser internal constructor(
     }
 
     @SuppressLint("SetJavaScriptEnabled")
-    private fun create(id: String): WebView {
-        val webView = WebView(MutableContextWrapper(context))
+    private fun create(id: String): TabWebView {
+        val webView = TabWebView(MutableContextWrapper(context))
         val incognitoTab = isIncognito(id)
         if (incognitoTab && WebViewFeature.isFeatureSupported(WebViewFeature.MULTI_PROFILE)) {
             val _ = runCatching {
@@ -1837,6 +1843,23 @@ public class Browser internal constructor(
             }
             return ParsedDataUri(mime = mime, bytes = bytes)
         }
+    }
+}
+
+/**
+ * A tab's WebView, counting the pulls past the top of its page. Chromium reports an overscroll only when the page's
+ * root scroller is the one a gesture scrolls and it can't take the scroll (cc's `did_overscroll_root`, which reaches
+ * `View.overScrollBy` through `AwContents.didOverscroll`), so a pull inside a box that scrolls on its own (ren's pages
+ * scroll that way) or on a map that takes the touch isn't one. Chrome starts its pull-to-refresh from the same report
+ * (`OverscrollRefresh::OnOverscrolled`).
+ */
+private class TabWebView(context: Context) : WebView(context) {
+    var topPulls: Int = 0
+        private set
+
+    override fun onOverScrolled(scrollX: Int, scrollY: Int, clampedX: Boolean, clampedY: Boolean) {
+        super.onOverScrolled(scrollX, scrollY, clampedX, clampedY)
+        if (clampedY && scrollY == 0) topPulls++
     }
 }
 

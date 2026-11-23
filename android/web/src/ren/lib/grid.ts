@@ -268,9 +268,35 @@ export function gridColumns(sheet: GridSheet, values?: readonly (readonly GridCe
   })
 }
 
+/** How an open spreadsheet's rows show, after AppSheet's views (https://support.google.com/appsheet/answer/10106772). */
+export type RowView = 'cards' | 'gallery' | 'calendar' | 'map' | 'chart' | 'dashboard'
+
+/** A view of its own for a sheet with a column of one of these types. */
+const VIEW_COLUMNS: readonly (readonly [RowView, readonly ColumnType[]])[] = [
+  ['chart', ['enum', 'number', 'price', 'percent']],
+  ['calendar', ['date', 'datetime']],
+  ['map', ['address', 'latlong']],
+  ['gallery', ['image']],
+]
+
+/** The views a sheet's columns give it: always its cards; a chart, a calendar, a map and a gallery where it has the data for one; a dashboard of them when it has two or more. */
+export function rowViews(columns: readonly GridColumn[]): RowView[] {
+  const parts = VIEW_COLUMNS.flatMap(([view, types]) => (columns.some((column) => types.includes(column.type)) ? [view] : []))
+  const views: RowView[] = ['cards', ...parts]
+  return parts.length > 1 ? [...views, 'dashboard'] : views
+}
+
 const DAY = 86_400_000
 /** 1970-01-01 as a spreadsheet counts days, from 1899-12-30. */
 const EPOCH = 25_569
+
+/** The day a date, or a date and time, falls on ("2026-11-21"), from a cell a spreadsheet keeps as a number or as text; null when it is neither. */
+export function cellDay(cell: GridCell | undefined): string | null {
+  if (typeof cell === 'string') return /^\d{4}-\d{2}-\d{2}/.test(cell) ? cell.slice(0, 10) : null
+  if (typeof cell !== 'number') return null
+  const date = new Date(Math.round((cell - EPOCH) * DAY))
+  return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10)
+}
 
 /** A date, a time or both as a spreadsheet keeps one, in days with a time as a part of a day, from what an input gives ("2026-11-21", "09:30", "2026-11-21T09:30"). */
 export function temporalSerial(type: 'date' | 'datetime' | 'time', text: string): number | null {
