@@ -147,7 +147,7 @@ public enum class Page { Activity, Settings }
 
 /**
  * The browser: the toolbar with the address bar and Ask Ren, the active tab (Ren's home page or a web page, or two tabs
- * in split view), and the bottom bar with back, forward, search, the tabs and the menu. The bottom bar steps aside while the keyboard is up.
+ * in split view), and the bottom bar with back, forward, search, the tabs and the menu. The keyboard rises over the bottom bar.
  * Each new [searchRequests] (the search widget) puts the address bar in editing, with the keyboard up.
  */
 @Composable
