@@ -267,8 +267,10 @@ function OpenGrid({ value, editable, onClose }: {
           {busy === 'closing' ? <Loader2 className="animate-spin" /> : null}{editable ? 'Done' : 'Close'}
         </Button>
       </div>
-      <div className="relative min-h-0 flex-1">
-        {/* Univer layers its toolbar, canvas and floating keys by z-index; isolated, they stay under the cards. */}
+      <div className="relative min-h-0 flex-1 overflow-hidden">
+        {/* Univer layers its toolbar, canvas and floating keys by z-index; isolated, they stay under the cards. Its
+            phone layout keeps its height when the area shrinks by a keyboard's (MobileWorkbench), so the area clips it
+            and the views' bar below stays clear. */}
         <div ref={host} inert={rows} className="absolute inset-0 isolate" />
         {rows && (
           <div className="absolute inset-0 flex flex-col bg-surface-0 dark:bg-surface-900">

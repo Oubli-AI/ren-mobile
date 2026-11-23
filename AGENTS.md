@@ -264,7 +264,11 @@ What the overhaul added, on the branch `claude/project-thread-tnj6xo` (PR #14) a
     for each, and Back leaves each step. A row's previous and next stay among the rows its view shows. Checked
     (2026-11-23) in Chromium at phone size on the built pages against ren's Projects code on loopback, light and dark:
     the tabs, the search, a new slice and color rule, a row turning within its slice, Back, a slice in the chart,
-    calendar, map and gallery, both still there after Done and a reload, and deleting them. Not on a phone yet.
+    calendar, map and gallery, both still there after Done and a reload, and deleting them. On the emulator
+    (2026-11-23) all of it passed but the search with the keyboard up: Univer's phone layout (`MobileWorkbench`)
+    keeps its height when its area shrinks by 80 px or more, taking that for a keyboard, so its canvas ran past the
+    area and drew over the views' bar. The area clips it (ren `6eba369`, on main `52b1060` by itself; ren PR #62
+    carries it to main).
   - **In the APK:** the engine is a chunk of its own (1.75 MB compressed), loaded when a spreadsheet first calculates
     or opens. To stay under 20 MB, `vite.config.ts` leaves out what a phone never loads, 1.67 MB compressed: the
     hyphenation patterns of 77 languages, which Univer's layout loads for a cell laid out as a document whose text
